@@ -31,8 +31,8 @@ const Navbar = () => {
                 {item.label}
               </a>
             ))}
-            <Button variant="outline" size="sm">
-              Book Now
+            <Button variant="outline" size="sm" asChild>
+              <a href="#booking">Book Now</a>
             </Button>
           </div>
 
@@ -59,8 +59,8 @@ const Navbar = () => {
                   {item.label}
                 </a>
               ))}
-              <Button variant="outline" size="sm" className="w-fit">
-                Book Now
+              <Button variant="outline" size="sm" className="w-fit" asChild>
+                <a href="#booking">Book Now</a>
               </Button>
             </div>
           </div>
