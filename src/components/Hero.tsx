@@ -40,9 +40,9 @@ const Hero = () => {
             <Button
               variant="hero"
               size="xl"
-              onClick={() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" })}
+              onClick={() => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" })}
             >
-              Book Now
+              Book a Cleaning
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
             <Button

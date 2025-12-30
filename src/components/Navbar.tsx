@@ -6,8 +6,12 @@ const navItems = [
   { label: "Services", href: "#services" },
   { label: "Shop", href: "#shop" },
   { label: "About", href: "#about" },
-  { label: "Contact", href: "#contact" },
+  { label: "Contact", href: "#booking" },
 ];
+
+const scrollToBooking = () => {
+  document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" });
+};
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -31,7 +35,7 @@ const Navbar = () => {
                 {item.label}
               </a>
             ))}
-            <Button variant="outline" size="sm">
+            <Button variant="hero" size="sm" onClick={scrollToBooking}>
               Book Now
             </Button>
           </div>
@@ -59,7 +63,15 @@ const Navbar = () => {
                   {item.label}
                 </a>
               ))}
-              <Button variant="outline" size="sm" className="w-fit">
+              <Button
+                variant="hero"
+                size="sm"
+                className="w-fit"
+                onClick={() => {
+                  setIsOpen(false);
+                  scrollToBooking();
+                }}
+              >
                 Book Now
               </Button>
             </div>
