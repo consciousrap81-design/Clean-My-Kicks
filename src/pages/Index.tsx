@@ -5,11 +5,10 @@ import Shop from "@/components/Shop";
 import About from "@/components/About";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
-import MobileBottomBar from "@/components/MobileBottomBar";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <Hero />
       <Services />
@@ -17,7 +16,6 @@ const Index = () => {
       <About />
       <Contact />
       <Footer />
-      <MobileBottomBar />
     </div>
   );
 };

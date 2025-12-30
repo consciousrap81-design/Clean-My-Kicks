@@ -37,14 +37,12 @@ const Hero = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 animate-fade-up" style={{ animationDelay: "0.3s" }}>
-            <Button variant="hero" size="xl" asChild>
-              <a href="#booking">
-                Book a Cleaning
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </a>
+            <Button variant="hero" size="xl">
+              Get Started
+              <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
-            <Button variant="outline" size="xl" asChild>
-              <a href="#services">View Services</a>
+            <Button variant="outline" size="xl">
+              View Services
             </Button>
           </div>
 
