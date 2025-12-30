@@ -4,23 +4,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Mail, MapPin, Phone, Send } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-
 const Contact = () => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     service: "",
-    message: "",
+    message: ""
   });
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     toast.success("Message sent! We'll get back to you soon.");
-    setFormData({ name: "", email: "", service: "", message: "" });
+    setFormData({
+      name: "",
+      email: "",
+      service: "",
+      message: ""
+    });
   };
-
-  return (
-    <section id="contact" className="py-20 md:py-32 bg-secondary/30">
+  return <section id="contact" className="py-20 md:py-32 bg-secondary/30">
       <div className="container px-4">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20">
           {/* Info */}
@@ -51,7 +52,7 @@ const Contact = () => {
                 </div>
                 <div>
                   <p className="font-body text-sm text-muted-foreground">Phone</p>
-                  <p className="font-body text-foreground">(555) 123-4567</p>
+                  <p className="font-body text-foreground">(940) 281-4277</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -73,26 +74,19 @@ const Contact = () => {
                 <label className="font-body text-sm text-muted-foreground uppercase tracking-wider block mb-2">
                   Name
                 </label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Your name"
-                  required
-                  className="bg-card border-border focus:border-primary"
-                />
+                <Input value={formData.name} onChange={e => setFormData({
+                ...formData,
+                name: e.target.value
+              })} placeholder="Your name" required className="bg-card border-border focus:border-primary" />
               </div>
               <div>
                 <label className="font-body text-sm text-muted-foreground uppercase tracking-wider block mb-2">
                   Email
                 </label>
-                <Input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="your@email.com"
-                  required
-                  className="bg-card border-border focus:border-primary"
-                />
+                <Input type="email" value={formData.email} onChange={e => setFormData({
+                ...formData,
+                email: e.target.value
+              })} placeholder="your@email.com" required className="bg-card border-border focus:border-primary" />
               </div>
             </div>
 
@@ -100,12 +94,10 @@ const Contact = () => {
               <label className="font-body text-sm text-muted-foreground uppercase tracking-wider block mb-2">
                 Service Interested In
               </label>
-              <select
-                value={formData.service}
-                onChange={(e) => setFormData({ ...formData, service: e.target.value })}
-                className="w-full h-10 px-3 rounded-md bg-card border border-border text-foreground focus:border-primary focus:outline-none font-body"
-                required
-              >
+              <select value={formData.service} onChange={e => setFormData({
+              ...formData,
+              service: e.target.value
+            })} className="w-full h-10 px-3 rounded-md bg-card border border-border text-foreground focus:border-primary focus:outline-none font-body" required>
                 <option value="">Select a service</option>
                 <option value="cleaning">Deep Clean</option>
                 <option value="restoration">Restoration</option>
@@ -118,14 +110,10 @@ const Contact = () => {
               <label className="font-body text-sm text-muted-foreground uppercase tracking-wider block mb-2">
                 Message
               </label>
-              <Textarea
-                value={formData.message}
-                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                placeholder="Tell us about your sneakers and what you're looking for..."
-                rows={5}
-                required
-                className="bg-card border-border focus:border-primary resize-none"
-              />
+              <Textarea value={formData.message} onChange={e => setFormData({
+              ...formData,
+              message: e.target.value
+            })} placeholder="Tell us about your sneakers and what you're looking for..." rows={5} required className="bg-card border-border focus:border-primary resize-none" />
             </div>
 
             <Button type="submit" variant="hero" className="w-full sm:w-auto">
@@ -135,8 +123,6 @@ const Contact = () => {
           </form>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default Contact;
