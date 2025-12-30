@@ -35,7 +35,7 @@ const Footer = forwardRef<HTMLElement>((_, ref) => {
               <li><a href="#services" className="font-body text-muted-foreground hover:text-primary transition-colors">Services</a></li>
               <li><a href="#shop" className="font-body text-muted-foreground hover:text-primary transition-colors">Shop</a></li>
               <li><a href="#about" className="font-body text-muted-foreground hover:text-primary transition-colors">About Us</a></li>
-              <li><a href="#contact" className="font-body text-muted-foreground hover:text-primary transition-colors">Contact</a></li>
+              <li><a href="#booking" className="font-body text-muted-foreground hover:text-primary transition-colors">Contact</a></li>
             </ul>
           </div>
 
