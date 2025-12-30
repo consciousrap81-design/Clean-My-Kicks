@@ -37,11 +37,19 @@ const Hero = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 animate-fade-up" style={{ animationDelay: "0.3s" }}>
-            <Button variant="hero" size="xl">
-              Get Started
+            <Button
+              variant="hero"
+              size="xl"
+              onClick={() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" })}
+            >
+              Book Now
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
-            <Button variant="outline" size="xl">
+            <Button
+              variant="outline"
+              size="xl"
+              onClick={() => document.getElementById("services")?.scrollIntoView({ behavior: "smooth" })}
+            >
               View Services
             </Button>
           </div>

@@ -1,27 +1,49 @@
+import { forwardRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Mail, MapPin, Phone, Send } from "lucide-react";
-import { useState } from "react";
+import { Mail, MapPin, Phone, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-const Contact = () => {
+
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/xwpkpwqv"; // Replace with your Formspree form ID
+
+const Contact = forwardRef<HTMLElement>((_, ref) => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     service: "",
     message: ""
   });
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Message sent! We'll get back to you soon.");
-    setFormData({
-      name: "",
-      email: "",
-      service: "",
-      message: ""
-    });
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(FORMSPREE_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        toast.success("Message sent! We'll get back to you within 24 hours.");
+        setFormData({ name: "", email: "", service: "", message: "" });
+      } else {
+        toast.error("Something went wrong. Please try again.");
+      }
+    } catch {
+      toast.error("Failed to send message. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-  return <section id="contact" className="py-20 md:py-32 bg-secondary/30">
+
+  return (
+    <section ref={ref} id="contact" className="py-20 md:py-32 bg-secondary/30">
       <div className="container px-4">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20">
           {/* Info */}
@@ -116,13 +138,25 @@ const Contact = () => {
             })} placeholder="Tell us about your sneakers and what you're looking for..." rows={5} required className="bg-card border-border focus:border-primary resize-none" />
             </div>
 
-            <Button type="submit" variant="hero" className="w-full sm:w-auto">
-              <Send className="w-4 h-4 mr-2" />
-              Send Message
+            <Button type="submit" variant="hero" className="w-full sm:w-auto" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Message
+                </>
+              )}
             </Button>
           </form>
         </div>
       </div>
-    </section>;
-};
+    </section>
+  );
+});
+
+Contact.displayName = "Contact";
 export default Contact;
