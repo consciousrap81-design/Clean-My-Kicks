@@ -1,4 +1,4 @@
-import { Menu, X } from "lucide-react";
+import { Menu, X, Phone } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -25,7 +25,7 @@ const Navbar = () => {
           </a>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-6">
             {navItems.map((item) => (
               <a
                 key={item.label}
@@ -35,6 +35,13 @@ const Navbar = () => {
                 {item.label}
               </a>
             ))}
+            <a
+              href="tel:+19402814277"
+              className="flex items-center gap-2 font-body text-sm text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Phone className="w-4 h-4" />
+              (940) 281-4277
+            </a>
             <Button variant="hero" size="sm" onClick={scrollToBooking}>
               Book Now
             </Button>

@@ -1,85 +1,36 @@
-import { forwardRef, useState } from "react";
+import { forwardRef, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Mail, MapPin, Phone, Send, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
-/**
- * FORMSPREE SETUP:
- * 1. Go to https://formspree.io and create a free account
- * 2. Create a new form and copy the form ID (looks like "xwpkpwqv")
- * 3. Replace the ID below with your form ID
- * 
- * Example: If your endpoint is https://formspree.io/f/xwpkpwqv
- * Then FORMSPREE_FORM_ID should be "xwpkpwqv"
- */
-const FORMSPREE_FORM_ID = "xwpkpwqv"; // <-- REPLACE WITH YOUR FORMSPREE FORM ID
-const FORMSPREE_ENDPOINT = `https://formspree.io/f/${FORMSPREE_FORM_ID}`;
-
-interface BookingFormData {
-  fullName: string;
-  phone: string;
-  email: string;
-  serviceLevel: string;
-  shoeBrand: string;
-  shoeModel: string;
-  shoeSize: string;
-  dropoffMethod: string;
-  notes: string;
-}
-
-const initialFormData: BookingFormData = {
-  fullName: "",
-  phone: "",
-  email: "",
-  serviceLevel: "",
-  shoeBrand: "",
-  shoeModel: "",
-  shoeSize: "",
-  dropoffMethod: "",
-  notes: "",
-};
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/xvzojebk";
 
 const Contact = forwardRef<HTMLElement>((_, ref) => {
-  const [formData, setFormData] = useState<BookingFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    const formData = new FormData(e.currentTarget);
 
     try {
       const response = await fetch(FORMSPREE_ENDPOINT, {
         method: "POST",
+        body: formData,
         headers: {
-          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-        body: JSON.stringify({
-          "Full Name": formData.fullName,
-          "Phone": formData.phone,
-          "Email": formData.email,
-          "Service Level": formData.serviceLevel,
-          "Shoe Brand": formData.shoeBrand,
-          "Shoe Model/Name": formData.shoeModel,
-          "Shoe Size": formData.shoeSize,
-          "Drop-off Method": formData.dropoffMethod,
-          "Notes": formData.notes,
-        }),
       });
 
       if (response.ok) {
         setIsSubmitted(true);
-        toast.success("Booking request submitted! We'll contact you within 24 hours.");
-        setFormData(initialFormData);
+        toast.success("Request sent — we'll contact you soon.");
+        formRef.current?.reset();
       } else {
         toast.error("Something went wrong. Please try again or call us directly.");
       }
@@ -92,7 +43,7 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
 
   const resetForm = () => {
     setIsSubmitted(false);
-    setFormData(initialFormData);
+    formRef.current?.reset();
   };
 
   return (
@@ -152,16 +103,26 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
               <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mb-6">
                 <CheckCircle className="w-8 h-8 text-primary" />
               </div>
-              <h3 className="font-display text-2xl text-foreground mb-3">Booking Received!</h3>
+              <h3 className="font-display text-2xl text-foreground mb-3">Request Sent!</h3>
               <p className="font-body text-muted-foreground mb-6 max-w-md">
-                Thanks for your booking request. We'll review your sneaker details and contact you within 24 hours with a quote.
+                Request sent — we'll contact you soon.
               </p>
               <Button variant="outline" onClick={resetForm}>
                 Submit Another Request
               </Button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form
+              ref={formRef}
+              method="POST"
+              action={FORMSPREE_ENDPOINT}
+              onSubmit={handleSubmit}
+              className="space-y-5"
+            >
+              {/* Hidden Fields */}
+              <input type="hidden" name="_subject" value="New Clean My Kicks Booking Request" />
+              <input type="text" name="_gotcha" className="sr-only" tabIndex={-1} autoComplete="off" />
+
               {/* Full Name & Phone */}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
@@ -170,8 +131,6 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
                   </label>
                   <Input
                     name="fullName"
-                    value={formData.fullName}
-                    onChange={handleChange}
                     placeholder="Your full name"
                     required
                     className="bg-card border-border focus:border-primary"
@@ -184,8 +143,6 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
                   <Input
                     name="phone"
                     type="tel"
-                    value={formData.phone}
-                    onChange={handleChange}
                     placeholder="(555) 123-4567"
                     required
                     className="bg-card border-border focus:border-primary"
@@ -201,8 +158,6 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
                 <Input
                   name="email"
                   type="email"
-                  value={formData.email}
-                  onChange={handleChange}
                   placeholder="your@email.com"
                   required
                   className="bg-card border-border focus:border-primary"
@@ -216,16 +171,13 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
                 </label>
                 <select
                   name="serviceLevel"
-                  value={formData.serviceLevel}
-                  onChange={handleChange}
                   required
                   className="w-full h-10 px-3 rounded-md bg-card border border-border text-foreground focus:border-primary focus:outline-none font-body"
                 >
                   <option value="">Select a service</option>
-                  <option value="basic">Basic Clean - $35</option>
-                  <option value="deep">Deep Clean - $55</option>
-                  <option value="restoration">Full Restoration - $75+</option>
-                  <option value="customization">Customization - $150+</option>
+                  <option value="Basic">Basic Clean</option>
+                  <option value="Deep">Deep Clean</option>
+                  <option value="Restoration">Restoration</option>
                 </select>
               </div>
 
@@ -237,8 +189,6 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
                   </label>
                   <Input
                     name="shoeBrand"
-                    value={formData.shoeBrand}
-                    onChange={handleChange}
                     placeholder="e.g., Nike, Jordan, Adidas"
                     required
                     className="bg-card border-border focus:border-primary"
@@ -250,8 +200,6 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
                   </label>
                   <Input
                     name="shoeModel"
-                    value={formData.shoeModel}
-                    onChange={handleChange}
                     placeholder="e.g., Air Jordan 1 Retro"
                     required
                     className="bg-card border-border focus:border-primary"
@@ -267,8 +215,6 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
                   </label>
                   <Input
                     name="shoeSize"
-                    value={formData.shoeSize}
-                    onChange={handleChange}
                     placeholder="e.g., Men's 10.5"
                     required
                     className="bg-card border-border focus:border-primary"
@@ -279,16 +225,14 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
                     Drop-off Method *
                   </label>
                   <select
-                    name="dropoffMethod"
-                    value={formData.dropoffMethod}
-                    onChange={handleChange}
+                    name="dropOffMethod"
                     required
                     className="w-full h-10 px-3 rounded-md bg-card border border-border text-foreground focus:border-primary focus:outline-none font-body"
                   >
                     <option value="">Select method</option>
-                    <option value="dropoff">Drop-off (Local)</option>
-                    <option value="pickup">Pickup (We'll come to you)</option>
-                    <option value="mailin">Mail-in (Ship to us)</option>
+                    <option value="Drop-off">Drop-off</option>
+                    <option value="Pickup">Pickup</option>
+                    <option value="Mail-in">Mail-in</option>
                   </select>
                 </div>
               </div>
@@ -300,8 +244,6 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
                 </label>
                 <Textarea
                   name="notes"
-                  value={formData.notes}
-                  onChange={handleChange}
                   placeholder="Describe the condition of your sneakers, any specific issues, or special requests..."
                   rows={4}
                   className="bg-card border-border focus:border-primary resize-none"
