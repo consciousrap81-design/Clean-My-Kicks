@@ -24,7 +24,7 @@ const MobileBottomBar = () => {
           className="flex-1 h-11 px-2"
           asChild
         >
-          <a href="sms:+19402814277">
+          <a href="sms:+19402814277&body=Hi%20Clean%20My%20Kicks%2C%20I%27d%20like%20a%20quote%20for%20a%20cleaning.%20My%20shoes%20are%3A%20">
             <MessageCircle className="w-4 h-4 mr-1.5" />
             Text
           </a>
