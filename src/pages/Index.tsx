@@ -14,7 +14,7 @@ import MobileBottomBar from "@/components/MobileBottomBar";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen bg-background pb-24 md:pb-0">
       <Navbar />
       <Hero />
       <TrustStrip />

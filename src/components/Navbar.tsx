@@ -1,4 +1,4 @@
-import { Menu, X, Phone } from "lucide-react";
+import { Menu, X, Phone, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -35,13 +35,22 @@ const Navbar = () => {
                 {item.label}
               </a>
             ))}
-            <a
-              href="tel:+19402814277"
-              className="flex items-center gap-2 font-body text-sm text-muted-foreground hover:text-primary transition-colors"
-            >
-              <Phone className="w-4 h-4" />
-              (940) 281-4277
-            </a>
+            <div className="flex items-center gap-4">
+              <a
+                href="tel:+19402814277"
+                className="flex items-center gap-2 font-body text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Phone className="w-4 h-4" />
+                (940) 281-4277
+              </a>
+              <a
+                href="sms:+19402814277"
+                className="flex items-center gap-2 font-body text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Text
+              </a>
+            </div>
             <Button variant="hero" size="sm" onClick={scrollToBooking}>
               Book Now
             </Button>
