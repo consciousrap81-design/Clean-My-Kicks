@@ -1,4 +1,4 @@
-import { Menu, X, Phone, MessageCircle } from "lucide-react";
+import { Menu, X, Phone, MessageCircle, Instagram } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -43,12 +43,23 @@ const Navbar = () => {
                 <Phone className="w-4 h-4" />
                 (940) 281-4277
               </a>
+              {/* Mobile: Text SMS link */}
               <a
-                href="sms:+19402814277"
-                className="flex items-center gap-2 font-body text-sm text-muted-foreground hover:text-primary transition-colors"
+                href="sms:+19402814277&body=Hi%20Clean%20My%20Kicks%2C%20I%27d%20like%20a%20quote%20for%20a%20cleaning.%20My%20shoes%20are%3A%20"
+                className="flex sm:hidden items-center gap-2 font-body text-sm text-muted-foreground hover:text-primary transition-colors"
               >
                 <MessageCircle className="w-4 h-4" />
                 Text
+              </a>
+              {/* Desktop: DM on Instagram */}
+              <a
+                href="https://www.instagram.com/cleanmykicksdotcom/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:flex items-center gap-2 font-body text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Instagram className="w-4 h-4" />
+                DM on Instagram
               </a>
             </div>
             <Button variant="hero" size="sm" onClick={scrollToBooking}>
