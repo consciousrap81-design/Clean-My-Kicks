@@ -1,7 +1,6 @@
 import { Menu, X, Phone, MessageCircle, Instagram } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/logo.png";
 
 const navItems = [
   { label: "Services", href: "#services" },
@@ -21,13 +20,14 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <a href="#" className="flex items-center">
-            <img 
-              src={logo} 
-              alt="Clean My Kicks" 
-              className="h-10 md:h-14 w-auto object-contain"
-              style={{ filter: 'brightness(0) invert(1)', mixBlendMode: 'screen' }}
-            />
+          <a href="#" className="flex flex-col items-start leading-none">
+            <span className="font-display text-xs md:text-sm tracking-wider text-foreground/90">CLEAN MY</span>
+            <span className="font-display text-2xl md:text-3xl tracking-tight text-foreground relative">
+              KICKS
+              <svg className="absolute -bottom-1 left-0 w-6 md:w-8 h-4 md:h-5" viewBox="0 0 32 20" fill="none">
+                <path d="M4 2C6 8 8 14 10 18M10 18C12 14 14 8 16 2M16 2C18 8 20 14 22 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-primary"/>
+              </svg>
+            </span>
           </a>
 
           {/* Desktop Navigation */}
