@@ -2,6 +2,7 @@ import { Menu, X, Phone, MessageCircle, Instagram } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import Logo from "@/components/Logo";
+import BrandLogo from "./BrandLogo";
 
 const navItems = [
   { label: "Services", href: "#services" },
