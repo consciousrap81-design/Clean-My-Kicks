@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import { Instagram, MapPin, Phone } from "lucide-react";
+import logo from "@/assets/logo.png";
 
 const Footer = forwardRef<HTMLElement>((_, ref) => {
   return (
@@ -8,8 +9,8 @@ const Footer = forwardRef<HTMLElement>((_, ref) => {
         <div className="grid md:grid-cols-4 gap-8 mb-12">
           {/* Brand */}
           <div className="md:col-span-2">
-            <a href="#" className="font-display text-3xl text-gradient">
-              CLEAN MY KICKS
+            <a href="#" className="inline-block">
+              <img src={logo} alt="Clean My Kicks" className="h-10 w-auto" />
             </a>
             <p className="font-body text-muted-foreground mt-4 max-w-md">
               Professional sneaker cleaning, restoration, and customization. 
