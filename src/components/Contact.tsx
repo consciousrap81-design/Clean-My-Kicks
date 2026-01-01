@@ -71,7 +71,7 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
                 </div>
                 <div>
                   <p className="font-body text-sm text-muted-foreground">Email</p>
-                  <p className="font-body text-foreground">hello@cleanmykicks.com</p>
+                  <p className="font-body text-foreground">questions@cleanmykicks.com</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
