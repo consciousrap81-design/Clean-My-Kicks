@@ -25,7 +25,8 @@ const Navbar = () => {
             <img 
               src={logo} 
               alt="Clean My Kicks" 
-              className="h-10 md:h-14 w-auto object-contain brightness-0 invert"
+              className="h-10 md:h-14 w-auto object-contain"
+              style={{ filter: 'brightness(0) invert(1)', mixBlendMode: 'screen' }}
             />
           </a>
 
