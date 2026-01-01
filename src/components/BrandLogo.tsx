@@ -3,66 +3,67 @@ type BrandLogoProps = {
   className?: string;
 };
 
+
+
+
 export default function BrandLogo({ className = "" }: BrandLogoProps) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 720 140"
-      xmlns="http://www.w3.org/2000/svg"
-      role="img"
+    <span
+      className={[
+        "inline-flex items-baseline gap-1 leading-none font-extrabold tracking-tight",
+        className,
+      ].join(" ")}
       aria-label="Clean My Kicks"
     >
-      {/* Uses currentColor so it automatically matches your website text color */}
-      <g fill="currentColor">
-        {/* CLEAN MY */}
-        <text
-          x="0"
-          y="95"
-          fontSize="72"
-          fontWeight="800"
-          fontFamily="system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif"
-          letterSpacing="-0.02em"
-        >
-          CLEAN MY
-        </text>
+      <span>CLEAN</span>
+      <span>MY</span>
 
-        {/* K */}
-        <text
-          x="305"
-          y="95"
-          fontSize="72"
-          fontWeight="900"
-          fontFamily="system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif"
-          letterSpacing="-0.02em"
-        >
-          K
-        </text>
 
-        {/* ICKS */}
-        <text
-          x="410"
-          y="95"
-          fontSize="72"
-          fontWeight="800"
-          fontFamily="system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif"
-          letterSpacing="-0.02em"
-        >
-          ICKS
-        </text>
-      </g>
 
-      {/* LACES IN THE K (stroke uses currentColor too) */}
-      <g
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="7"
-        strokeLinecap="round"
-      >
-        {/* lace top */}
-        <path d="M350 25 C370 45, 390 60, 410 78" />
-        {/* lace bottom */}
-        <path d="M350 105 C370 85, 390 70, 410 50" />
-      </g>
-    </svg>
+
+      {/* K with laces */}
+      <span className="inline-flex items-baseline">
+        <svg
+          viewBox="0 0 120 140"
+          width="0.95em"
+          height="1.05em"
+          xmlns="http://www.w3.org/2000/svg"
+          role="img"
+          aria-hidden="true"
+          style={{ verticalAlign: "-0.08em" }}
+        >
+          {/* The K */}
+          <text
+            x="18"
+            y="112"
+            fontSize="118"
+            fontWeight="900"
+            fontFamily="system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif"
+            fill="currentColor"
+          >
+            K
+          </text>
+
+
+
+
+          {/* Shoelaces over the diagonal */}
+          <g
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="10"
+            strokeLinecap="round"
+          >
+            <path d="M40 35 C60 55, 75 70, 95 88" />
+            <path d="M40 110 C60 90, 75 75, 95 55" />
+          </g>
+        </svg>
+      </span>
+
+
+
+
+      <span>ICKS</span>
+    </span>
   );
 }
