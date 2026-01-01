@@ -1,8 +1,6 @@
 import { Menu, X, Phone, MessageCircle, Instagram } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import Logo from "@/components/Logo";
-import BrandLogo from "./BrandLogo";
 
 const navItems = [
   { label: "Services", href: "#services" },
@@ -22,8 +20,8 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <a href="#" className="text-foreground">
-            <Logo className="h-8 md:h-10 w-auto" />
+          <a href="#" className="font-display text-2xl md:text-3xl text-gradient">
+            CLEAN MY KICKS
           </a>
 
           {/* Desktop Navigation */}
