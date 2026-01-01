@@ -1,6 +1,5 @@
 import { Menu, X, Phone, MessageCircle, Instagram } from "lucide-react";
 import { useState } from "react";
-import BrandLogo from "./BrandLogo";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
