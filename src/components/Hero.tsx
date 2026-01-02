@@ -1,20 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import heroImage from "@/assets/hero-sneaker.jpg";
-import { useParallax } from "@/hooks/use-parallax";
 
 const Hero = () => {
-  const parallaxOffset = useParallax(0.4);
-
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20 bg-slate-900">
-      {/* Background Image with Parallax */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
+      {/* Background Image */}
+      <div className="absolute inset-0 z-0">
         <img
           src={heroImage}
           alt="Premium sneaker cleaning"
-          className="w-full h-[120%] object-cover opacity-40 will-change-transform"
-          style={{ transform: `translateY(${parallaxOffset}px)` }}
+          className="w-full h-full object-cover opacity-40"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-slate-900/40" />
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 to-transparent" />
