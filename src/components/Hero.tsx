@@ -28,7 +28,7 @@ const Hero = () => {
           
           <h1 className="font-display text-5xl md:text-7xl lg:text-8xl text-white leading-none mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
             RESTORE YOUR
-            <span className="block text-gradient">KICKS TO GLORY</span>
+            <span className="block text-shimmer">KICKS TO GLORY</span>
           </h1>
           
           <p className="font-body text-lg md:text-xl text-slate-300 max-w-xl mb-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
