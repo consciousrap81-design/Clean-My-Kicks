@@ -139,13 +139,13 @@
   .text-foil {
     background: linear-gradient(
       135deg,
-      hsl(24 100% 45%) 0%,
-      hsl(36 100% 65%) 20%,
-      hsl(24 100% 55%) 40%,
-      hsl(40 100% 75%) 50%,
-      hsl(24 100% 55%) 60%,
-      hsl(36 100% 65%) 80%,
-      hsl(24 100% 45%) 100%
+      hsl(24 80% 45%) 0%,
+      hsl(30 70% 55%) 20%,
+      hsl(24 75% 50%) 40%,
+      hsl(32 65% 58%) 50%,
+      hsl(24 75% 50%) 60%,
+      hsl(30 70% 55%) 80%,
+      hsl(24 80% 45%) 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
