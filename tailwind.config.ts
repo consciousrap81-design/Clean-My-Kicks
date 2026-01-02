@@ -77,7 +77,8 @@ export default {
         },
         kick: {
           "0%": { transform: "rotate(0deg)" },
-          "100%": { transform: "rotate(360deg)" },
+          "50%": { transform: "rotate(45deg)" },
+          "100%": { transform: "rotate(0deg)" },
         },
         kickedBounce: {
           "0%": { transform: "translateX(0)" },
