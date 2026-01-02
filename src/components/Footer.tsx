@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { Instagram, MapPin, Phone } from "lucide-react";
 import logoFull from "@/assets/logo-full.png";
+import sevenLogo from "@/assets/seven-logo.png";
 
 const Footer = forwardRef<HTMLElement>((_, ref) => {
   return (
@@ -94,8 +95,10 @@ const Footer = forwardRef<HTMLElement>((_, ref) => {
         </div>
 
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="font-body text-sm text-white/60">
-            © {new Date().getFullYear()} Clean My Kicks, a brand of Seven Loaf Ministries, LLC. All rights reserved.
+          <p className="font-body text-sm text-white/60 flex items-center gap-1 flex-wrap">
+            © {new Date().getFullYear()} Clean My Kicks, a brand of 
+            <img src={sevenLogo} alt="7" className="h-4 w-auto inline-block" />
+            Seven Loaf Ministries, LLC. All rights reserved.
           </p>
           <div className="flex gap-6">
             <a href="#" className="font-body text-sm text-white/60 hover:text-primary transition-colors">
