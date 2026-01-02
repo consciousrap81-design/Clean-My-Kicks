@@ -1,16 +1,31 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import heroImage from "@/assets/hero-sneaker.jpg";
 
 const Hero = () => {
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20 bg-slate-900">
-      {/* Background Image */}
+      {/* Background Image with Parallax */}
       <div className="absolute inset-0 z-0">
         <img
           src={heroImage}
           alt="Premium sneaker cleaning"
-          className="w-full h-full object-cover opacity-60"
+          className="w-full h-full object-cover opacity-60 will-change-transform"
+          style={{
+            transform: `translateY(${scrollY * 0.4}px) scale(1.1)`,
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900/70 to-transparent" />
