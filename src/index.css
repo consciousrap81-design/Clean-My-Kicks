@@ -147,11 +147,9 @@
       hsl(36 100% 65%) 80%,
       hsl(24 100% 45%) 100%
     );
-    background-size: 200% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: foilShimmer 4s ease-in-out infinite;
   }
 
   @keyframes foilShimmer {
