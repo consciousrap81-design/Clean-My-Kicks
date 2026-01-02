@@ -1,7 +1,7 @@
 import { Menu, X, Phone, MessageCircle, Instagram } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import logoK from "@/assets/logo.png";
+import heroK from "@/assets/hero-k.png";
 const navItems = [
   { label: "Services", href: "#services" },
   { label: "Shop", href: "#shop" },
@@ -22,9 +22,9 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16 md:h-20">
           <a href="#" className="flex items-center gap-1 group">
             <img 
-              src={logoK} 
+              src={heroK} 
               alt="K" 
-              className="h-10 md:h-14 w-auto transition-transform duration-300 group-hover:rotate-[-20deg] group-hover:translate-x-1 group-hover:translate-y-[-2px]" 
+              className="h-12 md:h-16 w-auto transition-transform duration-300 group-hover:rotate-[-20deg] group-hover:translate-x-1 group-hover:translate-y-[-2px]" 
             />
             <span className="font-display text-xl md:text-2xl font-bold text-white tracking-tight transition-transform duration-300 group-hover:translate-x-1">
               CLEAN MY KICKS
