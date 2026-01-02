@@ -26,26 +26,8 @@ const Navbar = () => {
               alt="K" 
               className="h-12 md:h-16 w-auto origin-center group-hover:animate-kick" 
             />
-            <span className="font-anton text-xl md:text-2xl text-foil tracking-tight flex">
-              {"CLEAN MY KICKS".split("").map((letter, i) => {
-                const scatterX = [12, -8, 15, -12, 10, -6, 14, -10, 8, -14, 11, -9, 13, -7][i % 14];
-                const scatterY = [-15, 12, -10, 14, -8, 16, -12, 10, -14, 8, -16, 12, -10, 14][i % 14];
-                const scatterR = [15, -20, 12, -18, 22, -15, 18, -12, 20, -16, 14, -22, 16, -14][i % 14];
-                return (
-                  <span
-                    key={i}
-                    className="inline-block group-hover:animate-kickedBounce"
-                    style={{
-                      ["--scatter-x" as string]: `${scatterX}px`,
-                      ["--scatter-y" as string]: `${scatterY}px`,
-                      ["--scatter-r" as string]: `${scatterR}deg`,
-                      animationDelay: `${i * 0.02}s`,
-                    }}
-                  >
-                    {letter === " " ? "\u00A0" : letter}
-                  </span>
-                );
-              })}
+            <span className="font-anton text-xl md:text-2xl text-foil tracking-tight group-hover:animate-kickedBounce">
+              CLEAN MY KICKS
             </span>
           </a>
 
