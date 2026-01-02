@@ -147,9 +147,15 @@
       hsl(30 70% 55%) 80%,
       hsl(24 80% 45%) 100%
     );
+    background-size: 200% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+    transition: background-position 0.3s ease;
+  }
+
+  .group:hover .text-foil {
+    animation: foilShimmer 0.8s ease-in-out;
   }
 
   @keyframes foilShimmer {
