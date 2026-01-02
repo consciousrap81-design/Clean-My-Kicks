@@ -51,6 +51,7 @@ export default {
       fontFamily: {
         display: ["var(--font-display)", "sans-serif"],
         body: ["var(--font-body)", "sans-serif"],
+        anton: ["'Anton'", "sans-serif"],
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -74,12 +75,19 @@ export default {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        kick: {
+          "0%": { transform: "rotate(0deg) translateX(0)" },
+          "30%": { transform: "rotate(-35deg) translateX(4px) translateY(-4px)" },
+          "50%": { transform: "rotate(-30deg) translateX(6px) translateY(-2px)" },
+          "100%": { transform: "rotate(0deg) translateX(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         float: "float 3s ease-in-out infinite",
         shimmer: "shimmer 2s linear infinite",
+        kick: "kick 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
       },
     },
   },

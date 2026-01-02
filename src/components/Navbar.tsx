@@ -20,14 +20,14 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 nav-dark backdrop-blur-lg border-b border-white/10">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <a href="#" className="flex items-center gap-1 group">
+          <a href="#" className="flex items-center gap-0 group">
             <img 
               src={heroK} 
               alt="K" 
-              className="h-12 md:h-16 w-auto transition-transform duration-300 group-hover:rotate-[-20deg] group-hover:translate-x-1 group-hover:translate-y-[-2px]" 
+              className="h-12 md:h-16 w-auto transition-transform duration-300 origin-bottom-right group-hover:animate-kick" 
             />
-            <span className="font-display text-xl md:text-2xl font-bold text-white tracking-tight transition-transform duration-300 group-hover:translate-x-1">
-              CLEAN MY KICKS
+            <span className="font-anton text-xl md:text-2xl text-foil tracking-tight transition-transform duration-300 group-hover:translate-x-2">
+              LEAN MY KICKS
             </span>
           </a>
 
