@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import heroImage from "@/assets/hero-sneaker.jpg";
-import logoK from "@/assets/logo-k.png";
 
 const useCountUp = (end: number, duration: number = 2000, trigger: boolean) => {
   const [count, setCount] = useState(0);
@@ -94,14 +93,7 @@ const Hero = () => {
           
           <h1 className="font-display text-5xl md:text-7xl lg:text-8xl text-white leading-none mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
             RESTORE YOUR
-            <span className="flex items-center gap-2 text-shimmer">
-              <img 
-                src={logoK} 
-                alt="K" 
-                className="inline-block h-16 md:h-24 lg:h-32 w-auto animate-kick"
-              />
-              ICKS TO GLORY
-            </span>
+            <span className="block text-shimmer">KICKS TO GLORY</span>
           </h1>
           
           <p className="font-body text-lg md:text-xl text-slate-300 max-w-xl mb-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
