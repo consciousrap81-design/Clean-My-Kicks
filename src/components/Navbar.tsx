@@ -24,7 +24,7 @@ const Navbar = () => {
             <img 
               src={heroK} 
               alt="K" 
-              className="h-12 md:h-16 w-auto origin-bottom-right group-hover:animate-kick" 
+              className="h-12 md:h-16 w-auto origin-center group-hover:animate-kick" 
             />
             <span className="font-anton text-xl md:text-2xl text-foil tracking-tight group-hover:animate-kickedBounce">
               CLEAN MY KICKS
