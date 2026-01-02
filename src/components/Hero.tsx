@@ -1,10 +1,39 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import heroImage from "@/assets/hero-sneaker.jpg";
+
+const useCountUp = (end: number, duration: number = 2000, trigger: boolean) => {
+  const [count, setCount] = useState(0);
+  
+  useEffect(() => {
+    if (!trigger) return;
+    
+    let startTime: number;
+    let animationFrame: number;
+    
+    const animate = (currentTime: number) => {
+      if (!startTime) startTime = currentTime;
+      const progress = Math.min((currentTime - startTime) / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(easeOut * end));
+      
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [end, duration, trigger]);
+  
+  return count;
+};
 
 const Hero = () => {
   const [scrollY, setScrollY] = useState(0);
+  const [statsVisible, setStatsVisible] = useState(false);
+  const statsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -14,6 +43,27 @@ const Hero = () => {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setStatsVisible(true);
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    if (statsRef.current) {
+      observer.observe(statsRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  const kicksCount = useCountUp(500, 2000, statsVisible);
+  const satisfactionCount = useCountUp(100, 1800, statsVisible);
+  const ratingCount = useCountUp(5, 1500, statsVisible);
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20 bg-slate-900">
@@ -71,17 +121,17 @@ const Hero = () => {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-8 mt-16 pt-8 border-t border-slate-700 animate-fade-up" style={{ animationDelay: "0.4s" }}>
+          <div ref={statsRef} className="grid grid-cols-3 gap-8 mt-16 pt-8 border-t border-slate-700 animate-fade-up" style={{ animationDelay: "0.4s" }}>
             <div>
-              <p className="font-display text-3xl md:text-4xl text-primary">500+</p>
+              <p className="font-display text-3xl md:text-4xl text-primary">{kicksCount}+</p>
               <p className="font-body text-sm text-slate-400 uppercase tracking-wider">Kicks Restored</p>
             </div>
             <div>
-              <p className="font-display text-3xl md:text-4xl text-primary">100%</p>
+              <p className="font-display text-3xl md:text-4xl text-primary">{satisfactionCount}%</p>
               <p className="font-body text-sm text-slate-400 uppercase tracking-wider">Satisfaction</p>
             </div>
             <div>
-              <p className="font-display text-3xl md:text-4xl text-primary">5★</p>
+              <p className="font-display text-3xl md:text-4xl text-primary">{ratingCount}★</p>
               <p className="font-body text-sm text-slate-400 uppercase tracking-wider">Rated Service</p>
             </div>
           </div>
