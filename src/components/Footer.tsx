@@ -10,7 +10,7 @@ const Footer = forwardRef<HTMLElement>((_, ref) => {
           {/* Brand */}
           <div className="md:col-span-2">
             <a href="#">
-              <img src={logoFull} alt="Clean My Kicks" className="h-12 w-auto" />
+              <img src={logoFull} alt="Clean My Kicks" className="h-16 w-auto" />
             </a>
             <p className="font-body text-white/70 mt-4 max-w-md">
               Professional sneaker cleaning, restoration, and customization. 
