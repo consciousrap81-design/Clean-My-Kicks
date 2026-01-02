@@ -17,7 +17,7 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
+    <nav className="fixed top-0 left-0 right-0 z-50 nav-dark backdrop-blur-lg border-b border-white/10">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
           <a href="#" className="font-display text-2xl md:text-3xl text-gradient">
@@ -30,7 +30,7 @@ const Navbar = () => {
               <a
                 key={item.label}
                 href={item.href}
-                className="font-body text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors duration-300"
+                className="font-body text-sm uppercase tracking-widest text-white/70 hover:text-primary transition-colors duration-300"
               >
                 {item.label}
               </a>
@@ -38,7 +38,7 @@ const Navbar = () => {
             <div className="flex items-center gap-4">
               <a
                 href="tel:+19402814277"
-                className="flex items-center gap-2 font-body text-sm text-muted-foreground hover:text-primary transition-colors"
+                className="flex items-center gap-2 font-body text-sm text-white/70 hover:text-primary transition-colors"
               >
                 <Phone className="w-4 h-4" />
                 (940) 281-4277
@@ -46,7 +46,7 @@ const Navbar = () => {
               {/* Mobile: Text SMS link */}
               <a
                 href="sms:+19402814277&body=Hi%20Clean%20My%20Kicks%2C%20I%27d%20like%20a%20quote%20for%20a%20cleaning.%20My%20shoes%20are%3A%20"
-                className="flex sm:hidden items-center gap-2 font-body text-sm text-muted-foreground hover:text-primary transition-colors"
+                className="flex sm:hidden items-center gap-2 font-body text-sm text-white/70 hover:text-primary transition-colors"
               >
                 <MessageCircle className="w-4 h-4" />
                 Text
@@ -56,7 +56,7 @@ const Navbar = () => {
                 href="https://www.instagram.com/cleanmykicksdotcom/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:flex items-center gap-2 font-body text-sm text-muted-foreground hover:text-primary transition-colors"
+                className="hidden sm:flex items-center gap-2 font-body text-sm text-white/70 hover:text-primary transition-colors"
               >
                 <Instagram className="w-4 h-4" />
                 DM on Instagram
@@ -70,7 +70,7 @@ const Navbar = () => {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 text-foreground"
+            className="md:hidden p-2 text-white"
           >
             {isOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
@@ -78,14 +78,14 @@ const Navbar = () => {
 
         {/* Mobile Navigation */}
         {isOpen && (
-          <div className="md:hidden py-4 border-t border-border animate-fade-in">
+          <div className="md:hidden py-4 border-t border-white/10 animate-fade-in">
             <div className="flex flex-col gap-4">
               {navItems.map((item) => (
                 <a
                   key={item.label}
                   href={item.href}
                   onClick={() => setIsOpen(false)}
-                  className="font-body text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors py-2"
+                  className="font-body text-sm uppercase tracking-widest text-white/70 hover:text-primary transition-colors py-2"
                 >
                   {item.label}
                 </a>
