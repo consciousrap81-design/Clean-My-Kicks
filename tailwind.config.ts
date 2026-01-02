@@ -77,7 +77,7 @@ export default {
         },
         kick: {
           "0%": { transform: "rotate(0deg)" },
-          "50%": { transform: "rotate(45deg)" },
+          "40%": { transform: "rotate(-45deg)" },
           "100%": { transform: "rotate(0deg)" },
         },
         kickedBounce: {
@@ -94,7 +94,7 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         float: "float 3s ease-in-out infinite",
         shimmer: "shimmer 2s linear infinite",
-        kick: "kick 0.5s ease-in-out",
+        kick: "kick 0.35s cubic-bezier(0.25, 0.1, 0.25, 1.5)",
         kickedBounce: "kickedBounce 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
       },
     },
