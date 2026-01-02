@@ -97,8 +97,10 @@ const Footer = forwardRef<HTMLElement>((_, ref) => {
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="font-body text-sm text-white/60 flex items-center gap-1 flex-wrap">
             © {new Date().getFullYear()} Clean My Kicks, a brand of 
-            <img src={sevenLogo} alt="7" className="h-4 w-auto inline-block" />
-            Seven Loaf Ministries, LLC. All rights reserved.
+            <a href="https://sevenloafministries.org" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-white/80 transition-colors">
+              <img src={sevenLogo} alt="7" className="h-4 w-auto inline-block" />
+              Seven Loaf Ministries, LLC.
+            </a> All rights reserved.
           </p>
           <div className="flex gap-6">
             <a href="#" className="font-body text-sm text-white/60 hover:text-primary transition-colors">
