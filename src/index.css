@@ -137,6 +137,7 @@
   }
 
   .text-foil {
+    position: relative;
     background: linear-gradient(
       135deg,
       hsl(24 80% 45%) 0%,
@@ -151,24 +152,12 @@
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    transition: background-position 0.3s ease;
+    transition: filter 0.3s ease;
+    filter: brightness(1);
   }
 
   .group:hover .text-foil {
-    background: linear-gradient(
-      135deg,
-      hsl(24 100% 50%) 0%,
-      hsl(36 100% 70%) 20%,
-      hsl(24 100% 60%) 40%,
-      hsl(45 100% 80%) 50%,
-      hsl(24 100% 60%) 60%,
-      hsl(36 100% 70%) 80%,
-      hsl(24 100% 50%) 100%
-    );
-    background-size: 200% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    filter: brightness(1.3);
     animation: foilShimmer 0.8s ease-in-out;
   }
 
