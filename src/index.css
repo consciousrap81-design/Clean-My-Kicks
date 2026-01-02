@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -134,6 +134,33 @@
     background-clip: text;
     -webkit-text-fill-color: transparent;
     animation: shimmer 3s ease-in-out infinite;
+  }
+
+  .text-foil {
+    background: linear-gradient(
+      135deg,
+      hsl(24 100% 45%) 0%,
+      hsl(36 100% 65%) 20%,
+      hsl(24 100% 55%) 40%,
+      hsl(40 100% 75%) 50%,
+      hsl(24 100% 55%) 60%,
+      hsl(36 100% 65%) 80%,
+      hsl(24 100% 45%) 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: foilShimmer 4s ease-in-out infinite;
+  }
+
+  @keyframes foilShimmer {
+    0%, 100% {
+      background-position: 0% center;
+    }
+    50% {
+      background-position: 100% center;
+    }
   }
 
   @keyframes shimmer {
