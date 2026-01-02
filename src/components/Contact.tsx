@@ -47,7 +47,7 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
   };
 
   return (
-    <section ref={ref} id="booking" className="py-20 md:py-32 bg-secondary/30">
+    <section ref={ref} id="booking" className="py-20 md:py-32 bg-background">
       <div className="container px-4">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20">
           {/* Info */}
