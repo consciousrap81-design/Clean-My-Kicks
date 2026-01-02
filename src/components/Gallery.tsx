@@ -23,7 +23,7 @@ const scrollToBooking = () => {
 
 const Gallery = () => {
   return (
-    <section id="gallery" className="py-20 md:py-32 bg-secondary/30">
+    <section id="gallery" className="py-20 md:py-32 bg-slate-100">
       <div className="container px-4">
         <div className="text-center mb-16">
           <span className="text-primary font-body text-sm uppercase tracking-widest">
@@ -46,27 +46,27 @@ const Gallery = () => {
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               {/* Before */}
-              <div className="relative group overflow-hidden rounded-xl border border-border">
+              <div className="relative group overflow-hidden rounded-xl border border-border bg-white">
                 <img
                   src={item.before}
                   alt={`${item.label} - Before`}
                   className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-4">
-                  <span className="font-body text-xs uppercase tracking-wider text-muted-foreground">
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/80 to-transparent p-4">
+                  <span className="font-body text-xs uppercase tracking-wider text-slate-300">
                     Before
                   </span>
                 </div>
               </div>
 
               {/* After */}
-              <div className="relative group overflow-hidden rounded-xl border border-primary/30">
+              <div className="relative group overflow-hidden rounded-xl border border-primary/30 bg-white">
                 <img
                   src={item.after}
                   alt={`${item.label} - After`}
                   className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-4">
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/80 to-transparent p-4">
                   <span className="font-body text-xs uppercase tracking-wider text-primary">
                     After
                   </span>

@@ -17,7 +17,7 @@ const trustItems = [
 
 const TrustStrip = () => {
   return (
-    <section className="bg-primary/10 border-y border-primary/20 py-4">
+    <section className="bg-slate-100 border-y border-slate-200 py-4">
       <div className="container px-4">
         <div className="flex flex-wrap justify-center items-center gap-6 md:gap-12">
           {trustItems.map((item, index) => (

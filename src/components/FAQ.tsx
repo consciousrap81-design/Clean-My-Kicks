@@ -50,7 +50,7 @@ const faqs = [
 
 const FAQ = () => {
   return (
-    <section id="faq" className="py-20 md:py-32 bg-secondary/30">
+    <section id="faq" className="py-20 md:py-32 bg-slate-100">
       <div className="container px-4">
         <div className="text-center mb-16">
           <span className="text-primary font-body text-sm uppercase tracking-widest">
