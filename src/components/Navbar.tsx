@@ -26,7 +26,7 @@ const Navbar = () => {
               alt="K" 
               className="h-12 md:h-16 w-auto origin-center group-hover:animate-kick" 
             />
-            <span className="font-anton text-xl md:text-2xl text-foil tracking-tight group-hover:animate-kickedBounce -ml-1">
+            <span className="font-anton text-xl md:text-2xl text-foil tracking-tight group-hover:animate-kickedBounce -ml-3">
               CLEAN MY KICKS
             </span>
           </a>
