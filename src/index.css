@@ -120,6 +120,31 @@
     background-image: linear-gradient(135deg, hsl(24 100% 60%) 0%, hsl(24 100% 45%) 100%);
   }
 
+  .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(24 100% 50%) 0%,
+      hsl(36 100% 70%) 25%,
+      hsl(24 100% 50%) 50%,
+      hsl(36 100% 70%) 75%,
+      hsl(24 100% 50%) 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0%, 100% {
+      background-position: 200% center;
+    }
+    50% {
+      background-position: 0% center;
+    }
+  }
+
   .glow {
     box-shadow: var(--shadow-glow);
   }
