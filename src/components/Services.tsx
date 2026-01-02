@@ -1,5 +1,6 @@
 import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ScrollReveal from "@/components/ScrollReveal";
 import serviceClean from "@/assets/service-clean.jpg";
 import serviceRestore from "@/assets/service-restore.jpg";
 import serviceCustom from "@/assets/service-custom.jpg";
@@ -52,7 +53,7 @@ const Services = () => {
   return (
     <section id="services" className="py-20 md:py-32 bg-background">
       <div className="container px-4">
-        <div className="text-center mb-16">
+        <ScrollReveal animation="fade-up" className="text-center mb-16">
           <span className="text-primary font-body text-sm uppercase tracking-widest">
             Pricing
           </span>
@@ -62,19 +63,22 @@ const Services = () => {
           <p className="font-body text-muted-foreground max-w-2xl mx-auto mt-4">
             From a quick refresh to a complete transformation, we have got your kicks covered.
           </p>
-        </div>
+        </ScrollReveal>
 
         <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
           {services.map((service, index) => (
-            <div
+            <ScrollReveal
               key={service.title}
-              className={`group relative card-gradient rounded-2xl overflow-hidden border transition-all duration-500 animate-fade-up ${
-                service.popular
-                  ? "border-primary shadow-lg shadow-primary/20"
-                  : "border-border hover:border-primary/50"
-              }`}
-              style={{ animationDelay: `${index * 0.1}s` }}
+              animation="fade-up"
+              delay={index * 100}
             >
+              <div
+                className={`group relative card-gradient rounded-2xl overflow-hidden border transition-all duration-500 h-full ${
+                  service.popular
+                    ? "border-primary shadow-lg shadow-primary/20"
+                    : "border-border hover:border-primary/50"
+                }`}
+              >
               {/* Popular Badge */}
               {service.popular && (
                 <div className="absolute top-4 right-4 z-10 bg-primary text-primary-foreground text-xs font-body uppercase tracking-wider px-3 py-1 rounded-full">
@@ -136,6 +140,7 @@ const Services = () => {
                 </Button>
               </div>
             </div>
+            </ScrollReveal>
           ))}
         </div>
       </div>

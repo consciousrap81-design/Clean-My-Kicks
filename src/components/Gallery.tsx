@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ScrollReveal from "@/components/ScrollReveal";
 
 import before1 from "@/assets/before1.jpg";
 import after1 from "@/assets/after1.jpg";
@@ -25,7 +26,7 @@ const Gallery = () => {
   return (
     <section id="gallery" className="py-20 md:py-32 bg-slate-100">
       <div className="container px-4">
-        <div className="text-center mb-16">
+        <ScrollReveal animation="fade-up" className="text-center mb-16">
           <span className="text-primary font-body text-sm uppercase tracking-widest">
             Our Work
           </span>
@@ -35,59 +36,60 @@ const Gallery = () => {
           <p className="font-body text-muted-foreground max-w-2xl mx-auto mt-4">
             See the transformation. Real results from real kicks.
           </p>
-        </div>
+        </ScrollReveal>
 
         {/* Gallery Grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {galleryItems.map((item, index) => (
-            <div
+            <ScrollReveal
               key={item.label}
-              className="space-y-4 animate-fade-up"
-              style={{ animationDelay: `${index * 0.1}s` }}
+              animation="fade-up"
+              delay={index * 100}
             >
-              {/* Before */}
-              <div className="relative group overflow-hidden rounded-xl border border-border bg-white">
-                <img
-                  src={item.before}
-                  alt={`${item.label} - Before`}
-                  className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/80 to-transparent p-4">
-                  <span className="font-body text-xs uppercase tracking-wider text-slate-300">
-                    Before
-                  </span>
+              <div className="space-y-4">
+                {/* Before */}
+                <div className="relative group overflow-hidden rounded-xl border border-border bg-white">
+                  <img
+                    src={item.before}
+                    alt={`${item.label} - Before`}
+                    className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/80 to-transparent p-4">
+                    <span className="font-body text-xs uppercase tracking-wider text-slate-300">
+                      Before
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* After */}
-              <div className="relative group overflow-hidden rounded-xl border border-primary/30 bg-white">
-                <img
-                  src={item.after}
-                  alt={`${item.label} - After`}
-                  className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/80 to-transparent p-4">
-                  <span className="font-body text-xs uppercase tracking-wider text-primary">
-                    After
-                  </span>
+                {/* After */}
+                <div className="relative group overflow-hidden rounded-xl border border-primary/30 bg-white">
+                  <img
+                    src={item.after}
+                    alt={`${item.label} - After`}
+                    className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/80 to-transparent p-4">
+                    <span className="font-body text-xs uppercase tracking-wider text-primary">
+                      After
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Label */}
-              <p className="font-body text-sm text-center text-muted-foreground">
-                {item.label}
-              </p>
-            </div>
+                {/* Label */}
+                <p className="font-body text-sm text-center text-muted-foreground">
+                  {item.label}
+                </p>
+              </div>
+            </ScrollReveal>
           ))}
         </div>
 
-        {/* CTA */}
-        <div className="text-center mt-16">
+        <ScrollReveal animation="fade-up" delay={400} className="text-center mt-16">
           <Button variant="hero" size="xl" onClick={scrollToBooking}>
             Book a Cleaning
             <ArrowRight className="w-5 h-5 ml-2" />
           </Button>
-        </div>
+        </ScrollReveal>
       </div>
     </section>
   );
