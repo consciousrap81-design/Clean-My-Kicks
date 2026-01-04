@@ -20,7 +20,7 @@ const products = [
     image: shop2,
   },
   {
-    name: "Jordan 4 Military Blue",
+    name: "Nike SB Zoom Blazer Mid",
     condition: "Restored",
     size: "10.5",
     price: "$220",
