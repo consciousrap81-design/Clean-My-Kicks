@@ -7,23 +7,23 @@ import shop3 from "@/assets/shop-3.jpg";
 const products = [
   {
     name: "Jordan 4 Oxidized Green",
-    condition: "Restored",
+    condition: "Lightly Used",
     size: "10",
-    price: "$265",
+    price: "$245",
     image: shop1,
   },
   {
     name: "Jordan 3 J Balvin",
-    condition: "Restored",
+    condition: "Like New",
     size: "9.5",
-    price: "$310",
+    price: "$340",
     image: shop2,
   },
   {
     name: "Nike SB Zoom Blazer Mid",
-    condition: "Restored",
+    condition: "Good Used",
     size: "10.5",
-    price: "$220",
+    price: "$85",
     image: shop3,
   },
 ];
