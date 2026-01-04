@@ -27,7 +27,7 @@ const Navbar = () => {
               className="h-12 md:h-16 w-auto origin-center group-hover:animate-kick [filter:drop-shadow(0_2px_2px_rgba(0,0,0,0.9))_drop-shadow(0_6px_12px_rgba(0,0,0,0.6))]" 
             />
             <span className="font-anton text-xl md:text-2xl text-foil tracking-tight group-hover:animate-kickedBounce -ml-5 [filter:drop-shadow(0_2px_2px_rgba(0,0,0,0.9))_drop-shadow(0_6px_12px_rgba(0,0,0,0.6))]">
-              CLEAN MY KICKS<sup className="text-[0.5em] align-super ml-0.5">®</sup>
+              CLEAN MY KICKS
             </span>
           </a>
 
