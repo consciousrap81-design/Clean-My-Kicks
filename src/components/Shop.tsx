@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { ShoppingBag } from "lucide-react";
 import shop1 from "@/assets/shop-1.jpg";
-import shop4 from "@/assets/shop-4.jpg";
-import shop5 from "@/assets/shop-5.jpg";
+import shop4 from "@/assets/shop-4.png";
+import shop5 from "@/assets/shop-5.png";
 
 const products = [
   {
