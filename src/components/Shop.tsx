@@ -53,7 +53,7 @@ const Shop = () => {
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               {/* Image */}
-              <div className="relative aspect-square overflow-hidden bg-secondary">
+              <div className="relative aspect-square overflow-hidden bg-slate-200">
                 <img
                   src={product.image}
                   alt={product.name}
