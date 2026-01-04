@@ -12,30 +12,30 @@ const features = [
 
 const About = () => {
   return (
-    <section id="about" className="py-20 md:py-32 bg-background">
+    <section id="about" className="py-16 md:py-32 bg-background">
       <div className="container px-4">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-20 items-center">
           <ScrollReveal animation="fade-right">
             <div>
-              <span className="text-primary font-body text-sm uppercase tracking-widest">About Us</span>
-              <h2 className="font-display text-4xl md:text-6xl text-foreground mt-4 mb-6">
+              <span className="text-primary font-body text-xs md:text-sm uppercase tracking-widest">About Us</span>
+              <h2 className="font-display text-3xl sm:text-4xl md:text-6xl text-foreground mt-3 md:mt-4 mb-4 md:mb-6">
                 WHY CHOOSE
                 <span className="block text-gradient">CLEAN MY KICKS</span>
               </h2>
-              <p className="font-body text-muted-foreground mb-8">
+              <p className="font-body text-sm md:text-base text-muted-foreground mb-6 md:mb-8">
                 We're passionate sneakerheads who understand the value of your collection. 
                 Every pair that comes through our doors is treated with the care and attention it deserves. 
                 Whether you're looking to refresh your daily drivers or restore a vintage grail, we've got the skills and dedication to make it happen.
               </p>
 
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 {features.map((feature, index) => (
                   <div
                     key={index}
-                    className="flex items-start gap-3"
+                    className="flex items-start gap-2 md:gap-3"
                   >
-                    <CheckCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                    <span className="font-body text-sm text-foreground">{feature}</span>
+                    <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-primary shrink-0 mt-0.5" />
+                    <span className="font-body text-xs md:text-sm text-foreground">{feature}</span>
                   </div>
                 ))}
               </div>
@@ -44,15 +44,15 @@ const About = () => {
 
           <ScrollReveal animation="fade-left" delay={200}>
             <div className="relative">
-              <div className="aspect-square rounded-3xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border border-primary/20 flex items-center justify-center">
+              <div className="aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border border-primary/20 flex items-center justify-center">
                 <div className="text-center">
-                  <p className="font-display text-8xl md:text-9xl text-gradient">CMK</p>
-                  <p className="font-body text-muted-foreground uppercase tracking-widest mt-4">Est. 2024</p>
+                  <p className="font-display text-6xl sm:text-7xl md:text-9xl text-gradient">CMK</p>
+                  <p className="font-body text-xs md:text-sm text-muted-foreground uppercase tracking-widest mt-2 md:mt-4">Est. 2024</p>
                 </div>
               </div>
               {/* Decorative elements */}
-              <div className="absolute -top-4 -right-4 w-24 h-24 bg-primary/10 rounded-full blur-2xl" />
-              <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-primary/10 rounded-full blur-3xl" />
+              <div className="absolute -top-2 -right-2 md:-top-4 md:-right-4 w-16 h-16 md:w-24 md:h-24 bg-primary/10 rounded-full blur-2xl" />
+              <div className="absolute -bottom-4 -left-4 md:-bottom-8 md:-left-8 w-20 h-20 md:w-32 md:h-32 bg-primary/10 rounded-full blur-3xl" />
             </div>
           </ScrollReveal>
         </div>

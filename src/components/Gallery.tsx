@@ -24,59 +24,59 @@ const scrollToBooking = () => {
 
 const Gallery = () => {
   return (
-    <section id="gallery" className="py-20 md:py-32 bg-slate-100">
+    <section id="gallery" className="py-16 md:py-32 bg-slate-100">
       <div className="container px-4">
-        <ScrollReveal animation="fade-up" className="text-center mb-16">
-          <span className="text-primary font-body text-sm uppercase tracking-widest">
+        <ScrollReveal animation="fade-up" className="text-center mb-10 md:mb-16">
+          <span className="text-primary font-body text-xs md:text-sm uppercase tracking-widest">
             Our Work
           </span>
-          <h2 className="font-display text-4xl md:text-6xl text-foreground mt-4">
+          <h2 className="font-display text-3xl sm:text-4xl md:text-6xl text-foreground mt-3 md:mt-4">
             BEFORE & AFTER
           </h2>
-          <p className="font-body text-muted-foreground max-w-2xl mx-auto mt-4">
+          <p className="font-body text-sm md:text-base text-muted-foreground max-w-2xl mx-auto mt-3 md:mt-4">
             See the transformation. Real results from real kicks.
           </p>
         </ScrollReveal>
 
         {/* Gallery Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
           {galleryItems.map((item, index) => (
             <ScrollReveal
               key={item.label}
               animation="fade-up"
-              delay={index * 100}
+              delay={index * 50}
             >
-              <div className="space-y-4">
+              <div className="space-y-2 md:space-y-4">
                 {/* Before */}
-                <div className="relative group overflow-hidden rounded-xl border border-border bg-white">
+                <div className="relative group overflow-hidden rounded-lg md:rounded-xl border border-border bg-white">
                   <img
                     src={item.before}
                     alt={`${item.label} - Before`}
                     className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/80 to-transparent p-4">
-                    <span className="font-body text-xs uppercase tracking-wider text-slate-300">
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/80 to-transparent p-2 md:p-4">
+                    <span className="font-body text-[10px] md:text-xs uppercase tracking-wider text-slate-300">
                       Before
                     </span>
                   </div>
                 </div>
 
                 {/* After */}
-                <div className="relative group overflow-hidden rounded-xl border border-primary/30 bg-white">
+                <div className="relative group overflow-hidden rounded-lg md:rounded-xl border border-primary/30 bg-white">
                   <img
                     src={item.after}
                     alt={`${item.label} - After`}
                     className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/80 to-transparent p-4">
-                    <span className="font-body text-xs uppercase tracking-wider text-primary">
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/80 to-transparent p-2 md:p-4">
+                    <span className="font-body text-[10px] md:text-xs uppercase tracking-wider text-primary">
                       After
                     </span>
                   </div>
                 </div>
 
                 {/* Label */}
-                <p className="font-body text-sm text-center text-muted-foreground">
+                <p className="font-body text-xs md:text-sm text-center text-muted-foreground">
                   {item.label}
                 </p>
               </div>
@@ -84,10 +84,10 @@ const Gallery = () => {
           ))}
         </div>
 
-        <ScrollReveal animation="fade-up" delay={400} className="text-center mt-16">
-          <Button variant="hero" size="xl" onClick={scrollToBooking}>
+        <ScrollReveal animation="fade-up" delay={200} className="text-center mt-10 md:mt-16">
+          <Button variant="hero" size="lg" className="md:h-14 md:px-8" onClick={scrollToBooking}>
             Book a Cleaning
-            <ArrowRight className="w-5 h-5 ml-2" />
+            <ArrowRight className="w-4 h-4 md:w-5 md:h-5 ml-2" />
           </Button>
         </ScrollReveal>
       </div>

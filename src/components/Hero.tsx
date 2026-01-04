@@ -82,38 +82,39 @@ const Hero = () => {
       </div>
 
       {/* Content */}
-      <div className="container relative z-10 px-4 py-20">
+      <div className="container relative z-10 px-4 py-12 md:py-20">
         <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 bg-primary/20 border border-primary/40 rounded-full px-4 py-2 mb-6 animate-fade-up">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-body uppercase tracking-wider text-primary">
+          <div className="inline-flex items-center gap-2 bg-primary/20 border border-primary/40 rounded-full px-3 py-1.5 md:px-4 md:py-2 mb-4 md:mb-6 animate-fade-up">
+            <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
+            <span className="text-xs md:text-sm font-body uppercase tracking-wider text-primary">
               Premium Sneaker Care
             </span>
           </div>
           
-          <h1 className="font-display text-5xl md:text-7xl lg:text-8xl text-white leading-none mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
+          <h1 className="font-display text-4xl sm:text-5xl md:text-7xl lg:text-8xl text-white leading-[0.95] mb-4 md:mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
             RESTORE YOUR
             <span className="block text-shimmer">KICKS TO GLORY</span>
           </h1>
           
-          <p className="font-body text-lg md:text-xl text-slate-300 max-w-xl mb-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
+          <p className="font-body text-base md:text-xl text-slate-300 max-w-xl mb-6 md:mb-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
             Professional sneaker cleaning, restoration, and customization services. 
             From Jordans to Dunks, we bring your grails back to life.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 animate-fade-up" style={{ animationDelay: "0.3s" }}>
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 animate-fade-up" style={{ animationDelay: "0.3s" }}>
             <Button
               variant="hero"
-              size="xl"
+              size="lg"
+              className="md:h-14 md:px-8 md:text-base"
               onClick={() => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" })}
             >
               Book a Cleaning
-              <ArrowRight className="w-5 h-5 ml-2" />
+              <ArrowRight className="w-4 h-4 md:w-5 md:h-5 ml-2" />
             </Button>
             <Button
               variant="outline"
-              size="xl"
-              className="border-slate-600 text-white hover:bg-slate-800"
+              size="lg"
+              className="border-slate-600 text-white hover:bg-slate-800 md:h-14 md:px-8 md:text-base"
               onClick={() => document.getElementById("services")?.scrollIntoView({ behavior: "smooth" })}
             >
               View Services
@@ -121,18 +122,18 @@ const Hero = () => {
           </div>
 
           {/* Stats */}
-          <div ref={statsRef} className="grid grid-cols-3 gap-8 mt-16 pt-8 border-t border-slate-700 animate-fade-up" style={{ animationDelay: "0.4s" }}>
-            <div>
-              <p className="font-display text-3xl md:text-4xl text-primary">{kicksCount}+</p>
-              <p className="font-body text-sm text-slate-400 uppercase tracking-wider">Kicks Restored</p>
+          <div ref={statsRef} className="grid grid-cols-3 gap-4 md:gap-8 mt-10 md:mt-16 pt-6 md:pt-8 border-t border-slate-700 animate-fade-up" style={{ animationDelay: "0.4s" }}>
+            <div className="text-center sm:text-left">
+              <p className="font-display text-2xl sm:text-3xl md:text-4xl text-primary">{kicksCount}+</p>
+              <p className="font-body text-[10px] sm:text-xs md:text-sm text-slate-400 uppercase tracking-wider">Kicks Restored</p>
             </div>
-            <div>
-              <p className="font-display text-3xl md:text-4xl text-primary">{satisfactionCount}%</p>
-              <p className="font-body text-sm text-slate-400 uppercase tracking-wider">Satisfaction</p>
+            <div className="text-center sm:text-left">
+              <p className="font-display text-2xl sm:text-3xl md:text-4xl text-primary">{satisfactionCount}%</p>
+              <p className="font-body text-[10px] sm:text-xs md:text-sm text-slate-400 uppercase tracking-wider">Satisfaction</p>
             </div>
-            <div>
-              <p className="font-display text-3xl md:text-4xl text-primary">{ratingCount}★</p>
-              <p className="font-body text-sm text-slate-400 uppercase tracking-wider">Rated Service</p>
+            <div className="text-center sm:text-left">
+              <p className="font-display text-2xl sm:text-3xl md:text-4xl text-primary">{ratingCount}★</p>
+              <p className="font-body text-[10px] sm:text-xs md:text-sm text-slate-400 uppercase tracking-wider">Rated Service</p>
             </div>
           </div>
         </div>

@@ -46,57 +46,57 @@ const StarRating = ({ rating }: { rating: number }) => {
 
 const Testimonials = () => {
   return (
-    <section id="testimonials" className="py-20 md:py-32 bg-background">
+    <section id="testimonials" className="py-16 md:py-32 bg-background">
       <div className="container px-4">
-        <ScrollReveal animation="fade-up" className="text-center mb-16">
-          <span className="text-primary font-body text-sm uppercase tracking-widest">
+        <ScrollReveal animation="fade-up" className="text-center mb-10 md:mb-16">
+          <span className="text-primary font-body text-xs md:text-sm uppercase tracking-widest">
             Testimonials
           </span>
-          <h2 className="font-display text-4xl md:text-6xl text-foreground mt-4">
+          <h2 className="font-display text-3xl sm:text-4xl md:text-6xl text-foreground mt-3 md:mt-4">
             WHAT OUR CUSTOMERS SAY
           </h2>
-          <p className="font-body text-muted-foreground max-w-2xl mx-auto mt-4">
+          <p className="font-body text-sm md:text-base text-muted-foreground max-w-2xl mx-auto mt-3 md:mt-4">
             Don't just take our word for it. Hear from sneakerheads who trust us with their kicks.
           </p>
         </ScrollReveal>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
           {testimonials.map((testimonial, index) => (
             <ScrollReveal
               key={testimonial.name}
               animation="fade-up"
               delay={index * 100}
             >
-              <div className="bg-card border border-border rounded-2xl p-8 hover:border-primary/50 transition-all duration-300 h-full">
+              <div className="bg-card border border-border rounded-xl md:rounded-2xl p-5 md:p-8 hover:border-primary/50 transition-all duration-300 h-full">
                 {/* Header with photo and info */}
-                <div className="flex items-center gap-4 mb-6">
+                <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-6">
                   <div className="relative">
                     <img
                       src={testimonial.photo}
                       alt={testimonial.name}
-                      className="w-14 h-14 rounded-full object-cover border-2 border-primary/30"
+                      className="w-11 h-11 md:w-14 md:h-14 rounded-full object-cover border-2 border-primary/30"
                     />
-                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                      <span className="text-primary-foreground text-xs">✓</span>
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 md:w-5 md:h-5 bg-primary rounded-full flex items-center justify-center">
+                      <span className="text-primary-foreground text-[10px] md:text-xs">✓</span>
                     </div>
                   </div>
                   <div>
-                    <h4 className="font-display text-foreground text-lg">
+                    <h4 className="font-display text-foreground text-base md:text-lg">
                       {testimonial.name}
                     </h4>
-                    <p className="font-body text-muted-foreground text-sm">
+                    <p className="font-body text-muted-foreground text-xs md:text-sm">
                       {testimonial.location}
                     </p>
                   </div>
                 </div>
 
                 {/* Star Rating */}
-                <div className="mb-4">
+                <div className="mb-3 md:mb-4">
                   <StarRating rating={testimonial.rating} />
                 </div>
 
                 {/* Testimonial Text */}
-                <p className="font-body text-muted-foreground leading-relaxed">
+                <p className="font-body text-muted-foreground text-sm md:text-base leading-relaxed">
                   "{testimonial.text}"
                 </p>
               </div>

@@ -51,21 +51,21 @@ const scrollToBooking = () => {
 
 const Services = () => {
   return (
-    <section id="services" className="py-20 md:py-32 bg-background">
+    <section id="services" className="py-16 md:py-32 bg-background">
       <div className="container px-4">
-        <ScrollReveal animation="fade-up" className="text-center mb-16">
-          <span className="text-primary font-body text-sm uppercase tracking-widest">
+        <ScrollReveal animation="fade-up" className="text-center mb-10 md:mb-16">
+          <span className="text-primary font-body text-xs md:text-sm uppercase tracking-widest">
             Pricing
           </span>
-          <h2 className="font-display text-4xl md:text-6xl text-foreground mt-4">
+          <h2 className="font-display text-3xl sm:text-4xl md:text-6xl text-foreground mt-3 md:mt-4">
             OUR SERVICES
           </h2>
-          <p className="font-body text-muted-foreground max-w-2xl mx-auto mt-4">
+          <p className="font-body text-sm md:text-base text-muted-foreground max-w-2xl mx-auto mt-3 md:mt-4">
             From a quick refresh to a complete transformation, we have got your kicks covered.
           </p>
         </ScrollReveal>
 
-        <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
           {services.map((service, index) => (
             <ScrollReveal
               key={service.title}
@@ -73,7 +73,7 @@ const Services = () => {
               delay={index * 100}
             >
               <div
-                className={`group relative card-gradient rounded-2xl overflow-hidden border transition-all duration-500 h-full ${
+                className={`group relative card-gradient rounded-xl md:rounded-2xl overflow-hidden border transition-all duration-500 h-full ${
                   service.popular
                     ? "border-primary shadow-lg shadow-primary/20"
                     : "border-border hover:border-primary/50"
@@ -81,13 +81,13 @@ const Services = () => {
               >
               {/* Popular Badge */}
               {service.popular && (
-                <div className="absolute top-4 right-4 z-10 bg-primary text-primary-foreground text-xs font-body uppercase tracking-wider px-3 py-1 rounded-full">
+                <div className="absolute top-3 right-3 md:top-4 md:right-4 z-10 bg-primary text-primary-foreground text-[10px] md:text-xs font-body uppercase tracking-wider px-2 py-0.5 md:px-3 md:py-1 rounded-full">
                   Most Popular
                 </div>
               )}
 
               {/* Image */}
-              <div className="relative h-48 overflow-hidden">
+              <div className="relative h-40 md:h-48 overflow-hidden">
                 <img
                   src={service.image}
                   alt={service.title}
@@ -97,32 +97,32 @@ const Services = () => {
               </div>
 
               {/* Content */}
-              <div className="p-6">
-                <h3 className="font-display text-2xl text-foreground mb-1">
+              <div className="p-4 md:p-6">
+                <h3 className="font-display text-xl md:text-2xl text-foreground mb-1">
                   {service.title}
                 </h3>
-                <p className="font-display text-xl text-primary mb-1">
+                <p className="font-display text-lg md:text-xl text-primary mb-0.5 md:mb-1">
                   {service.price}
                 </p>
-                <p className="font-body text-sm text-muted-foreground mb-4">
+                <p className="font-body text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
                   {service.turnaround}
                 </p>
-                <p className="font-body text-muted-foreground text-sm mb-5">
+                <p className="font-body text-muted-foreground text-xs md:text-sm mb-4 md:mb-5">
                   {service.description}
                 </p>
 
                 {/* What's Included */}
-                <div className="mb-6">
-                  <p className="font-body text-xs uppercase tracking-wider text-muted-foreground mb-3">
+                <div className="mb-4 md:mb-6">
+                  <p className="font-body text-[10px] md:text-xs uppercase tracking-wider text-muted-foreground mb-2 md:mb-3">
                     What&apos;s Included
                   </p>
-                  <ul className="space-y-2">
+                  <ul className="space-y-1.5 md:space-y-2">
                     {service.features.map((feature) => (
                       <li
                         key={feature}
-                        className="flex items-start gap-2 text-sm text-foreground"
+                        className="flex items-start gap-2 text-xs md:text-sm text-foreground"
                       >
-                        <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                        <Check className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary mt-0.5 flex-shrink-0" />
                         <span className="font-body">{feature}</span>
                       </li>
                     ))}
@@ -132,7 +132,7 @@ const Services = () => {
                 {/* Book Now Button */}
                 <Button
                   variant={service.popular ? "hero" : "outline"}
-                  className="w-full"
+                  className="w-full h-10 md:h-11 text-sm"
                   onClick={scrollToBooking}
                 >
                   Book Now
