@@ -22,12 +22,12 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16 md:h-20">
           <a href="#" className="flex items-center group">
             <div className="relative">
+              <span className="absolute -top-1 -left-1 text-[8px] md:text-[10px] text-foil font-bold [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.9))]">®</span>
               <img 
                 src={heroK} 
                 alt="K" 
                 className="h-12 md:h-16 w-auto origin-center group-hover:animate-kick [filter:drop-shadow(0_2px_2px_rgba(0,0,0,0.9))_drop-shadow(0_6px_12px_rgba(0,0,0,0.6))]" 
               />
-              <span className="absolute -top-1 -right-1 text-[8px] md:text-[10px] text-foil font-bold [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.9))]">®</span>
             </div>
             <span className="font-anton text-xl md:text-2xl text-foil tracking-tight group-hover:animate-kickedBounce -ml-5 [filter:drop-shadow(0_2px_2px_rgba(0,0,0,0.9))_drop-shadow(0_6px_12px_rgba(0,0,0,0.6))]">
               CLEAN MY KICKS
