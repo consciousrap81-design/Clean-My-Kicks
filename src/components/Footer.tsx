@@ -5,55 +5,53 @@ import sevenLogo from "@/assets/seven-logo.png";
 
 const Footer = forwardRef<HTMLElement>((_, ref) => {
   return (
-    <footer ref={ref} className="nav-dark border-t border-white/10 py-12">
+    <footer ref={ref} className="nav-dark border-t border-white/10 py-10 md:py-12">
       <div className="container px-4">
-        <div className="grid md:grid-cols-4 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-10 md:mb-12">
           {/* Brand */}
-          <div className="md:col-span-2">
+          <div className="col-span-2">
             <a href="#">
-              <img src={logoFull} alt="Clean My Kicks" className="h-16 w-auto" />
+              <img src={logoFull} alt="Clean My Kicks" className="h-12 md:h-16 w-auto" />
             </a>
-            <p className="font-body text-white/70 mt-4 max-w-md">
+            <p className="font-body text-sm md:text-base text-white/70 mt-3 md:mt-4 max-w-md">
               Professional sneaker cleaning, restoration, and customization. 
               Your kicks deserve the best care.
             </p>
             
             {/* Contact Info */}
-            <div className="mt-6 space-y-3">
+            <div className="mt-4 md:mt-6 space-y-2 md:space-y-3">
               <a 
                 href="tel:+19402814277" 
-                className="flex items-center gap-2 font-body text-white/70 hover:text-primary transition-colors"
+                className="flex items-center gap-2 font-body text-sm text-white/70 hover:text-primary transition-colors"
               >
                 <Phone className="w-4 h-4 text-primary" />
                 (940) 281-4277
               </a>
-              <div className="flex items-start gap-2 font-body text-white/70">
-                <MapPin className="w-4 h-4 text-primary mt-0.5" />
+              <div className="flex items-start gap-2 font-body text-sm text-white/70">
+                <MapPin className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                 <span>Denton, TX • Serving the DFW Metroplex</span>
               </div>
             </div>
 
             {/* Social Links */}
-            <div className="flex gap-4 mt-6">
-              {/* Replace href with your actual Instagram URL */}
+            <div className="flex gap-3 md:gap-4 mt-4 md:mt-6">
               <a 
                 href="https://instagram.com/cleanmykicks" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
                 aria-label="Follow us on Instagram"
               >
-                <Instagram className="w-5 h-5 text-white" />
+                <Instagram className="w-4 h-4 md:w-5 md:h-5 text-white" />
               </a>
-              {/* Replace href with your actual Google Business URL */}
               <a 
                 href="https://g.page/cleanmykicks" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
                 aria-label="Find us on Google"
               >
-                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <svg className="w-4 h-4 md:w-5 md:h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -65,28 +63,28 @@ const Footer = forwardRef<HTMLElement>((_, ref) => {
 
           {/* Quick Links */}
           <div>
-            <h4 className="font-display text-lg text-white mb-4">QUICK LINKS</h4>
-            <ul className="space-y-2">
-              <li><a href="#services" className="font-body text-white/70 hover:text-primary transition-colors">Services</a></li>
-              <li><a href="#gallery" className="font-body text-white/70 hover:text-primary transition-colors">Gallery</a></li>
-              <li><a href="#shop" className="font-body text-white/70 hover:text-primary transition-colors">Shop</a></li>
-              <li><a href="#about" className="font-body text-white/70 hover:text-primary transition-colors">About Us</a></li>
-              <li><a href="#faq" className="font-body text-white/70 hover:text-primary transition-colors">FAQ</a></li>
-              <li><a href="#booking" className="font-body text-white/70 hover:text-primary transition-colors">Book Now</a></li>
+            <h4 className="font-display text-base md:text-lg text-white mb-3 md:mb-4">QUICK LINKS</h4>
+            <ul className="space-y-1.5 md:space-y-2">
+              <li><a href="#services" className="font-body text-sm text-white/70 hover:text-primary transition-colors">Services</a></li>
+              <li><a href="#gallery" className="font-body text-sm text-white/70 hover:text-primary transition-colors">Gallery</a></li>
+              <li><a href="#shop" className="font-body text-sm text-white/70 hover:text-primary transition-colors">Shop</a></li>
+              <li><a href="#about" className="font-body text-sm text-white/70 hover:text-primary transition-colors">About Us</a></li>
+              <li><a href="#faq" className="font-body text-sm text-white/70 hover:text-primary transition-colors">FAQ</a></li>
+              <li><a href="#booking" className="font-body text-sm text-white/70 hover:text-primary transition-colors">Book Now</a></li>
             </ul>
           </div>
 
           {/* Services */}
           <div>
-            <h4 className="font-display text-lg text-white mb-4">SERVICES</h4>
-            <ul className="space-y-2">
-              <li><a href="#services" className="font-body text-white/70 hover:text-primary transition-colors">Basic Clean</a></li>
-              <li><a href="#services" className="font-body text-white/70 hover:text-primary transition-colors">Deep Clean</a></li>
-              <li><a href="#services" className="font-body text-white/70 hover:text-primary transition-colors">Restoration</a></li>
+            <h4 className="font-display text-base md:text-lg text-white mb-3 md:mb-4">SERVICES</h4>
+            <ul className="space-y-1.5 md:space-y-2">
+              <li><a href="#services" className="font-body text-sm text-white/70 hover:text-primary transition-colors">Basic Clean</a></li>
+              <li><a href="#services" className="font-body text-sm text-white/70 hover:text-primary transition-colors">Deep Clean</a></li>
+              <li><a href="#services" className="font-body text-sm text-white/70 hover:text-primary transition-colors">Restoration</a></li>
             </ul>
             
-            <h4 className="font-display text-lg text-white mb-4 mt-8">SERVICE AREA</h4>
-            <ul className="space-y-2 font-body text-white/70">
+            <h4 className="font-display text-base md:text-lg text-white mb-3 md:mb-4 mt-6 md:mt-8">SERVICE AREA</h4>
+            <ul className="space-y-1.5 md:space-y-2 font-body text-sm text-white/70">
               <li>Denton, TX</li>
               <li>Dallas-Fort Worth Metroplex</li>
               <li>Mail-in service available</li>
@@ -94,19 +92,19 @@ const Footer = forwardRef<HTMLElement>((_, ref) => {
           </div>
         </div>
 
-        <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="font-body text-sm text-white/60 flex items-center gap-1 flex-wrap">
+        <div className="border-t border-white/10 pt-6 md:pt-8 flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
+          <p className="font-body text-xs md:text-sm text-white/60 flex items-center gap-1 flex-wrap justify-center md:justify-start text-center md:text-left">
             © {new Date().getFullYear()} Clean My Kicks, a brand of 
             <a href="https://sevenloafministries.org" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-white/80 transition-colors">
-              <img src={sevenLogo} alt="7" className="h-4 w-auto inline-block" />
+              <img src={sevenLogo} alt="7" className="h-3.5 md:h-4 w-auto inline-block" />
               Seven Loaf Ministries, LLC.
             </a> All rights reserved.
           </p>
-          <div className="flex gap-6">
-            <a href="#" className="font-body text-sm text-white/60 hover:text-primary transition-colors">
+          <div className="flex gap-4 md:gap-6">
+            <a href="#" className="font-body text-xs md:text-sm text-white/60 hover:text-primary transition-colors">
               Privacy Policy
             </a>
-            <a href="#" className="font-body text-sm text-white/60 hover:text-primary transition-colors">
+            <a href="#" className="font-body text-xs md:text-sm text-white/60 hover:text-primary transition-colors">
               Terms of Service
             </a>
           </div>
