@@ -1,30 +1,30 @@
 import { Button } from "@/components/ui/button";
 import { ShoppingBag } from "lucide-react";
 import shop1 from "@/assets/shop-1.jpg";
-import shop4 from "@/assets/shop-4.png";
-import shop5 from "@/assets/shop-5.png";
+import shop2 from "@/assets/shop-2.jpg";
+import shop3 from "@/assets/shop-3.jpg";
 
 const products = [
-  {
-    name: "Jordan 4 Military Blue",
-    condition: "Restored",
-    size: "10.5",
-    price: "$220",
-    image: shop1,
-  },
   {
     name: "Jordan 4 Oxidized Green",
     condition: "Restored",
     size: "10",
     price: "$265",
-    image: shop4,
+    image: shop1,
   },
   {
     name: "Jordan 3 J Balvin",
     condition: "Restored",
     size: "9.5",
     price: "$310",
-    image: shop5,
+    image: shop2,
+  },
+  {
+    name: "Jordan 4 Military Blue",
+    condition: "Restored",
+    size: "10.5",
+    price: "$220",
+    image: shop3,
   },
 ];
 
