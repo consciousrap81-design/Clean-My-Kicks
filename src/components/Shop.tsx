@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { ShoppingBag } from "lucide-react";
 import shop1 from "@/assets/shop-1.jpg";
-import shop2 from "@/assets/shop-2.jpg";
-import shop3 from "@/assets/shop-3.jpg";
+import shop4 from "@/assets/shop-4.jpg";
+import shop5 from "@/assets/shop-5.jpg";
 
 const products = [
   {
@@ -13,18 +13,18 @@ const products = [
     image: shop1,
   },
   {
-    name: "Nike Dunk Low Panda",
+    name: "Jordan 4 Oxidized Green",
     condition: "Restored",
-    size: "9",
-    price: "$145",
-    image: shop2,
+    size: "10",
+    price: "$265",
+    image: shop4,
   },
   {
-    name: "Jordan 1 Chicago",
+    name: "Jordan 3 J Balvin",
     condition: "Restored",
-    size: "11",
-    price: "$285",
-    image: shop3,
+    size: "9.5",
+    price: "$310",
+    image: shop5,
   },
 ];
 
