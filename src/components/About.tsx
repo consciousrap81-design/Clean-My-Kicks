@@ -53,7 +53,8 @@ const About = () => {
                 />
               </div>
               <div className="mt-6 text-center">
-                <p className="font-display text-lg md:text-xl text-foreground">Founder & CEO</p>
+                <p className="font-display text-xl md:text-2xl text-foreground">Clifford Baylor</p>
+                <p className="font-body text-sm text-primary uppercase tracking-wider">Founder & CEO</p>
                 <p className="font-body text-sm md:text-base text-muted-foreground mt-3 italic">
                   "Walking by faith, not by sight. My mission is to serve our community with excellence, 
                   restore what others consider lost, and glorify God through every pair we bring back to life."
