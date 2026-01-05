@@ -4,7 +4,6 @@ import TrustStrip from "@/components/TrustStrip";
 import HowItWorks from "@/components/HowItWorks";
 import Services from "@/components/Services";
 import Gallery from "@/components/Gallery";
-import ShopGallery from "@/components/ShopGallery";
 import Testimonials from "@/components/Testimonials";
 import Shop from "@/components/Shop";
 import About from "@/components/About";
@@ -22,7 +21,6 @@ const Index = () => {
       <HowItWorks />
       <Services />
       <Gallery />
-      <ShopGallery />
       <Testimonials />
       <Shop />
       <About />
