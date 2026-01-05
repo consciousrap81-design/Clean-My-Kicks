@@ -1,5 +1,6 @@
 import { CheckCircle } from "lucide-react";
 import ScrollReveal from "@/components/ScrollReveal";
+import ceoImage from "@/assets/ceo.png";
 
 const features = [
   "Premium cleaning solutions safe for all materials",
@@ -44,11 +45,20 @@ const About = () => {
 
           <ScrollReveal animation="fade-left" delay={200}>
             <div className="relative">
-              <div className="aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border border-primary/20 flex items-center justify-center">
-                <div className="text-center">
-                  <p className="font-display text-6xl sm:text-7xl md:text-9xl text-gradient">CMK</p>
-                  <p className="font-body text-xs md:text-sm text-muted-foreground uppercase tracking-widest mt-2 md:mt-4">Est. 2024</p>
-                </div>
+              <div className="aspect-square rounded-2xl md:rounded-3xl overflow-hidden border border-primary/20">
+                <img 
+                  src={ceoImage} 
+                  alt="CEO of Clean My Kicks" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="mt-6 text-center">
+                <p className="font-display text-lg md:text-xl text-foreground">Founder & CEO</p>
+                <p className="font-body text-sm md:text-base text-muted-foreground mt-3 italic">
+                  "Walking by faith, not by sight. My mission is to serve our community with excellence, 
+                  restore what others consider lost, and glorify God through every pair we bring back to life."
+                </p>
+                <p className="font-body text-xs text-primary mt-2 uppercase tracking-widest">— 2 Corinthians 5:7</p>
               </div>
               {/* Decorative elements */}
               <div className="absolute -top-2 -right-2 md:-top-4 md:-right-4 w-16 h-16 md:w-24 md:h-24 bg-primary/10 rounded-full blur-2xl" />
