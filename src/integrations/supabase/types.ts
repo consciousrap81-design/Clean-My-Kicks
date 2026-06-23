@@ -14,16 +14,291 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      customers: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          lead_source_id: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          lead_source_id?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          lead_source_id?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_lead_source_id_fkey"
+            columns: ["lead_source_id"]
+            isOneToOne: false
+            referencedRelation: "lead_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_photos: {
+        Row: {
+          id: string
+          job_id: string
+          kind: string
+          uploaded_at: string
+          url: string
+        }
+        Insert: {
+          id?: string
+          job_id: string
+          kind: string
+          uploaded_at?: string
+          url: string
+        }
+        Update: {
+          id?: string
+          job_id?: string
+          kind?: string
+          uploaded_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_photos_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          admin_notes: string | null
+          completion_date: string | null
+          condition_notes: string | null
+          created_at: string
+          customer_id: string
+          due_date: string | null
+          id: string
+          intake_date: string | null
+          lead_source_id: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          quoted_price: number
+          service_id: string | null
+          shoe_brand: string | null
+          shoe_model: string | null
+          status: Database["public"]["Enums"]["job_status"]
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          completion_date?: string | null
+          condition_notes?: string | null
+          created_at?: string
+          customer_id: string
+          due_date?: string | null
+          id?: string
+          intake_date?: string | null
+          lead_source_id?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          quoted_price?: number
+          service_id?: string | null
+          shoe_brand?: string | null
+          shoe_model?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          completion_date?: string | null
+          condition_notes?: string | null
+          created_at?: string
+          customer_id?: string
+          due_date?: string | null
+          id?: string
+          intake_date?: string | null
+          lead_source_id?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          quoted_price?: number
+          service_id?: string | null
+          shoe_brand?: string | null
+          shoe_model?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_lead_source_id_fkey"
+            columns: ["lead_source_id"]
+            isOneToOne: false
+            referencedRelation: "lead_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_sources: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          job_id: string
+          method: string | null
+          notes: string | null
+          paid_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          job_id: string
+          method?: string | null
+          notes?: string | null
+          paid_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          job_id?: string
+          method?: string | null
+          notes?: string | null
+          paid_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          active: boolean
+          base_price: number
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          base_price?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          active?: boolean
+          base_price?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      job_status:
+        | "new_request"
+        | "awaiting_shoes"
+        | "received"
+        | "in_progress"
+        | "ready_for_payment"
+        | "completed"
+        | "shipped"
+        | "picked_up"
+        | "cancelled"
+      payment_status: "unpaid" | "partial" | "paid" | "refunded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +425,20 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      job_status: [
+        "new_request",
+        "awaiting_shoes",
+        "received",
+        "in_progress",
+        "ready_for_payment",
+        "completed",
+        "shipped",
+        "picked_up",
+        "cancelled",
+      ],
+      payment_status: ["unpaid", "partial", "paid", "refunded"],
+    },
   },
 } as const
