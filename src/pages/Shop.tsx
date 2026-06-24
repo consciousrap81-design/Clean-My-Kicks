@@ -290,13 +290,27 @@ export default function ShopPage() {
                 ))}
               </select>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground uppercase tracking-wider text-[10px] md:text-xs">Sort</span>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as typeof sort)}
+                className="bg-card border border-border rounded-md px-2 py-1 text-foreground"
+                aria-label="Sort products"
+              >
+                <option value="newest">Newest</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="popular">Most popular</option>
+              </select>
+            </div>
             {(brand !== "All" || size !== "All" || condition !== "All" || query) && (
               <button onClick={resetFilters} className="text-primary underline underline-offset-2 text-xs">
                 Reset
               </button>
             )}
             <div className="ml-auto text-muted-foreground">
-              {filtered.length} {filtered.length === 1 ? "pair" : "pairs"}
+              {sorted.length} {sorted.length === 1 ? "pair" : "pairs"}
             </div>
           </div>
 
@@ -306,7 +320,7 @@ export default function ShopPage() {
                 <div key={i} className="aspect-square bg-card rounded-xl animate-pulse" />
               ))}
             </div>
-          ) : filtered.length === 0 ? (
+          ) : sorted.length === 0 ? (
             <div className="text-center py-16 border border-dashed border-border rounded-xl">
               <p className="text-muted-foreground mb-4">
                 {products.length === 0
@@ -321,7 +335,7 @@ export default function ShopPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
-              {filtered.map((p, index) => {
+              {sorted.map((p, index) => {
                 const img = p.photo_path ? urls[p.photo_path] : null;
                 const reserved = p.status === "reserved";
                 const display = [p.brand, p.model].filter(Boolean).join(" ") || p.name;
