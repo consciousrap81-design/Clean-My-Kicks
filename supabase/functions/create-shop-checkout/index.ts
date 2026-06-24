@@ -133,7 +133,7 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
     variantIds.length
       ? supabase
           .from("shop_accessory_variants")
-          .select("id, name, stock_qty, active, price_cents_override, shop_accessories!inner(id, name, base_price_cents, active, shop_accessory_photos(storage_path, sort_order))")
+          .select("id, name, sku, stock_qty, active, price_cents_override, shop_accessories!inner(id, name, base_price_cents, active, shop_accessory_photos(storage_path, sort_order))")
           .in("id", variantIds)
       : Promise.resolve({ data: [] }),
   ]);
@@ -151,6 +151,15 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
       const stillReserved = s.reserved_until && new Date(s.reserved_until) > now;
       if (stillReserved && s.reserved_session_id !== cartId) {
         return json({ error: `${s.name} was reserved by another buyer` }, 409);
+      }
+      // Our own reservation must still be valid OR we re-acquire it below.
+      const heldByUs = stillReserved && s.reserved_session_id === cartId;
+      const cartReservedUntil = it.reserved_until ? new Date(it.reserved_until) : null;
+      const cartExpired = cartReservedUntil ? cartReservedUntil <= now : true;
+      if (!heldByUs || cartExpired) {
+        return json({
+          error: `Your hold on ${[s.brand, s.model].filter(Boolean).join(" ") || s.name} expired. Re-reserve it from the cart and try again.`,
+        }, 409);
       }
       const display = [s.brand, s.model, s.name].filter(Boolean).join(" ").trim() || s.name;
       const photoUrl = await firstSneakerPhotoUrl(supabase, s);
@@ -184,9 +193,9 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
         return json({ error: `Only ${v.stock_qty} of ${v.shop_accessories.name} in stock` }, 409);
       }
       const unitCents = v.price_cents_override ?? v.shop_accessories.base_price_cents;
-      const display = v.name && v.name !== "Default"
-        ? `${v.shop_accessories.name} — ${v.name}`
-        : v.shop_accessories.name;
+      const variantSuffix = v.name && v.name !== "Default" ? ` — ${v.name}` : "";
+      const skuSuffix = v.sku ? ` (SKU ${v.sku})` : "";
+      const display = `${v.shop_accessories.name}${variantSuffix}${skuSuffix}`;
       const photoUrl = await firstAccessoryPhotoUrl(supabase, v.shop_accessories);
       lineItems.push({
         quantity: it.qty,
@@ -195,6 +204,7 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
           unit_amount: unitCents,
           product_data: {
             name: display,
+            description: v.sku ? `SKU: ${v.sku}` : undefined,
             images: photoUrl ? [photoUrl] : undefined,
           },
         },
@@ -204,6 +214,8 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
         variant_id: v.id,
         accessory_id: v.shop_accessories.id,
         name: display,
+        variant_name: v.name ?? null,
+        sku: v.sku ?? null,
         qty: it.qty,
         unit_price_cents: unitCents,
       });
@@ -217,13 +229,50 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
       .from("shop_products")
       .update({ status: "reserved", reserved_until: reservedUntil, reserved_session_id: cartId })
       .eq("id", sid);
+    await supabase
+      .from("shop_cart_items")
+      .update({ reserved_until: reservedUntil })
+      .eq("cart_id", cartId)
+      .eq("sneaker_product_id", sid);
   }
+
+  // Shipping options: free standard over $100, otherwise $8; express always $25.
+  const subtotalCents = lineItems.reduce(
+    (sum: number, li: any) => sum + (li.price_data?.unit_amount ?? 0) * (li.quantity ?? 1),
+    0,
+  );
+  const standardCents = subtotalCents >= 10000 ? 0 : 800;
+  const shippingOptions: any[] = [
+    {
+      shipping_rate_data: {
+        type: "fixed_amount",
+        fixed_amount: { amount: standardCents, currency: "usd" },
+        display_name: standardCents === 0 ? "Free Standard Shipping" : "Standard Shipping",
+        delivery_estimate: {
+          minimum: { unit: "business_day", value: 5 },
+          maximum: { unit: "business_day", value: 7 },
+        },
+      },
+    },
+    {
+      shipping_rate_data: {
+        type: "fixed_amount",
+        fixed_amount: { amount: 2500, currency: "usd" },
+        display_name: "Express Shipping",
+        delivery_estimate: {
+          minimum: { unit: "business_day", value: 1 },
+          maximum: { unit: "business_day", value: 3 },
+        },
+      },
+    },
+  ];
 
   const stripeSession = await stripe.checkout.sessions.create({
     mode: "payment",
     payment_method_types: ["card"],
     shipping_address_collection: { allowed_countries: ["US"] },
     phone_number_collection: { enabled: true },
+    shipping_options: shippingOptions,
     line_items: lineItems,
     success_url: `${SITE_URL}/shop/order/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${SITE_URL}/shop?cancelled=1`,
