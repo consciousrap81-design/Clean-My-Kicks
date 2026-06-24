@@ -10,6 +10,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { signedPhotoUrls, type ShopProduct } from "@/lib/shop";
 import BuyNowButton from "@/components/shop/BuyNowButton";
+import AddSneakerToCartButton from "@/components/shop/AddSneakerToCartButton";
+import AccessoryCard, { type AccessoryRow } from "@/components/shop/AccessoryCard";
 import serviceClean from "@/assets/service-clean.jpg";
 import serviceRestore from "@/assets/service-restore.jpg";
 import serviceCustom from "@/assets/service-custom.jpg";
@@ -57,6 +59,7 @@ export default function ShopPage() {
   const [recentlySold, setRecentlySold] = useState<{ id: string; name: string; sold_at: string }[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [accessories, setAccessories] = useState<AccessoryRow[]>([]);
   const [brand, setBrand] = useState<string>("All");
   const [size, setSize] = useState<string>("All");
   const [condition, setCondition] = useState<string>("All");
@@ -80,6 +83,14 @@ export default function ShopPage() {
           .order("sold_at", { ascending: false })
           .limit(5),
       ]);
+
+      const { data: accs } = await supabase
+        .from("shop_accessories")
+        .select("id, name, slug, description, category, base_price_cents, shop_accessory_variants(id, name, stock_qty, active, price_cents_override, sort_order), shop_accessory_photos(storage_path, sort_order)")
+        .eq("active", true)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false });
+      if (mounted) setAccessories((accs ?? []) as any);
 
       const rows: Row[] = (live ?? []).map((p: any) => {
         const photos = (p.shop_product_photos ?? []).sort(
@@ -108,6 +119,7 @@ export default function ShopPage() {
     const channel = supabase
       .channel("shop-page-products")
       .on("postgres_changes", { event: "*", schema: "public", table: "shop_products" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "shop_accessory_variants" }, () => load())
       .subscribe();
     return () => {
       mounted = false;
