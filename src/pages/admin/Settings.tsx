@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Copy, ExternalLink } from "lucide-react";
 
 export default function Settings() {
   const qc = useQueryClient();
@@ -37,6 +37,7 @@ export default function Settings() {
   return (
     <div className="max-w-2xl space-y-4">
       <h1 className="text-3xl font-display tracking-wide">Settings</h1>
+      <StripeWebhookCard />
       <Card>
         <CardHeader><CardTitle className="text-base">Lead Sources</CardTitle></CardHeader>
         <CardContent className="space-y-3">
