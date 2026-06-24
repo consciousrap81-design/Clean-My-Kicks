@@ -9,6 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { signedPhotoUrls, type ShopProduct } from "@/lib/shop";
+import BuyNowButton from "@/components/shop/BuyNowButton";
 import serviceClean from "@/assets/service-clean.jpg";
 import serviceRestore from "@/assets/service-restore.jpg";
 import serviceCustom from "@/assets/service-custom.jpg";
@@ -386,6 +387,14 @@ export default function ShopPage() {
                           View <ArrowRight className="w-3 h-3" />
                         </span>
                       </div>
+                      <BuyNowButton
+                        productId={p.id}
+                        status={p.status}
+                        reservedUntil={(p as any).reserved_until}
+                        reservedSessionId={(p as any).reserved_session_id}
+                        price={Number(p.price)}
+                        className="w-full h-9 mt-3 text-xs"
+                      />
                     </div>
                   </Link>
                 );
