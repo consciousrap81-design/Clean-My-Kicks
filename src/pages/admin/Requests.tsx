@@ -669,6 +669,94 @@ export default function Requests() {
         </DialogContent>
       </Dialog>
 
+      {/* Quote create/edit dialog */}
+      <Dialog open={quoteOpen} onOpenChange={(o) => !o && setQuoteOpen(false)}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{quote ? "Edit Quote" : "Create Quote"}</DialogTitle>
+            <DialogDescription>
+              Build a quote for {selected?.customer_name}. Send the link so they can review, accept, or decline.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <div className="uppercase text-muted-foreground mb-0.5">Customer</div>
+                <div className="font-medium text-sm">{selected?.customer_name}</div>
+              </div>
+              <div>
+                <div className="uppercase text-muted-foreground mb-0.5">Shoe</div>
+                <div className="font-medium text-sm">{selected?.shoe_brand} {selected?.shoe_model}</div>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-muted-foreground block mb-1">Recommended Service</label>
+              <Input value={qService} onChange={(e) => setQService(e.target.value)} placeholder="e.g. Deep Clean + Restoration" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs uppercase text-muted-foreground block mb-1">Quote Amount ($)</label>
+                <Input type="number" min="0" step="0.01" value={qAmount} onChange={(e) => setQAmount(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs uppercase text-muted-foreground block mb-1">Expires On</label>
+                <Input type="date" value={qExpires} onChange={(e) => setQExpires(e.target.value)} />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs uppercase text-muted-foreground">Add-On Services</label>
+                <Button
+                  type="button" variant="ghost" size="sm"
+                  onClick={() => setQAddons((a) => [...a, { name: "", price: "0" }])}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add
+                </Button>
+              </div>
+              {qAddons.length === 0 && (
+                <div className="text-xs text-muted-foreground italic">No add-ons</div>
+              )}
+              <div className="space-y-2">
+                {qAddons.map((a, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Input
+                      value={a.name}
+                      onChange={(e) => setQAddons((arr) => arr.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                      placeholder="Add-on name"
+                    />
+                    <Input
+                      type="number" min="0" step="0.01" className="w-28"
+                      value={a.price}
+                      onChange={(e) => setQAddons((arr) => arr.map((x, j) => j === i ? { ...x, price: e.target.value } : x))}
+                    />
+                    <Button type="button" variant="ghost" size="icon"
+                      onClick={() => setQAddons((arr) => arr.filter((_, j) => j !== i))}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs uppercase text-muted-foreground block mb-1">Notes / Recommendations</label>
+              <Textarea rows={3} value={qNotes} onChange={(e) => setQNotes(e.target.value)} placeholder="What we recommend, condition observations, timeline..." />
+            </div>
+          </div>
+          <DialogFooter className="flex-wrap gap-2">
+            <Button variant="outline" onClick={() => saveQuote(false)} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Save Draft
+            </Button>
+            <Button onClick={() => saveQuote(true)} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {quote && quote.status !== "draft" ? "Resend Quote" : "Send Quote"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Lightbox */}
       <Dialog open={lightboxIdx !== null} onOpenChange={(o) => !o && setLightboxIdx(null)}>
         {/* (lightbox below) */}
