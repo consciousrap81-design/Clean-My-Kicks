@@ -108,6 +108,10 @@ Deno.serve(async (req) => {
 });
 
 async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string, req: Request) {
+  const reqBody = await safeBody(req);
+  const promoCodeInput = String(reqBody?.promoCode ?? "").trim().toUpperCase();
+  const shippingMethod = reqBody?.shippingMethod === "express" ? "express" : "standard";
+
   // Load cart items
   const { data: items } = await supabase
     .from("shop_cart_items")
@@ -242,8 +246,7 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
     0,
   );
   const standardCents = subtotalCents >= 10000 ? 0 : 800;
-  const shippingOptions: any[] = [
-    {
+  const standardOption = {
       shipping_rate_data: {
         type: "fixed_amount",
         fixed_amount: { amount: standardCents, currency: "usd" },
@@ -253,8 +256,8 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
           maximum: { unit: "business_day", value: 7 },
         },
       },
-    },
-    {
+  };
+  const expressOption = {
       shipping_rate_data: {
         type: "fixed_amount",
         fixed_amount: { amount: 2500, currency: "usd" },
@@ -264,8 +267,50 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
           maximum: { unit: "business_day", value: 3 },
         },
       },
-    },
-  ];
+  };
+  // First option becomes the Stripe default — order to match the customer's pick.
+  const shippingOptions: any[] = shippingMethod === "express"
+    ? [expressOption, standardOption]
+    : [standardOption, expressOption];
+
+  // Validate + create a one-shot Stripe coupon for any applied promo.
+  let coupon: Stripe.Coupon | null = null;
+  let promoRecord: any = null;
+  let discountCents = 0;
+  if (promoCodeInput) {
+    const { data: promo } = await supabase
+      .from("shop_promo_codes")
+      .select("*")
+      .eq("code", promoCodeInput)
+      .eq("active", true)
+      .maybeSingle();
+    if (!promo) return json({ error: "Promo code not found" }, 400);
+    if (promo.expires_at && new Date(promo.expires_at) <= now) return json({ error: "Promo code expired" }, 400);
+    if (promo.max_redemptions !== null && promo.redemption_count >= promo.max_redemptions) {
+      return json({ error: "Promo code fully redeemed" }, 400);
+    }
+    const eligibleCents = lineItems
+      .filter((_, idx) => {
+        const snap = itemSnapshots[idx];
+        if (promo.applies_to === "all") return true;
+        if (promo.applies_to === "sneakers") return snap.type === "sneaker";
+        return snap.type === "accessory";
+      })
+      .reduce((s, li: any) => s + (li.price_data?.unit_amount ?? 0) * (li.quantity ?? 1), 0);
+    if (eligibleCents === 0) return json({ error: `Code applies to ${promo.applies_to} only` }, 400);
+    if (promo.min_subtotal_cents && subtotalCents < promo.min_subtotal_cents) {
+      return json({ error: `Minimum subtotal $${(promo.min_subtotal_cents / 100).toFixed(2)} not met` }, 400);
+    }
+    discountCents = promo.discount_type === "percent"
+      ? Math.floor((eligibleCents * promo.amount) / 100)
+      : Math.min(eligibleCents, promo.amount);
+    coupon = await stripe.coupons.create(
+      promo.discount_type === "percent"
+        ? { percent_off: promo.amount, duration: "once", name: `${promoCodeInput} (${promo.amount}% off)` }
+        : { amount_off: Math.min(promo.amount, subtotalCents), currency: "usd", duration: "once", name: `${promoCodeInput}` },
+    );
+    promoRecord = promo;
+  }
 
   const stripeSession = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -273,6 +318,8 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
     shipping_address_collection: { allowed_countries: ["US"] },
     phone_number_collection: { enabled: true },
     shipping_options: shippingOptions,
+    allow_promotion_codes: false,
+    discounts: coupon ? [{ coupon: coupon.id }] : undefined,
     line_items: lineItems,
     success_url: `${SITE_URL}/shop/order/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${SITE_URL}/shop?cancelled=1`,
@@ -280,14 +327,24 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
       cart_id: cartId,
       reserved_session_id: cartId,
       order_kind: "shop_cart",
+      shipping_method: shippingMethod,
+      promo_code: promoCodeInput || "",
+      promo_id: promoRecord?.id ?? "",
+      discount_cents: String(discountCents),
       items_summary: JSON.stringify(itemSnapshots).slice(0, 480),
     },
     payment_intent_data: {
-      metadata: { cart_id: cartId, order_kind: "shop_cart" },
+      metadata: { cart_id: cartId, order_kind: "shop_cart", promo_code: promoCodeInput || "" },
     },
   });
 
   return json({ url: stripeSession.url });
+}
+
+async function safeBody(req: Request): Promise<any> {
+  // Body is already consumed in main handler — re-read won't work. We instead pass via closure.
+  // This helper exists so the call site reads cleanly; main handler hands us the parsed body.
+  return (req as any)._parsedBody ?? null;
 }
 
 async function firstPhotoUrl(supabase: any, productId: string): Promise<string | null> {
