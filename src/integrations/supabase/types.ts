@@ -937,6 +937,7 @@ export type Database = {
           review_request_sent_at: string | null
           shipped_at: string | null
           shipping_address: Json | null
+          shipping_method: string | null
           status: string
           stripe_payment_intent: string | null
           stripe_session_id: string | null
@@ -960,6 +961,7 @@ export type Database = {
           review_request_sent_at?: string | null
           shipped_at?: string | null
           shipping_address?: Json | null
+          shipping_method?: string | null
           status?: string
           stripe_payment_intent?: string | null
           stripe_session_id?: string | null
@@ -983,6 +985,7 @@ export type Database = {
           review_request_sent_at?: string | null
           shipped_at?: string | null
           shipping_address?: Json | null
+          shipping_method?: string | null
           status?: string
           stripe_payment_intent?: string | null
           stripe_session_id?: string | null

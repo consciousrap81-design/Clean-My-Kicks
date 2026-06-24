@@ -1,0 +1,1 @@
+ALTER TABLE public.shop_orders ADD COLUMN IF NOT EXISTS shipping_method text;
