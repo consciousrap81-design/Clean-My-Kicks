@@ -42,7 +42,7 @@ Adds a "Mail in" fulfillment option alongside existing drop-off, powered by Ship
 - `admin_reminders` table (RLS: admin only)
 - Seed one row: `key='international_mail_in'`, `due_at = now() + 14 days`
 
-**New secrets:** `SHIPPO_API_KEY`, `SHIPPO_WEBHOOK_SECRET`, `SHOP_ADDRESS_*` (origin address for outbound + destination for inbound). Stored via add_secret.
+**New secrets:** `SHIPPO_API_KEY` only. `SHOP_ADDRESS_*` values are stored as non-secret config. Shippo's dashboard does not issue a webhook signing secret, so `shippo-webhook` authenticates events by re-fetching the referenced object (track / transaction) from Shippo using `SHIPPO_API_KEY` and trusting only that re-fetched payload — no HMAC verification.
 
 **New edge functions:**
 - `shippo-quote` — called from booking form; returns inbound + estimated outbound rate
