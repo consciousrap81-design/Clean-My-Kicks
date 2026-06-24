@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { JOB_STATUS_OPTIONS, PAYMENT_STATUS_OPTIONS } from "@/components/admin/StatusBadge";
 import { toast } from "sonner";
 import { Loader2, Trash2, Upload } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +23,8 @@ export default function JobDetail() {
   const [paymentAmt, setPaymentAmt] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const [updateBody, setUpdateBody] = useState("");
+  const [updateVisible, setUpdateVisible] = useState(true);
 
   const { data: services } = useQuery({
     queryKey: ["services-active"],
@@ -36,7 +40,7 @@ export default function JobDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("jobs")
-        .select("*, customer:customers(*), payments(*), job_photos(*)")
+        .select("*, customer:customers(*), payments(*), job_photos(*), job_updates(*)")
         .eq("id", id!)
         .single();
       if (error) throw error;
@@ -108,6 +112,34 @@ export default function JobDetail() {
     const { error } = await supabase.from("job_photos").insert({ job_id: id!, url: path, kind });
     if (error) return toast.error(error.message);
     toast.success(`${kind} photo uploaded`);
+    refetch();
+  }
+
+  async function togglePhotoVisibility(p: any) {
+    const { error } = await supabase
+      .from("job_photos")
+      .update({ customer_visible: !p.customer_visible })
+      .eq("id", p.id);
+    if (error) return toast.error(error.message);
+    refetch();
+  }
+
+  async function postUpdate() {
+    if (!updateBody.trim()) return;
+    const { error } = await supabase.from("job_updates").insert({
+      job_id: id!,
+      body: updateBody.trim(),
+      customer_visible: updateVisible,
+    });
+    if (error) return toast.error(error.message);
+    setUpdateBody("");
+    toast.success("Update posted");
+    refetch();
+  }
+
+  async function deleteUpdate(uid: string) {
+    const { error } = await supabase.from("job_updates").delete().eq("id", uid);
+    if (error) return toast.error(error.message);
     refetch();
   }
 
@@ -243,6 +275,13 @@ export default function JobDetail() {
                     {photos.map((p: any) => (
                       <div key={p.id} className="relative group aspect-square rounded-md overflow-hidden border">
                         {photoUrls[p.id] && <img src={photoUrls[p.id]} alt="" className="w-full h-full object-cover" />}
+                        <button
+                          onClick={() => togglePhotoVisibility(p)}
+                          className={`absolute bottom-1 left-1 right-1 text-[10px] px-1.5 py-0.5 rounded ${p.customer_visible ? "bg-emerald-600/85 text-white" : "bg-background/85 text-muted-foreground"}`}
+                          title="Toggle customer visibility"
+                        >
+                          {p.customer_visible ? "Customer can see" : "Hidden from customer"}
+                        </button>
                         <button onClick={() => deletePhoto(p)} className="absolute top-1 right-1 p-1 bg-background/80 rounded opacity-0 group-hover:opacity-100">
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -255,6 +294,46 @@ export default function JobDetail() {
           );
         })}
       </div>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Customer Updates (Timeline)</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <Textarea
+            placeholder="Post an update for the customer (e.g., 'Sole restoration complete, drying overnight.')"
+            value={updateBody}
+            onChange={(e) => setUpdateBody(e.target.value)}
+            rows={3}
+          />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <Switch checked={updateVisible} onCheckedChange={setUpdateVisible} id="vis" />
+              <Label htmlFor="vis">{updateVisible ? "Visible to customer" : "Internal only"}</Label>
+            </div>
+            <Button onClick={postUpdate} disabled={!updateBody.trim()}>Post Update</Button>
+          </div>
+          {(form.job_updates || []).length > 0 && (
+            <div className="divide-y border rounded-md">
+              {(form.job_updates as any[])
+                .slice()
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                .map((u) => (
+                <div key={u.id} className="px-3 py-2 text-sm flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="whitespace-pre-wrap">{u.body}</div>
+                    <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                      <span>{new Date(u.created_at).toLocaleString()}</span>
+                      <Badge variant="outline" className={u.customer_visible ? "bg-emerald-500/15 text-emerald-700 border-emerald-500/30" : ""}>
+                        {u.customer_visible ? "Customer-visible" : "Internal"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => deleteUpdate(u.id)}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
