@@ -557,7 +557,6 @@ function OrderDialog({
                 ) : confirmMode === "resend" ? "Resend email" : "Mark shipped & send"}
               </AlertDialogAction>
             </AlertDialogFooter>
-            </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       </DialogContent>
