@@ -21,6 +21,8 @@ import Requests from "./pages/admin/Requests";
 import Quotes from "./pages/admin/Quotes";
 import Products from "./pages/admin/Products";
 import ProductEdit from "./pages/admin/ProductEdit";
+import Accessories from "./pages/admin/Accessories";
+import AccessoryEdit from "./pages/admin/AccessoryEdit";
 import ShopOrders from "./pages/admin/ShopOrders";
 import AbandonedCarts from "./pages/admin/AbandonedCarts";
 import AdminReviews from "./pages/admin/Reviews";
@@ -37,6 +39,8 @@ import OrderDetail from "./pages/account/OrderDetail";
 import ShopOrderDetail from "./pages/account/ShopOrderDetail";
 import AccountLayout from "@/components/account/AccountLayout";
 import CustomerRoute from "@/components/account/CustomerRoute";
+import { CartProvider } from "@/lib/cart";
+import CartDrawer from "@/components/shop/CartDrawer";
 
 const queryClient = new QueryClient();
 
@@ -47,7 +51,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
+          <CartProvider>
+            <CartDrawer />
+            <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/set-password" element={<SetPassword />} />
@@ -75,6 +81,9 @@ const App = () => (
               <Route path="products" element={<Products />} />
               <Route path="products/new" element={<ProductEdit />} />
               <Route path="products/:id" element={<ProductEdit />} />
+              <Route path="accessories" element={<Accessories />} />
+              <Route path="accessories/new" element={<AccessoryEdit />} />
+              <Route path="accessories/:id" element={<AccessoryEdit />} />
               <Route path="shop-orders" element={<ShopOrders />} />
               <Route path="abandoned-carts" element={<AbandonedCarts />} />
               <Route path="reviews" element={<AdminReviews />} />
@@ -83,7 +92,8 @@ const App = () => (
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
-          </Routes>
+            </Routes>
+          </CartProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

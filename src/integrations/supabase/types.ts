@@ -677,6 +677,209 @@ export type Database = {
           },
         ]
       }
+      shop_accessories: {
+        Row: {
+          active: boolean
+          base_price_cents: number
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          base_price_cents: number
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          base_price_cents?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      shop_accessory_photos: {
+        Row: {
+          accessory_id: string
+          created_at: string
+          id: string
+          sort_order: number
+          storage_path: string
+        }
+        Insert: {
+          accessory_id: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          storage_path: string
+        }
+        Update: {
+          accessory_id?: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_accessory_photos_accessory_id_fkey"
+            columns: ["accessory_id"]
+            isOneToOne: false
+            referencedRelation: "shop_accessories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_accessory_variants: {
+        Row: {
+          accessory_id: string
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          price_cents_override: number | null
+          sku: string | null
+          sort_order: number
+          stock_qty: number
+          updated_at: string
+        }
+        Insert: {
+          accessory_id: string
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          price_cents_override?: number | null
+          sku?: string | null
+          sort_order?: number
+          stock_qty?: number
+          updated_at?: string
+        }
+        Update: {
+          accessory_id?: string
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          price_cents_override?: number | null
+          sku?: string | null
+          sort_order?: number
+          stock_qty?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_accessory_variants_accessory_id_fkey"
+            columns: ["accessory_id"]
+            isOneToOne: false
+            referencedRelation: "shop_accessories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_cart_items: {
+        Row: {
+          accessory_variant_id: string | null
+          cart_id: string
+          created_at: string
+          id: string
+          item_type: string
+          qty: number
+          reserved_until: string | null
+          sneaker_product_id: string | null
+          unit_price_cents: number
+          updated_at: string
+        }
+        Insert: {
+          accessory_variant_id?: string | null
+          cart_id: string
+          created_at?: string
+          id?: string
+          item_type: string
+          qty?: number
+          reserved_until?: string | null
+          sneaker_product_id?: string | null
+          unit_price_cents: number
+          updated_at?: string
+        }
+        Update: {
+          accessory_variant_id?: string | null
+          cart_id?: string
+          created_at?: string
+          id?: string
+          item_type?: string
+          qty?: number
+          reserved_until?: string | null
+          sneaker_product_id?: string | null
+          unit_price_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_cart_items_accessory_variant_id_fkey"
+            columns: ["accessory_variant_id"]
+            isOneToOne: false
+            referencedRelation: "shop_accessory_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_cart_items_cart_id_fkey"
+            columns: ["cart_id"]
+            isOneToOne: false
+            referencedRelation: "shop_carts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_cart_items_sneaker_product_id_fkey"
+            columns: ["sneaker_product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_carts: {
+        Row: {
+          created_at: string
+          id: string
+          session_token: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          session_token?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          session_token?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       shop_order_events: {
         Row: {
           actor_user_id: string | null

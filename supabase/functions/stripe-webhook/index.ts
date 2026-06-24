@@ -36,6 +36,166 @@ Deno.serve(async (req) => {
       const meta = session.metadata || {};
       const orderKind = meta.order_kind || (meta.quote_id ? "quote" : "");
 
+      // ============= MULTI-ITEM SHOP CART PATH =============
+      if (orderKind === "shop_cart") {
+        const cartId = meta.cart_id;
+        if (!cartId) return new Response("ok", { status: 200 });
+        const email = (session.customer_details?.email || "").toLowerCase();
+        const amount = (session.amount_total ?? 0) / 100;
+        const currency = (session.currency ?? "usd").toLowerCase();
+        const sessionId = session.id;
+        const intentId = typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : session.payment_intent?.id ?? null;
+
+        // Idempotency
+        const { data: existingOrder } = await supabase
+          .from("shop_orders")
+          .select("id")
+          .eq("stripe_session_id", sessionId)
+          .maybeSingle();
+        if (existingOrder) return new Response("ok", { status: 200 });
+
+        // Load cart items
+        const { data: cartItems } = await supabase
+          .from("shop_cart_items")
+          .select("*")
+          .eq("cart_id", cartId);
+
+        const sneakerIds = (cartItems ?? []).filter((i: any) => i.sneaker_product_id).map((i: any) => i.sneaker_product_id);
+        const variantIds = (cartItems ?? []).filter((i: any) => i.accessory_variant_id).map((i: any) => i.accessory_variant_id);
+
+        const [{ data: sneakers }, { data: variants }] = await Promise.all([
+          sneakerIds.length
+            ? supabase.from("shop_products").select("id, name, brand, model, size, condition, price").in("id", sneakerIds)
+            : Promise.resolve({ data: [] }),
+          variantIds.length
+            ? supabase
+                .from("shop_accessory_variants")
+                .select("id, name, stock_qty, price_cents_override, shop_accessories(id, name, base_price_cents)")
+                .in("id", variantIds)
+            : Promise.resolve({ data: [] }),
+        ]);
+        const sneakerMap = new Map<string, any>();
+        (sneakers ?? []).forEach((s: any) => sneakerMap.set(s.id, s));
+        const variantMap = new Map<string, any>();
+        (variants ?? []).forEach((v: any) => variantMap.set(v.id, v));
+
+        const itemsSnapshot = (cartItems ?? []).map((it: any) => {
+          if (it.item_type === "sneaker") {
+            const s = sneakerMap.get(it.sneaker_product_id);
+            return {
+              type: "sneaker",
+              product_id: it.sneaker_product_id,
+              name: s ? [s.brand, s.model, s.name].filter(Boolean).join(" ") || s.name : "Sneaker",
+              size: s?.size ?? null,
+              condition: s?.condition ?? null,
+              qty: 1,
+              unit_price_cents: it.unit_price_cents,
+            };
+          }
+          const v = variantMap.get(it.accessory_variant_id);
+          const accName = v?.shop_accessories?.name ?? "Accessory";
+          return {
+            type: "accessory",
+            variant_id: it.accessory_variant_id,
+            accessory_id: v?.shop_accessories?.id ?? null,
+            name: v?.name && v.name !== "Default" ? `${accName} — ${v.name}` : accName,
+            qty: it.qty,
+            unit_price_cents: it.unit_price_cents,
+          };
+        });
+
+        // Provision auth user
+        let userId: string | null = null;
+        if (email) {
+          const { data: existing } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
+          const found = existing?.users?.find((u: any) => (u.email || "").toLowerCase() === email);
+          if (found) {
+            userId = found.id;
+          } else {
+            const { data: created } = await supabase.auth.admin.createUser({ email, email_confirm: true });
+            userId = created?.user?.id ?? null;
+          }
+          if (userId) {
+            await supabase.from("user_roles").insert({ user_id: userId, role: "customer" }).then(() => {}).catch(() => {});
+          }
+        }
+
+        const shippingDetails = (session as any).shipping_details ?? (session as any).collected_information?.shipping_details ?? null;
+        // Primary product_id: first sneaker if any, else null
+        const primarySneakerId = sneakerIds[0] ?? null;
+
+        const { data: newOrder } = await supabase
+          .from("shop_orders")
+          .insert({
+            product_id: primarySneakerId,
+            product_snapshot: { items: itemsSnapshot, multi_item: true },
+            user_id: userId,
+            customer_email: email,
+            customer_name: session.customer_details?.name || null,
+            shipping_address: shippingDetails,
+            amount,
+            currency,
+            status: "paid",
+            stripe_session_id: sessionId,
+            stripe_payment_intent: intentId,
+            paid_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+
+        // Mark all sneakers in this cart as sold
+        for (const sid of sneakerIds) {
+          await supabase.from("shop_products").update({
+            status: "sold",
+            sold_at: new Date().toISOString(),
+            sold_order_id: newOrder?.id ?? null,
+            reserved_until: null,
+            reserved_session_id: null,
+          }).eq("id", sid);
+        }
+
+        // Decrement accessory stock per line
+        for (const it of cartItems ?? []) {
+          if (it.item_type !== "accessory") continue;
+          const v = variantMap.get(it.accessory_variant_id);
+          if (!v) continue;
+          const newStock = Math.max(0, (v.stock_qty ?? 0) - it.qty);
+          await supabase.from("shop_accessory_variants").update({ stock_qty: newStock }).eq("id", it.accessory_variant_id);
+        }
+
+        // Clear cart
+        await supabase.from("shop_cart_items").delete().eq("cart_id", cartId);
+
+        // Confirmation email
+        if (email) {
+          const firstItemName = itemsSnapshot[0]?.name ?? "your order";
+          await supabase.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "shop-order-confirmation",
+              recipientEmail: email,
+              idempotencyKey: `shop-cart-${sessionId}`,
+              templateData: {
+                customerName: session.customer_details?.name || "",
+                productName: itemsSnapshot.length === 1
+                  ? firstItemName
+                  : `${firstItemName} + ${itemsSnapshot.length - 1} more item${itemsSnapshot.length - 1 === 1 ? "" : "s"}`,
+                productSize: null,
+                productCondition: null,
+                amount: amount.toFixed(2),
+                orderUrl: `${SITE_URL}/account`,
+              },
+            },
+          });
+        }
+
+        return new Response(JSON.stringify({ received: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
       // ============= SHOP ORDER PATH =============
       if (orderKind === "shop") {
         const productId = meta.shop_product_id;

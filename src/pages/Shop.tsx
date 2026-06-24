@@ -10,6 +10,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { signedPhotoUrls, type ShopProduct } from "@/lib/shop";
 import BuyNowButton from "@/components/shop/BuyNowButton";
+import AddSneakerToCartButton from "@/components/shop/AddSneakerToCartButton";
+import AccessoryCard, { type AccessoryRow } from "@/components/shop/AccessoryCard";
 import serviceClean from "@/assets/service-clean.jpg";
 import serviceRestore from "@/assets/service-restore.jpg";
 import serviceCustom from "@/assets/service-custom.jpg";
@@ -57,6 +59,7 @@ export default function ShopPage() {
   const [recentlySold, setRecentlySold] = useState<{ id: string; name: string; sold_at: string }[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [accessories, setAccessories] = useState<AccessoryRow[]>([]);
   const [brand, setBrand] = useState<string>("All");
   const [size, setSize] = useState<string>("All");
   const [condition, setCondition] = useState<string>("All");
@@ -80,6 +83,14 @@ export default function ShopPage() {
           .order("sold_at", { ascending: false })
           .limit(5),
       ]);
+
+      const { data: accs } = await supabase
+        .from("shop_accessories")
+        .select("id, name, slug, description, category, base_price_cents, shop_accessory_variants(id, name, stock_qty, active, price_cents_override, sort_order), shop_accessory_photos(storage_path, sort_order)")
+        .eq("active", true)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false });
+      if (mounted) setAccessories((accs ?? []) as any);
 
       const rows: Row[] = (live ?? []).map((p: any) => {
         const photos = (p.shop_product_photos ?? []).sort(
@@ -108,6 +119,7 @@ export default function ShopPage() {
     const channel = supabase
       .channel("shop-page-products")
       .on("postgres_changes", { event: "*", schema: "public", table: "shop_products" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "shop_accessory_variants" }, () => load())
       .subscribe();
     return () => {
       mounted = false;
@@ -387,14 +399,28 @@ export default function ShopPage() {
                           View <ArrowRight className="w-3 h-3" />
                         </span>
                       </div>
-                      <BuyNowButton
-                        productId={p.id}
-                        status={p.status}
-                        reservedUntil={(p as any).reserved_until}
-                        reservedSessionId={(p as any).reserved_session_id}
-                        price={Number(p.price)}
-                        className="w-full h-9 mt-3 text-xs"
-                      />
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <AddSneakerToCartButton
+                          productId={p.id}
+                          priceDollars={Number(p.price)}
+                          status={p.status}
+                          reservedUntil={(p as any).reserved_until}
+                          reservedSessionId={(p as any).reserved_session_id}
+                          className="w-full h-9 text-xs"
+                          variant="outline"
+                          size="sm"
+                        />
+                        <BuyNowButton
+                          productId={p.id}
+                          status={p.status}
+                          reservedUntil={(p as any).reserved_until}
+                          reservedSessionId={(p as any).reserved_session_id}
+                          price={Number(p.price)}
+                          className="w-full h-9 text-xs col-span-2 sm:col-span-1"
+                          size="sm"
+                          label="Buy now"
+                        />
+                      </div>
                     </div>
                   </Link>
                 );
@@ -403,6 +429,26 @@ export default function ShopPage() {
           )}
         </div>
       </section>
+
+      {/* Accessories */}
+      {accessories.length > 0 && (
+        <section className="py-12 md:py-16 bg-slate-50 border-t border-border">
+          <div className="container px-4">
+            <div className="mb-6">
+              <span className="text-primary font-body text-xs md:text-sm uppercase tracking-widest">Gear</span>
+              <h2 className="font-display text-3xl md:text-5xl text-foreground mt-2">SHOP ACCESSORIES</h2>
+              <p className="font-body text-sm text-muted-foreground mt-2 max-w-2xl">
+                Keep your kicks fresh: cleaning kits, replacement laces, and the little details that finish the fit.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
+              {accessories.map((a) => (
+                <AccessoryCard key={a.id} acc={a} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Service cards */}
       <section className="py-12 md:py-20 bg-slate-100 border-t border-border">
