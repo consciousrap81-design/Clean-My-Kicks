@@ -688,20 +688,97 @@ const EVENT_ICONS: Record<string, { icon: typeof Truck; cls: string }> = {
 function Timeline({
   events, loading, orderCreatedAt,
 }: { events: TimelineEvent[]; loading: boolean; orderCreatedAt: string }) {
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [query, setQuery] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const availableTypes = useMemo(() => {
+    const set = new Set(events.map((e) => e.event_type));
+    return Array.from(set).sort();
+  }, [events]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const fromTs = from ? new Date(`${from}T00:00:00`).getTime() : null;
+    const toTs = to ? new Date(`${to}T23:59:59.999`).getTime() : null;
+    return events.filter((ev) => {
+      if (typeFilter !== "all" && ev.event_type !== typeFilter) return false;
+      const t = new Date(ev.created_at).getTime();
+      if (fromTs !== null && t < fromTs) return false;
+      if (toTs !== null && t > toTs) return false;
+      if (q) {
+        const m = ev.metadata || {};
+        const haystack = [
+          ev.message, ev.event_type,
+          m.carrier, m.carrier_from, m.carrier_to,
+          m.tracking_number, m.tracking_from, m.tracking_to,
+          m.tracking_url, m.recipient, m.message_id, m.error,
+        ].filter(Boolean).join(" ").toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [events, typeFilter, query, from, to]);
+
+  const hasFilters = typeFilter !== "all" || !!query || !!from || !!to;
+
+  function reset() {
+    setTypeFilter("all");
+    setQuery("");
+    setFrom("");
+    setTo("");
+  }
+
   return (
     <div className="rounded-md border p-3 space-y-3">
       <div className="text-xs uppercase text-muted-foreground tracking-wide flex items-center gap-1">
         <History className="w-3 h-3" /> Timeline
       </div>
+
+      {events.length > 0 && (
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All actions</SelectItem>
+                {availableTypes.map((t) => (
+                  <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Search carrier, tracking, msg id…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-8 text-xs" aria-label="From date" />
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-8 text-xs" aria-label="To date" />
+            {hasFilters && (
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={reset}>Clear</Button>
+            )}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            {filtered.length} of {events.length} event{events.length === 1 ? "" : "s"}
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-xs text-muted-foreground">Loading…</div>
       ) : events.length === 0 ? (
         <div className="text-xs text-muted-foreground">
           No shipment activity yet. Order placed {format(new Date(orderCreatedAt), "PPp")}.
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-xs text-muted-foreground">No events match your filters.</div>
       ) : (
         <ol className="space-y-3">
-          {events.map((ev) => {
+          {filtered.map((ev) => {
             const cfg = EVENT_ICONS[ev.event_type] || { icon: CheckCircle2, cls: "bg-slate-200 text-slate-700" };
             const Icon = cfg.icon;
             const m = ev.metadata || {};
