@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import heroK from "@/assets/hero-k.png";
 const navItems = [
   { label: "Services", href: "#services" },
-  { label: "Shop", href: "#shop" },
+  { label: "Shop", href: "/shop" },
   { label: "About", href: "#about" },
   { label: "Contact", href: "#booking" },
 ];
