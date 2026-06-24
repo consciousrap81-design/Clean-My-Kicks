@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Loader2, Minus, Plus, Trash2, ShoppingBag, Clock, AlertTriangle, Link2, Check, RefreshCw, Truck } from "lucide-react";
+import { Loader2, Minus, Plus, Trash2, ShoppingBag, Clock, AlertTriangle, Link2, Check, RefreshCw, Truck, Tag, X } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { signedPhotoUrls } from "@/lib/shop";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 function fmt(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
@@ -49,11 +52,16 @@ function estimatedDelivery() {
 }
 
 export default function CartDrawer() {
-  const { open, setOpen, items, totalCents, loading, updateQty, removeItem, refresh, cartId, addSneaker } = useCart();
+  const {
+    open, setOpen, items, totalCents, loading, updateQty, removeItem, refresh, cartId, addSneaker,
+    promo, applyPromo, clearPromo, shippingMethod, setShippingMethod,
+  } = useCart();
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [checkingOut, setCheckingOut] = useState(false);
   const [copied, setCopied] = useState(false);
   const [reReserving, setReReserving] = useState<string | null>(null);
+  const [promoInput, setPromoInput] = useState("");
+  const [applyingPromo, setApplyingPromo] = useState(false);
 
   // Resolve photo signed URLs (both shop-products and accessory photos live in shop-products bucket).
   useEffect(() => {
@@ -84,16 +92,27 @@ export default function CartDrawer() {
   const hasExpiredSneaker = items.some((it) => it.item_type === "sneaker" && it.reservation_expired);
 
   const canCheckout = items.length > 0 && items.every((it) => it.available);
+  const hasOutOfStock = items.some((it) => !it.available && it.item_type === "accessory");
   const eta = estimatedDelivery();
   const subtotal = totalCents;
-  const shippingPreview = subtotal >= 10000 ? 0 : 800; // free over $100
+  const standardCents = subtotal >= 10000 ? 0 : 800;
+  const expressCents = 2500;
+  const selectedShippingCents = shippingMethod === "express" ? expressCents : standardCents;
+  const discountCents = promo?.discount_cents ?? 0;
+  const grandTotal = Math.max(0, subtotal - discountCents) + selectedShippingCents;
+  const remainingForFreeShip = Math.max(0, 10000 - subtotal);
+  const freeShipUnlocked = subtotal >= 10000;
 
   async function handleCheckout() {
     if (!canCheckout) return;
     setCheckingOut(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-shop-checkout", {
-        body: { cartId },
+        body: {
+          cartId,
+          promoCode: promo?.code ?? undefined,
+          shippingMethod,
+        },
       });
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
@@ -105,6 +124,20 @@ export default function CartDrawer() {
     } catch (err: any) {
       toast.error(err.message || "Could not start checkout");
       setCheckingOut(false);
+    }
+  }
+
+  async function handleApplyPromo(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!promoInput.trim()) return;
+    setApplyingPromo(true);
+    const res = await applyPromo(promoInput);
+    setApplyingPromo(false);
+    if (!res.ok) {
+      toast.error(res.error || "Couldn't apply code");
+    } else {
+      toast.success("Promo applied");
+      setPromoInput("");
     }
   }
 
@@ -200,7 +233,22 @@ export default function CartDrawer() {
                             <p className="text-xs text-muted-foreground">{it.subtitle}</p>
                           )}
                           {!it.available && it.unavailable_reason && (
-                            <p className="text-xs text-destructive mt-0.5">{it.unavailable_reason}</p>
+                            <p className="text-xs text-destructive mt-0.5 flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" /> {it.unavailable_reason}
+                            </p>
+                          )}
+                          {!isSneaker && it.available && typeof it.max_qty === "number" && it.max_qty > 0 && it.max_qty <= 3 && (
+                            <p className="text-[11px] text-amber-700 mt-0.5">Only {it.max_qty} left in stock</p>
+                          )}
+                          {!isSneaker && !it.available && typeof it.max_qty === "number" && it.max_qty > 0 && it.qty > it.max_qty && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs mt-1.5"
+                              onClick={() => updateQty(it.id, it.max_qty!)}
+                            >
+                              Set qty to max ({it.max_qty})
+                            </Button>
                           )}
                           {isSneaker && it.reservation_expired && (
                             <Button
@@ -263,33 +311,124 @@ export default function CartDrawer() {
 
         {items.length > 0 && (
           <div className="border-t px-5 py-4 space-y-3">
-            {/* Shipping & ETA preview */}
-            <div className="rounded-lg border bg-secondary/40 p-3 text-xs space-y-2">
-              <div className="flex items-center gap-1.5 font-medium text-foreground">
-                <Truck className="w-3.5 h-3.5" /> Shipping options at checkout
+            {/* Promo code */}
+            {promo ? (
+              <div className="flex items-center justify-between rounded-lg border bg-emerald-50/60 border-emerald-200 px-3 py-2 text-sm">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Tag className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-emerald-900 truncate">{promo.code}</p>
+                    <p className="text-[11px] text-emerald-800 truncate">{promo.description}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={clearPromo}
+                  className="text-emerald-800 hover:text-emerald-900 p-1"
+                  aria-label="Remove promo"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <div className="flex items-center justify-between">
-                <span>
-                  Standard <span className="text-muted-foreground">· est. {eta.standard}</span>
-                </span>
-                <span className="font-medium">{shippingPreview === 0 ? "Free" : fmt(shippingPreview)}</span>
+            ) : (
+              <form onSubmit={handleApplyPromo} className="flex gap-2">
+                <Input
+                  value={promoInput}
+                  onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                  placeholder="Promo code"
+                  className="h-9 text-sm"
+                  maxLength={40}
+                  autoCapitalize="characters"
+                />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  disabled={!promoInput.trim() || applyingPromo}
+                >
+                  {applyingPromo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Apply"}
+                </Button>
+              </form>
+            )}
+
+            {/* Shipping method picker */}
+            <div className="rounded-lg border p-3 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium">
+                <Truck className="w-3.5 h-3.5" /> Shipping method
               </div>
-              <div className="flex items-center justify-between">
-                <span>
-                  Express <span className="text-muted-foreground">· est. {eta.express}</span>
-                </span>
-                <span className="font-medium">$25.00</span>
-              </div>
-              {subtotal < 10000 && subtotal > 0 && (
-                <p className="text-[11px] text-muted-foreground">
-                  Add {fmt(10000 - subtotal)} more for free standard shipping.
+              <RadioGroup
+                value={shippingMethod}
+                onValueChange={(v) => setShippingMethod(v as "standard" | "express")}
+                className="space-y-1.5"
+              >
+                <Label
+                  htmlFor="ship-standard"
+                  className="flex items-start gap-2 cursor-pointer rounded-md p-2 hover:bg-secondary/60 has-[:checked]:bg-secondary"
+                >
+                  <RadioGroupItem value="standard" id="ship-standard" className="mt-0.5" />
+                  <div className="flex-1 text-xs">
+                    <div className="flex justify-between font-medium">
+                      <span>Standard</span>
+                      <span>{standardCents === 0 ? "Free" : fmt(standardCents)}</span>
+                    </div>
+                    <p className="text-muted-foreground">Arrives {eta.standard}</p>
+                  </div>
+                </Label>
+                <Label
+                  htmlFor="ship-express"
+                  className="flex items-start gap-2 cursor-pointer rounded-md p-2 hover:bg-secondary/60 has-[:checked]:bg-secondary"
+                >
+                  <RadioGroupItem value="express" id="ship-express" className="mt-0.5" />
+                  <div className="flex-1 text-xs">
+                    <div className="flex justify-between font-medium">
+                      <span>Express</span>
+                      <span>{fmt(expressCents)}</span>
+                    </div>
+                    <p className="text-muted-foreground">Arrives {eta.express}</p>
+                  </div>
+                </Label>
+              </RadioGroup>
+              {freeShipUnlocked ? (
+                <p className="text-[11px] text-emerald-700 flex items-center gap-1">
+                  <Check className="w-3 h-3" /> Free standard shipping unlocked
                 </p>
+              ) : (
+                <div>
+                  <div className="h-1 bg-secondary rounded overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all"
+                      style={{ width: `${Math.min(100, (subtotal / 10000) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Spend {fmt(remainingForFreeShip)} more for free standard shipping
+                  </p>
+                </div>
               )}
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Subtotal</span>
-              <span className="text-lg font-semibold">{fmt(totalCents)}</span>
+            {/* Totals breakdown */}
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{fmt(subtotal)}</span>
+              </div>
+              {discountCents > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Discount ({promo?.code})</span>
+                  <span>−{fmt(discountCents)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
+                  Shipping <span className="text-[11px]">({shippingMethod === "express" ? "Express" : "Standard"})</span>
+                </span>
+                <span>{selectedShippingCents === 0 ? "Free" : fmt(selectedShippingCents)}</span>
+              </div>
+              <div className="flex justify-between pt-1.5 border-t mt-1.5">
+                <span className="font-medium">Total</span>
+                <span className="text-lg font-semibold">{fmt(grandTotal)}</span>
+              </div>
             </div>
 
             <Button
@@ -299,12 +438,14 @@ export default function CartDrawer() {
               disabled={!canCheckout || checkingOut}
             >
               {checkingOut ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              {hasExpiredSneaker ? "Reservation expired" : "Checkout"}
+              {hasExpiredSneaker ? "Reservation expired" : hasOutOfStock ? "Resolve items to checkout" : "Checkout"}
             </Button>
             {!canCheckout && items.length > 0 && (
               <p className="text-xs text-destructive text-center">
                 {hasExpiredSneaker
                   ? "Re-reserve your sneaker or remove it to continue."
+                  : hasOutOfStock
+                  ? "Remove or reduce out-of-stock items to continue."
                   : "Remove unavailable items to continue."}
               </p>
             )}
