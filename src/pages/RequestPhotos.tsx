@@ -101,7 +101,11 @@ export default function RequestPhotos() {
   }
 
   async function uploadAll(current: Pending[]) {
-    const folder = crypto.randomUUID();
+    // Folder MUST be the booking request id — the storage RLS policy verifies
+    // the upload path's first segment matches a real booking_requests row that
+    // is still accepting photos. Random UUIDs will be rejected.
+    const folder = info?.id;
+    if (!folder) throw new Error("Missing request id");
     const paths: string[] = [];
     let completed = current.filter((p) => p.status === "done" && p.path).length;
     setUploadedCount(completed);
