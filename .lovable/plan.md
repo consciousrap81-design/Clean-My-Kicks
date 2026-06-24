@@ -1,93 +1,53 @@
-# Customer Accounts & Portal
 
-End-to-end plan for auto-creating customer accounts on payment, linking quotes/jobs to the right user, and giving customers a mobile-friendly self-service portal.
+# Accessories + Combined Cart
 
-## 1. Payments (prerequisite)
+Adds a second product type (accessories) alongside 1-of-1 sneakers, a real cart drawer, and one Stripe checkout that can mix both.
 
-- Enable Lovable's built-in **Stripe payments** (seamless, no API key needed).
-- Add tax calculation & collection only (`automatic_tax`) — this is a hands-on service, not eligible for full merchant-of-record handling.
-- For each accepted quote, create a one-time Stripe Checkout session for the quote total. On `checkout.session.completed`, mark the quote `paid` and trigger account creation.
-- Add a "Pay Now" CTA on the public `/quote/:token` page that appears only when the quote status is `accepted`.
+## What you'll see as the owner
 
-## 2. Database changes (one migration)
+- **Admin → Shop** gets a new "Accessories" tab next to "Sneakers." Add a cleaning kit, set price, stock count, photos, and optional variants (e.g. laces: white/black/red — each with its own stock).
+- **Shop page** gets a category toggle: **Sneakers** (1-of-1, Buy Now) and **Accessories** (Add to cart, qty selector).
+- **Navbar** gets a cart icon with item count. Opens a slide-out drawer listing everything in the cart with quantities and a Checkout button.
 
-- New enum value `app_role.customer` (admin already exists).
-- Add `user_id uuid` columns on `customers`, `quotes`, `jobs`, `booking_requests`, `payments` so rows can be scoped to a customer's auth user.
-- Add `customer_visible boolean default false` to `job_photos` and an existing notes field, plus a new `job_updates` table for the timeline (admin-authored, marked customer-visible).
-- New `payments` columns: `stripe_session_id`, `stripe_payment_intent`, `status`, `amount`, `paid_at`.
-- RLS: customers can `SELECT` only rows where `user_id = auth.uid()`; admins keep current full access via `has_role(auth.uid(), 'admin')`. Storage policies on `request-photos` and `job-photos` buckets restrict customer reads to their own folders.
-- Helper RPC `link_customer_user(_email, _user_id)` (security definer) attaches a newly-confirmed user to all existing customer/quote/job/request rows that match the email.
+## What customers experience
 
-## 3. Account creation flow
+- Browsing sneakers works exactly as today — Buy Now goes straight to Stripe.
+- Browsing accessories: pick a variant (if any), pick a quantity, "Add to cart." Cart icon updates. They keep shopping.
+- They can also "Add to cart" a sneaker — this **reserves the pair for 15 minutes** while they shop. A timer shows in the cart drawer. If they don't check out in time, the pair releases.
+- Checkout button = one Stripe session with all items (the sneaker + any accessories). One shipping charge, one receipt.
+- Out-of-stock accessories show "Sold out" and can't be added. Sneakers already reserved by someone else stay disabled.
 
-A new edge function `stripe-webhook` (no JWT) receives Stripe events:
+## Data model
 
-1. Verify signature.
-2. On `checkout.session.completed`:
-   - Insert `payments` row, mark quote `paid`.
-   - Look up auth user by email via admin API.
-   - If missing: `admin.createUser({ email, email_confirm: false })`, assign role `customer` in `user_roles`.
-   - Either way: call `link_customer_user(email, user_id)` to attach all matching rows.
-   - Send a branded "Set your password" email (`generateLink({ type: 'recovery', redirectTo: '/auth/set-password' })`) through the existing app-email pipeline.
+New tables:
 
-New app-email template `customer-welcome.tsx` with the password-setup link and a portal preview.
+- `shop_accessories` — id, name, slug, description, base_price_cents, category (`cleaning_kit` | `laces` | `buckle` | `other`), active, photos, created_at
+- `shop_accessory_variants` — id, accessory_id, name (e.g. "White, 45in"), sku, price_cents (overrides base if set), stock_qty, active
+- `shop_carts` — id, session_id (anon) or user_id, created_at, expires_at
+- `shop_cart_items` — id, cart_id, item_type (`sneaker` | `accessory`), product_id (sneaker id or variant id), qty, unit_price_cents, reserved_until (sneakers only)
 
-## 4. Customer portal
+Sneaker reservation reuses the existing `reserved_until` / `reserved_session_id` columns on `shop_products` — adding to cart sets these, removing or expiry clears them.
 
-New routes (public-shell, not under `/admin`):
+## Checkout flow
 
-- `/auth/set-password` — handles the recovery link, lets the user set a password, then redirects to `/account`.
-- `/account` — protected by a new `CustomerRoute` guard (must be signed in; must NOT be admin → if admin, send to `/admin`).
-- `/account/orders/:jobId` — order detail.
+- `create-shop-checkout` edge function gets reworked to accept a `cart_id` instead of a single `product_id`.
+- It validates: every sneaker still reserved for this session, every accessory variant has enough stock, prices haven't changed.
+- Builds Stripe `line_items` from the cart, one entry per item.
+- On success webhook: decrements accessory stock, marks sneaker(s) `sold`, clears cart.
+- On expiry/cancel: releases sneaker reservations, leaves accessory stock alone.
 
-Portal layout: top bar with logo + sign out, single-column mobile-first content, sticky bottom nav on small screens.
+## Build order
 
-**Dashboard `/account`** (titled "My Clean My Kicks Orders"):
-- List of orders (one card per accepted quote / job) with: shoe, service, status badge, payment status, total, "View" link.
+1. **Migration** — accessory tables, cart tables, GRANTs, RLS (anon can read active accessories; cart scoped to session_id or user_id).
+2. **Admin UI** — Accessories tab: list, create/edit form with photos + variants + stock.
+3. **Cart store** — `useCart` hook (Zustand or React context) backed by `shop_carts`/`shop_cart_items`. Add/remove/update qty/clear.
+4. **Cart drawer** — Sheet component in navbar, item rows with qty steppers, sneaker reservation timer, subtotal, Checkout button.
+5. **Shop page** — Category toggle, accessory cards with variant + qty selector + Add to cart, sneaker cards get a secondary "Add to cart" alongside Buy Now.
+6. **Checkout edge function** — rewrite to accept cart_id, validate, build multi-line Stripe session.
+7. **Webhook handler** — decrement stock on success, release reservations on expire/cancel.
 
-**Order detail `/account/orders/:jobId`**:
-- Accepted quote summary + total.
-- Payment status (Paid / Pending).
-- Active job status + pickup/shipping status.
-- Progress timeline built from `jobs.status` history + `job_updates` rows where `customer_visible = true`, chronological with timestamps.
-- Before photos (from `request-photos` for the linked request).
-- After photos (from `job-photos` where `customer_visible = true`).
-- Updates feed (admin notes flagged customer-visible).
+## Out of scope for this pass
 
-## 5. Auth / role separation
-
-- `useAuth` already exposes `isAdmin`. Add `isCustomer` (has role `customer` and not admin).
-- `ProtectedRoute` (admin) already blocks non-admins → unchanged.
-- New `CustomerRoute` redirects admins to `/admin` and unauthenticated users to `/auth?next=/account`.
-- `/auth` page: detect `next` query param and route appropriately after login.
-
-## 6. Admin additions (minimal)
-
-- Job detail page: checkbox on each photo "Visible to customer", and a "Post update" composer that writes to `job_updates` with a `customer_visible` toggle.
-- That's it — no other admin workflow changes.
-
-## 7. Out of scope
-
-- Customer self-signup (accounts are only created via payment flow).
-- Two-way messaging.
-- Refund flow (admin can refund directly in Stripe dashboard).
-
-## Files to add / change (technical)
-
-```text
-supabase/migrations/<ts>_customer_portal.sql
-supabase/functions/create-checkout/index.ts        # creates Stripe session
-supabase/functions/stripe-webhook/index.ts         # verifies + provisions account
-supabase/functions/_shared/transactional-email-templates/customer-welcome.tsx
-src/pages/account/Dashboard.tsx
-src/pages/account/OrderDetail.tsx
-src/pages/auth/SetPassword.tsx
-src/components/account/CustomerRoute.tsx
-src/components/account/AccountLayout.tsx
-src/pages/QuoteView.tsx                            # add Pay Now button
-src/pages/admin/JobDetail.tsx                      # photo visibility + updates composer
-src/App.tsx                                        # new routes
-src/hooks/useAuth.tsx                              # isCustomer
-```
-
-Approve and I'll start with Stripe enablement, then ship the migration, edge functions, and portal in that order.
+- Bundles/discounts ("buy 2 kits, get 10% off") — straightforward to add later on top of cart items.
+- Shipping rate tiers by item count/weight — uses your current flat shipping until you ask for tiered.
+- Inventory alerts / low-stock email — easy follow-up.
