@@ -16,7 +16,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Package, Truck, Mail, MapPin, ExternalLink, Send, Loader2, Copy } from "lucide-react";
+import { Package, Truck, Mail, MapPin, ExternalLink, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { trackingUrlFor, carrierLabel, detectCarrierFromTracking } from "@/lib/tracking";
@@ -220,6 +220,13 @@ function OrderDialog({
   const [customUrl, setCustomUrl] = useState("");
   const [confirmMode, setConfirmMode] = useState<null | "mark" | "resend">(null);
   const [sending, setSending] = useState(false);
+
+  function copyId(id: string) {
+    navigator.clipboard.writeText(id).then(
+      () => toast.success("Message ID copied"),
+      () => toast.error("Copy failed"),
+    );
+  }
 
   const PRESETS = ["USPS", "UPS", "FedEx", "DHL"];
 
