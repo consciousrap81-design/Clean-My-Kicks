@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -171,7 +171,7 @@ function OrderDialog({
   const [saving, setSaving] = useState(false);
 
   // Reset form when order changes
-  useMemo(() => {
+  useEffect(() => {
     if (order) {
       setCarrier(order.tracking_carrier || "USPS");
       setTracking(order.tracking_number || "");
