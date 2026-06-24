@@ -858,6 +858,7 @@ export type Database = {
       }
       shop_carts: {
         Row: {
+          applied_promo_code: string | null
           created_at: string
           id: string
           session_token: string | null
@@ -865,6 +866,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          applied_promo_code?: string | null
           created_at?: string
           id?: string
           session_token?: string | null
@@ -872,6 +874,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          applied_promo_code?: string | null
           created_at?: string
           id?: string
           session_token?: string | null
@@ -925,13 +928,16 @@ export type Database = {
           currency: string
           customer_email: string
           customer_name: string | null
+          discount_cents: number
           id: string
           paid_at: string | null
           product_id: string | null
           product_snapshot: Json
+          promo_code: string | null
           review_request_sent_at: string | null
           shipped_at: string | null
           shipping_address: Json | null
+          shipping_method: string | null
           status: string
           stripe_payment_intent: string | null
           stripe_session_id: string | null
@@ -946,13 +952,16 @@ export type Database = {
           currency?: string
           customer_email: string
           customer_name?: string | null
+          discount_cents?: number
           id?: string
           paid_at?: string | null
           product_id?: string | null
           product_snapshot: Json
+          promo_code?: string | null
           review_request_sent_at?: string | null
           shipped_at?: string | null
           shipping_address?: Json | null
+          shipping_method?: string | null
           status?: string
           stripe_payment_intent?: string | null
           stripe_session_id?: string | null
@@ -967,13 +976,16 @@ export type Database = {
           currency?: string
           customer_email?: string
           customer_name?: string | null
+          discount_cents?: number
           id?: string
           paid_at?: string | null
           product_id?: string | null
           product_snapshot?: Json
+          promo_code?: string | null
           review_request_sent_at?: string | null
           shipped_at?: string | null
           shipping_address?: Json | null
+          shipping_method?: string | null
           status?: string
           stripe_payment_intent?: string | null
           stripe_session_id?: string | null
@@ -1112,6 +1124,83 @@ export type Database = {
           view_count?: number
         }
         Relationships: []
+      }
+      shop_promo_codes: {
+        Row: {
+          active: boolean
+          amount: number
+          applies_to: string
+          code: string
+          created_at: string
+          discount_type: string
+          expires_at: string | null
+          id: string
+          max_redemptions: number | null
+          min_subtotal_cents: number
+          redemption_count: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amount: number
+          applies_to?: string
+          code: string
+          created_at?: string
+          discount_type: string
+          expires_at?: string | null
+          id?: string
+          max_redemptions?: number | null
+          min_subtotal_cents?: number
+          redemption_count?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          applies_to?: string
+          code?: string
+          created_at?: string
+          discount_type?: string
+          expires_at?: string | null
+          id?: string
+          max_redemptions?: number | null
+          min_subtotal_cents?: number
+          redemption_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      shop_promo_redemptions: {
+        Row: {
+          cart_id: string | null
+          id: string
+          order_id: string | null
+          promo_id: string
+          redeemed_at: string
+        }
+        Insert: {
+          cart_id?: string | null
+          id?: string
+          order_id?: string | null
+          promo_id: string
+          redeemed_at?: string
+        }
+        Update: {
+          cart_id?: string | null
+          id?: string
+          order_id?: string | null
+          promo_id?: string
+          redeemed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_promo_redemptions_promo_id_fkey"
+            columns: ["promo_id"]
+            isOneToOne: false
+            referencedRelation: "shop_promo_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shop_reviews: {
         Row: {

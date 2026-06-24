@@ -1,53 +1,71 @@
+# Cart & Checkout Enhancements
 
-# Accessories + Combined Cart
+Five additions, building on the existing combined-cart system.
 
-Adds a second product type (accessories) alongside 1-of-1 sneakers, a real cart drawer, and one Stripe checkout that can mix both.
+## 1. Promo codes (admin-managed)
 
-## What you'll see as the owner
+**New table** `shop_promo_codes`:
+- `code` (unique, uppercased), `discount_type` ('percent' | 'fixed'), `amount` (int — % or cents), `min_subtotal_cents`, `max_redemptions`, `redemption_count`, `expires_at`, `active`, `applies_to` ('all' | 'accessories' | 'sneakers')
 
-- **Admin → Shop** gets a new "Accessories" tab next to "Sneakers." Add a cleaning kit, set price, stock count, photos, and optional variants (e.g. laces: white/black/red — each with its own stock).
-- **Shop page** gets a category toggle: **Sneakers** (1-of-1, Buy Now) and **Accessories** (Add to cart, qty selector).
-- **Navbar** gets a cart icon with item count. Opens a slide-out drawer listing everything in the cart with quantities and a Checkout button.
+**New table** `shop_promo_redemptions`:
+- `promo_id`, `cart_id`, `order_id`, redeemed_at — used to enforce one-per-cart and increment counts safely from the webhook.
 
-## What customers experience
+**Admin page** `/admin/promo-codes`: list + create/edit form (toggle active, set expiry, limits).
 
-- Browsing sneakers works exactly as today — Buy Now goes straight to Stripe.
-- Browsing accessories: pick a variant (if any), pick a quantity, "Add to cart." Cart icon updates. They keep shopping.
-- They can also "Add to cart" a sneaker — this **reserves the pair for 15 minutes** while they shop. A timer shows in the cart drawer. If they don't check out in time, the pair releases.
-- Checkout button = one Stripe session with all items (the sneaker + any accessories). One shipping charge, one receipt.
-- Out-of-stock accessories show "Sold out" and can't be added. Sneakers already reserved by someone else stay disabled.
+**Cart drawer**: promo input + Apply button → calls new edge function `validate-promo-code` (rate-limited, returns discount preview). Applied code stored on `shop_carts.applied_promo_code` (new nullable column). Displays discount line in summary.
 
-## Data model
+**Checkout**: `create-shop-checkout` re-validates the code server-side, creates a Stripe one-shot coupon (`stripe.coupons.create` with `duration: "once"`), attaches via `discounts: [{coupon}]` on the session. Webhook records redemption + increments `redemption_count` on payment success.
 
-New tables:
+## 2. Detailed shipping breakdown in cart summary
 
-- `shop_accessories` — id, name, slug, description, base_price_cents, category (`cleaning_kit` | `laces` | `buckle` | `other`), active, photos, created_at
-- `shop_accessory_variants` — id, accessory_id, name (e.g. "White, 45in"), sku, price_cents (overrides base if set), stock_qty, active
-- `shop_carts` — id, session_id (anon) or user_id, created_at, expires_at
-- `shop_cart_items` — id, cart_id, item_type (`sneaker` | `accessory`), product_id (sneaker id or variant id), qty, unit_price_cents, reserved_until (sneakers only)
+In `CartDrawer.tsx` summary section, before checkout button:
+- Rate name + price (Standard / Express)
+- Estimated delivery window (already computed) shown as date range
+- "Free shipping over $100" hint with remaining-to-go progress when under threshold; "✓ Free shipping unlocked" when over
+- Shipping method picker (radio): Standard / Express — selection passed to `create-shop-checkout` as `shippingMethod` so Stripe session pre-selects it (still editable on Stripe page)
 
-Sneaker reservation reuses the existing `reserved_until` / `reserved_session_id` columns on `shop_products` — adding to cart sets these, removing or expiry clears them.
+## 3. Address collection
 
-## Checkout flow
+Per user choice: **Stripe Checkout collects + validates the address.** Already configured. We only need to ensure `shipping_address_collection` is enabled on the session with allowed countries (US only for now — confirm in implementation). No new on-site form.
 
-- `create-shop-checkout` edge function gets reworked to accept a `cart_id` instead of a single `product_id`.
-- It validates: every sneaker still reserved for this session, every accessory variant has enough stock, prices haven't changed.
-- Builds Stripe `line_items` from the cart, one entry per item.
-- On success webhook: decrements accessory stock, marks sneaker(s) `sold`, clears cart.
-- On expiry/cancel: releases sneaker reservations, leaves accessory stock alone.
+## 4. Order status page (replaces /shop/order/success)
 
-## Build order
+Rebuild `src/pages/ShopOrderSuccess.tsx`:
+- Reads `?session_id=...`, calls new edge function `get-shop-order-status` which looks up the order by Stripe session id and returns: order #, items (with SKU + variant), shipping method, ETA window, shipping address, subtotal/discount/shipping/total, payment status, current order status.
+- Polls every 3s until status moves from `pending` → `paid` (webhook race), then stops.
+- Shows clear states: "Processing payment…", "Payment confirmed — order #1234", with expected delivery date prominent.
+- Links to `/account/shop-orders/:id` for signed-in users.
 
-1. **Migration** — accessory tables, cart tables, GRANTs, RLS (anon can read active accessories; cart scoped to session_id or user_id).
-2. **Admin UI** — Accessories tab: list, create/edit form with photos + variants + stock.
-3. **Cart store** — `useCart` hook (Zustand or React context) backed by `shop_carts`/`shop_cart_items`. Add/remove/update qty/clear.
-4. **Cart drawer** — Sheet component in navbar, item rows with qty steppers, sneaker reservation timer, subtotal, Checkout button.
-5. **Shop page** — Category toggle, accessory cards with variant + qty selector + Add to cart, sneaker cards get a secondary "Add to cart" alongside Buy Now.
-6. **Checkout edge function** — rewrite to accept cart_id, validate, build multi-line Stripe session.
-7. **Webhook handler** — decrement stock on success, release reservations on expire/cancel.
+## 5. Real-time stock warnings + checkout lockout
 
-## Out of scope for this pass
+In `src/lib/cart.ts` (`refresh()` already pulls `stock_qty`):
+- Subscribe to `shop_accessory_variants` realtime channel on mount (postgres_changes UPDATE filter by variant ids in cart) → triggers `refresh()`.
+- `EnrichedCartItem` already exposes `available` + `unavailable_reason` — make sure cart drawer shows red warning badge when `qty > max_qty` or `max_qty === 0`.
 
-- Bundles/discounts ("buy 2 kits, get 10% off") — straightforward to add later on top of cart items.
-- Shipping rate tiers by item count/weight — uses your current flat shipping until you ask for tiered.
-- Inventory alerts / low-stock email — easy follow-up.
+In `CartDrawer.tsx`:
+- Compute `hasBlockingIssue = items.some(i => !i.available)`.
+- Disable Checkout button when true; show inline message "Resolve item issues to continue."
+- Out-of-stock items get destructive border + "Remove" CTA prominent; over-qty items get a "Set to max (N)" quick action.
+
+`create-shop-checkout` already re-validates stock and returns errors — keep as final safeguard.
+
+## Technical notes
+
+- Promo coupon math: percent → `percent_off`; fixed → `amount_off` + `currency: "usd"`. Min subtotal enforced server-side before creating the coupon.
+- Stock realtime requires `shop_accessory_variants` in the supabase realtime publication (migration adds it).
+- No schema change to `shop_orders` needed for promo — store `discount_cents` + `promo_code` (add two columns).
+
+## Out of scope
+
+- Stacking multiple promos
+- BOGO / per-product discounts
+- Address autocomplete on our site (deferred — Stripe handles it)
+- International shipping zones
+
+## Files
+
+**Migrations:** new `shop_promo_codes`, `shop_promo_redemptions`; add `applied_promo_code` to `shop_carts`; add `discount_cents`, `promo_code` to `shop_orders`; enable realtime on `shop_accessory_variants`.
+
+**New:** `supabase/functions/validate-promo-code/index.ts`, `supabase/functions/get-shop-order-status/index.ts`, `src/pages/admin/PromoCodes.tsx`, `src/pages/admin/PromoCodeEdit.tsx`.
+
+**Edited:** `src/lib/cart.ts`, `src/components/shop/CartDrawer.tsx`, `src/pages/ShopOrderSuccess.tsx`, `supabase/functions/create-shop-checkout/index.ts`, `supabase/functions/stripe-webhook/index.ts`, `src/App.tsx`, `src/components/admin/AdminLayout.tsx`.

@@ -126,6 +126,11 @@ Deno.serve(async (req) => {
         // Primary product_id: first sneaker if any, else null
         const primarySneakerId = sneakerIds[0] ?? null;
 
+        const promoCode = (meta.promo_code || "").toUpperCase() || null;
+        const promoId = meta.promo_id || null;
+        const discountCents = Number(meta.discount_cents || 0);
+        const shippingMethod = meta.shipping_method === "express" ? "express" : "standard";
+
         const { data: newOrder } = await supabase
           .from("shop_orders")
           .insert({
@@ -141,9 +146,32 @@ Deno.serve(async (req) => {
             stripe_session_id: sessionId,
             stripe_payment_intent: intentId,
             paid_at: new Date().toISOString(),
+            discount_cents: discountCents,
+            promo_code: promoCode,
+            shipping_method: shippingMethod,
           })
           .select("id")
           .single();
+
+        // Record promo redemption + increment counter
+        if (promoId && newOrder?.id) {
+          await supabase.from("shop_promo_redemptions").insert({
+            promo_id: promoId,
+            cart_id: cartId,
+            order_id: newOrder.id,
+          });
+          const { data: cur } = await supabase
+            .from("shop_promo_codes")
+            .select("redemption_count")
+            .eq("id", promoId)
+            .maybeSingle();
+          if (cur) {
+            await supabase
+              .from("shop_promo_codes")
+              .update({ redemption_count: (cur.redemption_count ?? 0) + 1 })
+              .eq("id", promoId);
+          }
+        }
 
         // Mark all sneakers in this cart as sold
         for (const sid of sneakerIds) {

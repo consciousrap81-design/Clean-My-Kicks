@@ -68,6 +68,20 @@ type CartCtx = {
   addAccessory: (variantId: string, priceCents: number, qty?: number) => Promise<{ ok: boolean; error?: string }>;
   updateQty: (itemId: string, qty: number) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
+  promo: AppliedPromo | null;
+  applyPromo: (code: string) => Promise<{ ok: boolean; error?: string }>;
+  clearPromo: () => Promise<void>;
+  shippingMethod: "standard" | "express";
+  setShippingMethod: (m: "standard" | "express") => void;
+};
+
+export type AppliedPromo = {
+  code: string;
+  discount_cents: number;
+  discount_type: "percent" | "fixed";
+  amount: number;
+  applies_to: "all" | "accessories" | "sneakers";
+  description: string;
 };
 
 const Ctx = createContext<CartCtx | null>(null);
@@ -88,6 +102,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<EnrichedCartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [promo, setPromo] = useState<AppliedPromo | null>(null);
+  const [shippingMethod, setShippingMethodState] = useState<"standard" | "express">(() => {
+    if (typeof window === "undefined") return "standard";
+    return (localStorage.getItem("cmk_ship") as "standard" | "express") || "standard";
+  });
+  const setShippingMethod = useCallback((m: "standard" | "express") => {
+    setShippingMethodState(m);
+    if (typeof window !== "undefined") localStorage.setItem("cmk_ship", m);
+  }, []);
   const initialized = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -188,6 +211,73 @@ export function CartProvider({ children }: { children: ReactNode }) {
     initialized.current = true;
     refresh();
   }, [refresh]);
+
+  // Realtime: react to accessory stock changes for variants in this cart.
+  const variantIdsKey = items
+    .map((i) => i.accessory_variant_id)
+    .filter(Boolean)
+    .join(",");
+  useEffect(() => {
+    if (!variantIdsKey) return;
+    const variantIds = new Set(variantIdsKey.split(","));
+    const channel = supabase
+      .channel(`cart-stock-${cartId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "shop_accessory_variants" },
+        (payload) => {
+          const id = (payload.new as any)?.id;
+          if (id && variantIds.has(id)) refresh();
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [variantIdsKey, cartId, refresh]);
+
+  // Recompute discount whenever items change while a promo is applied.
+  useEffect(() => {
+    if (!promo) return;
+    const subtotal = items.reduce((s, it) => s + it.unit_price_cents * it.qty, 0);
+    const eligible = items
+      .filter((it) =>
+        promo.applies_to === "all" ||
+        (promo.applies_to === "sneakers" && it.item_type === "sneaker") ||
+        (promo.applies_to === "accessories" && it.item_type === "accessory"),
+      )
+      .reduce((s, it) => s + it.unit_price_cents * it.qty, 0);
+    if (eligible === 0) {
+      // No longer applicable
+      setPromo(null);
+      supabase.from("shop_carts").update({ applied_promo_code: null }).eq("id", cartId).then(() => {});
+      return;
+    }
+    const recomputed = promo.discount_type === "percent"
+      ? Math.floor((eligible * promo.amount) / 100)
+      : Math.min(eligible, promo.amount);
+    if (recomputed !== promo.discount_cents) {
+      setPromo({ ...promo, discount_cents: recomputed });
+    }
+    // capping by subtotal
+    void subtotal;
+  }, [items, promo, cartId]);
+
+  // Load persisted promo on init
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("shop_carts")
+        .select("applied_promo_code")
+        .eq("id", cartId)
+        .maybeSingle();
+      const code = data?.applied_promo_code;
+      if (code) {
+        // Silently re-validate so we get a fresh discount amount.
+        const res = await supabase.functions.invoke("validate-promo-code", { body: { cartId, code } });
+        if (res.data && !res.data.error) setPromo(res.data as AppliedPromo);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartId]);
 
   const addSneaker = useCallback<CartCtx["addSneaker"]>(async (productId, priceCents) => {
     await ensureCart(cartId);
@@ -297,6 +387,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const totalCents = items.reduce((s, it) => s + it.unit_price_cents * it.qty, 0);
   const itemCount = items.reduce((s, it) => s + it.qty, 0);
 
+  const applyPromo = useCallback<CartCtx["applyPromo"]>(async (code) => {
+    const res = await supabase.functions.invoke("validate-promo-code", {
+      body: { cartId, code: code.trim().toUpperCase() },
+    });
+    if (res.error) return { ok: false, error: res.error.message };
+    if (res.data?.error) return { ok: false, error: res.data.error };
+    setPromo(res.data as AppliedPromo);
+    return { ok: true };
+  }, [cartId]);
+
+  const clearPromo = useCallback<CartCtx["clearPromo"]>(async () => {
+    setPromo(null);
+    await supabase.from("shop_carts").update({ applied_promo_code: null }).eq("id", cartId);
+  }, [cartId]);
+
   const value: CartCtx = {
     cartId,
     items,
@@ -310,6 +415,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     addAccessory,
     updateQty,
     removeItem,
+    promo,
+    applyPromo,
+    clearPromo,
+    shippingMethod,
+    setShippingMethod,
   };
 
   return createElement(Ctx.Provider, { value }, children);
