@@ -7,9 +7,11 @@ const corsHeaders = {
 };
 
 const TOKEN_RE = /^[a-f0-9]{32}$/;
-// Matches the request-photos bucket path shape enforced by storage RLS.
+// Matches the request-photos bucket path shape enforced by storage RLS:
+// `<public_token>/<uuid>.<ext>`. The public_token folder scopes uploads to
+// the holder of the secret upload link.
 const PATH_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)$/;
+  /^[a-f0-9]{32}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|heic|heif)$/;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -32,7 +34,11 @@ Deno.serve(async (req) => {
       });
     }
     const safePaths = (photos as unknown[]).filter(
-      (p): p is string => typeof p === "string" && PATH_RE.test(p),
+      (p): p is string =>
+        typeof p === "string" &&
+        PATH_RE.test(p) &&
+        // Path folder must match the caller's token — no cross-request writes.
+        p.split("/")[0] === token,
     );
     if (safePaths.length === 0) {
       return new Response(JSON.stringify({ error: "No valid photo paths" }), {
