@@ -212,6 +212,32 @@ export default function ProductDetail() {
         <ReviewsSection productId={product.id} productName={display} />
       </div>
       <Footer />
+
+      {/* Sticky mobile Buy bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border px-4 py-3 flex items-center gap-3 shadow-lg">
+        <div className="flex-1 min-w-0">
+          <div className="font-display text-lg text-primary leading-none">
+            ${Number(product.price).toFixed(0)}
+          </div>
+          <div className="text-[11px] text-muted-foreground truncate">
+            {isSold ? "Sold" : isReserved && !reservedByMe ? "Reserved" : "Free US shipping"}
+          </div>
+        </div>
+        {isSold ? (
+          <Button disabled size="lg" className="shrink-0">
+            Sold
+          </Button>
+        ) : isReserved && !reservedByMe ? (
+          <Button disabled size="lg" className="shrink-0">
+            <Clock className="w-4 h-4 mr-1" /> Reserved
+          </Button>
+        ) : (
+          <Button onClick={buyNow} disabled={buying || !canBuy} size="lg" className="shrink-0">
+            {buying ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ShoppingBag className="w-4 h-4 mr-1" />}
+            Buy now
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
