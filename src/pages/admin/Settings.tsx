@@ -61,3 +61,33 @@ export default function Settings() {
     </div>
   );
 }
+
+function StripeWebhookCard() {
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-webhook`;
+  function copy() {
+    navigator.clipboard.writeText(url);
+    toast.success("Webhook URL copied");
+  }
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-base">Stripe Webhook</CardTitle></CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-muted-foreground">
+          In your Stripe Dashboard → Developers → Webhooks, add an endpoint
+          listening for <code className="text-xs bg-muted px-1 py-0.5 rounded">checkout.session.completed</code>
+          using the URL below, then paste the generated signing secret into
+          the <code className="text-xs bg-muted px-1 py-0.5 rounded">STRIPE_WEBHOOK_SECRET</code> backend secret.
+        </p>
+        <div className="flex items-center gap-2">
+          <Input readOnly value={url} className="font-mono text-xs" />
+          <Button variant="outline" size="sm" onClick={copy}><Copy className="h-4 w-4" /></Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href="https://dashboard.stripe.com/webhooks" target="_blank" rel="noreferrer">
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
