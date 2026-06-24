@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ListChecks, Clock, CheckCircle2, DollarSign, AlertCircle, Timer } from "lucide-react";
@@ -24,6 +25,7 @@ function StatCard({ icon: Icon, label, value, sub }: any) {
 }
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["admin-metrics"],
     queryFn: async () => {
@@ -73,6 +75,19 @@ export default function Dashboard() {
       return { totalJobs, pending, completed, totalRevenue, unpaid, avgTurnaround, topServices, leadSources };
     },
   });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-dashboard")
+      .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-metrics"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "payments" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-metrics"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   if (isLoading || !data) return <div className="text-muted-foreground">Loading metrics…</div>;
 
