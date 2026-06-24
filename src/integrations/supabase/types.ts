@@ -612,6 +612,44 @@ export type Database = {
         }
         Relationships: []
       }
+      shop_order_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          message: string | null
+          metadata: Json
+          order_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          message?: string | null
+          metadata?: Json
+          order_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          message?: string | null
+          metadata?: Json
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_order_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "shop_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shop_orders: {
         Row: {
           amount: number
