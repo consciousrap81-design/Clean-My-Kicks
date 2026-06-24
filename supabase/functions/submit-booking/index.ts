@@ -31,18 +31,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Validate photos: max 10 https URLs, each <= 2048 chars
+    // Validate photos: max 10 entries. Accept either fully-qualified https URLs
+    // (legacy) or storage object paths inside the request-photos bucket. Paths
+    // are restricted to safe characters and reasonable length.
+    const PATH_RE = /^[A-Za-z0-9._\-\/]{1,512}$/;
     let safePhotos: string[] = [];
     if (Array.isArray(photos)) {
       safePhotos = photos
-        .filter((u): u is string => typeof u === "string" && u.length <= 2048)
+        .filter((u): u is string => typeof u === "string" && u.length > 0 && u.length <= 2048)
         .filter((u) => {
-          try {
-            const parsed = new URL(u);
-            return parsed.protocol === "https:";
-          } catch {
-            return false;
+          if (u.startsWith("https://")) {
+            try {
+              return new URL(u).protocol === "https:";
+            } catch {
+              return false;
+            }
           }
+          // Storage path inside request-photos bucket
+          return PATH_RE.test(u) && !u.includes("..");
         })
         .slice(0, 10);
     }
