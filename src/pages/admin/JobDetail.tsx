@@ -296,12 +296,9 @@ export default function JobDetail() {
         })}
       </div>
 
+      <ShippingPanel jobId={id!} />
       <Card>
         <CardHeader><CardTitle className="text-base">Customer Updates (Timeline)</CardTitle></CardHeader>
-      </Card>
-      <ShippingPanel jobId={id!} />
-      <Card style={{ display: "none" }}>
-        <CardHeader><CardTitle className="text-base">_placeholder</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <Textarea
             placeholder="Post an update for the customer (e.g., 'Sole restoration complete, drying overnight.')"
