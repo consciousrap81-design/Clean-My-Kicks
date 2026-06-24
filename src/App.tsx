@@ -20,6 +20,7 @@ import Requests from "./pages/admin/Requests";
 import Quotes from "./pages/admin/Quotes";
 import QuoteView from "./pages/QuoteView";
 import Unsubscribe from "./pages/Unsubscribe";
+import RequestPhotos from "./pages/RequestPhotos";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/quote/:token" element={<QuoteView />} />
+            <Route path="/request/:token/photos" element={<RequestPhotos />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
               <Route index element={<Dashboard />} />
