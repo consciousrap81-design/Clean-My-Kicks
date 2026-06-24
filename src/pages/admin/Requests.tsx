@@ -10,7 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Inbox, CheckCircle2, XCircle, Archive, Loader2, Camera, X } from "lucide-react";
+import { Inbox, CheckCircle2, XCircle, Archive, Loader2, Camera, X, FileText, Send, Copy, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Request = {
@@ -30,7 +30,24 @@ type Request = {
   quoted_price: number;
   admin_notes: string | null;
   converted_job_id: string | null;
+  accepted_quote_id: string | null;
   submitted_at: string;
+};
+
+type Quote = {
+  id: string;
+  status: "draft" | "sent" | "viewed" | "accepted" | "declined" | "expired";
+  quote_amount: number;
+  service_recommended: string | null;
+  notes: string | null;
+  expires_at: string | null;
+  addons: Array<{ name: string; price: number }>;
+  public_token: string;
+  sent_at: string | null;
+  first_viewed_at: string | null;
+  view_count: number;
+  responded_at: string | null;
+  customer_response: string | null;
 };
 
 const STATUS_LABEL: Record<Request["status"], string> = {
@@ -68,6 +85,13 @@ export default function Requests() {
   const [busy, setBusy] = useState(false);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [qService, setQService] = useState("");
+  const [qAmount, setQAmount] = useState("0");
+  const [qNotes, setQNotes] = useState("");
+  const [qExpires, setQExpires] = useState("");
+  const [qAddons, setQAddons] = useState<Array<{ name: string; price: string }>>([]);
 
   const { data: requests, isLoading } = useQuery({
     queryKey: ["booking-requests", statusFilter],
@@ -99,6 +123,7 @@ export default function Requests() {
     setAdminNotes(r.admin_notes ?? "");
     setPhotoUrls([]);
     setLightboxIdx(null);
+    setQuote(null);
   }
 
   useEffect(() => {
@@ -113,6 +138,111 @@ export default function Requests() {
     })();
     return () => { cancelled = true; };
   }, [selected?.id]);
+
+  // Load latest quote for the selected request (and refresh on realtime)
+  useEffect(() => {
+    if (!selected) { setQuote(null); return; }
+    let cancelled = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from("quotes")
+        .select("*")
+        .eq("request_id", selected.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled) setQuote((data as any) ?? null);
+    };
+    load();
+    const ch = supabase
+      .channel(`quote-${selected.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "quotes", filter: `request_id=eq.${selected.id}` }, load)
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(ch); };
+  }, [selected?.id]);
+
+  function openQuoteDialog() {
+    if (!selected) return;
+    if (quote) {
+      setQService(quote.service_recommended ?? selected.service_requested ?? "");
+      setQAmount(String(quote.quote_amount ?? 0));
+      setQNotes(quote.notes ?? "");
+      setQExpires(quote.expires_at ? quote.expires_at.slice(0, 10) : "");
+      setQAddons((quote.addons ?? []).map((a) => ({ name: a.name, price: String(a.price ?? 0) })));
+    } else {
+      setQService(selected.service_requested ?? "");
+      setQAmount(String(selected.quoted_price ?? 0));
+      setQNotes("");
+      const d = new Date(); d.setDate(d.getDate() + 14);
+      setQExpires(d.toISOString().slice(0, 10));
+      setQAddons([]);
+    }
+    setQuoteOpen(true);
+  }
+
+  async function saveQuote(send: boolean) {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      const payload = {
+        request_id: selected.id,
+        customer_name: selected.customer_name,
+        customer_email: selected.email,
+        customer_phone: selected.phone,
+        shoe_brand: selected.shoe_brand,
+        shoe_model: selected.shoe_model,
+        service_recommended: qService || null,
+        quote_amount: Number(qAmount) || 0,
+        addons: qAddons
+          .filter((a) => a.name.trim())
+          .map((a) => ({ name: a.name.trim(), price: Number(a.price) || 0 })),
+        notes: qNotes || null,
+        expires_at: qExpires ? new Date(qExpires + "T23:59:59").toISOString() : null,
+        photos: selected.photos ?? [],
+        status: (send ? "sent" : "draft") as "sent" | "draft",
+        sent_at: send ? new Date().toISOString() : null,
+      };
+      let saved: any;
+      if (quote) {
+        const { data, error } = await supabase
+          .from("quotes")
+          .update(payload)
+          .eq("id", quote.id)
+          .select("*")
+          .single();
+        if (error) throw error;
+        saved = data;
+      } else {
+        const { data, error } = await supabase
+          .from("quotes")
+          .insert(payload)
+          .select("*")
+          .single();
+        if (error) throw error;
+        saved = data;
+      }
+      setQuote(saved);
+      const link = `${window.location.origin}/quote/${saved.public_token}`;
+      if (send) {
+        await navigator.clipboard.writeText(link).catch(() => {});
+        toast.success("Quote sent — link copied to clipboard");
+      } else {
+        toast.success("Quote saved as draft");
+      }
+      setQuoteOpen(false);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save quote");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function copyQuoteLink() {
+    if (!quote) return;
+    const link = `${window.location.origin}/quote/${quote.public_token}`;
+    navigator.clipboard.writeText(link);
+    toast.success("Link copied");
+  }
 
   async function saveDraft() {
     if (!selected) return;
@@ -129,6 +259,10 @@ export default function Requests() {
 
   async function approveAndConvert() {
     if (!selected) return;
+    if (!quote || quote.status !== "accepted") {
+      toast.error("Customer must accept a quote before converting to a job");
+      return;
+    }
     setBusy(true);
     try {
       // 1. Find or create customer
@@ -186,7 +320,7 @@ export default function Requests() {
           shoe_model: selected.shoe_model,
           condition_notes: conditionParts.join("\n") || null,
           admin_notes: adminNotes || null,
-          quoted_price: Number(quoted) || 0,
+          quoted_price: Number(quote.quote_amount) || Number(quoted) || 0,
           status: "new_request",
           payment_status: "unpaid",
           intake_date: new Date().toISOString().slice(0, 10),
@@ -448,6 +582,58 @@ export default function Requests() {
                     </a>
                   </div>
                 )}
+
+                {/* Quote section */}
+                <div className="rounded-lg border p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <FileText className="h-4 w-4" />
+                      Quote
+                      {quote && (
+                        <Badge variant="outline" className="text-[10px] uppercase">
+                          {quote.status}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button size="sm" variant="outline" onClick={openQuoteDialog} disabled={busy}>
+                      <FileText className="h-4 w-4" />
+                      {quote ? "Edit Quote" : "Create Quote"}
+                    </Button>
+                  </div>
+                  {quote ? (
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <div>
+                        Amount: <span className="text-foreground font-medium">${Number(quote.quote_amount).toFixed(2)}</span>
+                        {quote.expires_at && <> · Expires {new Date(quote.expires_at).toLocaleDateString()}</>}
+                      </div>
+                      {quote.sent_at && <div>Sent {new Date(quote.sent_at).toLocaleString()}</div>}
+                      {quote.first_viewed_at && <div>First viewed {new Date(quote.first_viewed_at).toLocaleString()} ({quote.view_count} view{quote.view_count === 1 ? "" : "s"})</div>}
+                      {quote.responded_at && <div>Responded {new Date(quote.responded_at).toLocaleString()}</div>}
+                      {quote.customer_response && (
+                        <div className="bg-muted/40 rounded p-2 whitespace-pre-wrap text-foreground">
+                          {quote.customer_response}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 pt-1">
+                        <Button size="sm" variant="ghost" onClick={copyQuoteLink}>
+                          <Copy className="h-3.5 w-3.5" /> Copy link
+                        </Button>
+                        <a
+                          href={`/quote/${quote.public_token}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary text-xs underline"
+                        >
+                          Open customer view
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">
+                      Create a quote and send it to the customer. The job can only be created after they accept it.
+                    </div>
+                  )}
+                </div>
               </div>
 
               <DialogFooter className="flex-wrap gap-2 sm:gap-2">
@@ -463,7 +649,11 @@ export default function Requests() {
                     <Button variant="outline" onClick={decline} disabled={busy}>
                       <XCircle className="h-4 w-4" /> Decline / Archive
                     </Button>
-                    <Button onClick={approveAndConvert} disabled={busy}>
+                    <Button
+                      onClick={approveAndConvert}
+                      disabled={busy || !quote || quote.status !== "accepted"}
+                      title={!quote || quote.status !== "accepted" ? "Customer must accept a quote first" : ""}
+                    >
                       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                       Approve & Create Job
                     </Button>
@@ -479,8 +669,97 @@ export default function Requests() {
         </DialogContent>
       </Dialog>
 
+      {/* Quote create/edit dialog */}
+      <Dialog open={quoteOpen} onOpenChange={(o) => !o && setQuoteOpen(false)}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{quote ? "Edit Quote" : "Create Quote"}</DialogTitle>
+            <DialogDescription>
+              Build a quote for {selected?.customer_name}. Send the link so they can review, accept, or decline.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <div className="uppercase text-muted-foreground mb-0.5">Customer</div>
+                <div className="font-medium text-sm">{selected?.customer_name}</div>
+              </div>
+              <div>
+                <div className="uppercase text-muted-foreground mb-0.5">Shoe</div>
+                <div className="font-medium text-sm">{selected?.shoe_brand} {selected?.shoe_model}</div>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-muted-foreground block mb-1">Recommended Service</label>
+              <Input value={qService} onChange={(e) => setQService(e.target.value)} placeholder="e.g. Deep Clean + Restoration" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs uppercase text-muted-foreground block mb-1">Quote Amount ($)</label>
+                <Input type="number" min="0" step="0.01" value={qAmount} onChange={(e) => setQAmount(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs uppercase text-muted-foreground block mb-1">Expires On</label>
+                <Input type="date" value={qExpires} onChange={(e) => setQExpires(e.target.value)} />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs uppercase text-muted-foreground">Add-On Services</label>
+                <Button
+                  type="button" variant="ghost" size="sm"
+                  onClick={() => setQAddons((a) => [...a, { name: "", price: "0" }])}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add
+                </Button>
+              </div>
+              {qAddons.length === 0 && (
+                <div className="text-xs text-muted-foreground italic">No add-ons</div>
+              )}
+              <div className="space-y-2">
+                {qAddons.map((a, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Input
+                      value={a.name}
+                      onChange={(e) => setQAddons((arr) => arr.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                      placeholder="Add-on name"
+                    />
+                    <Input
+                      type="number" min="0" step="0.01" className="w-28"
+                      value={a.price}
+                      onChange={(e) => setQAddons((arr) => arr.map((x, j) => j === i ? { ...x, price: e.target.value } : x))}
+                    />
+                    <Button type="button" variant="ghost" size="icon"
+                      onClick={() => setQAddons((arr) => arr.filter((_, j) => j !== i))}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs uppercase text-muted-foreground block mb-1">Notes / Recommendations</label>
+              <Textarea rows={3} value={qNotes} onChange={(e) => setQNotes(e.target.value)} placeholder="What we recommend, condition observations, timeline..." />
+            </div>
+          </div>
+          <DialogFooter className="flex-wrap gap-2">
+            <Button variant="outline" onClick={() => saveQuote(false)} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Save Draft
+            </Button>
+            <Button onClick={() => saveQuote(true)} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {quote && quote.status !== "draft" ? "Resend Quote" : "Send Quote"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Lightbox */}
       <Dialog open={lightboxIdx !== null} onOpenChange={(o) => !o && setLightboxIdx(null)}>
+        {/* (lightbox below) */}
         <DialogContent className="max-w-4xl p-2 sm:p-4 bg-background">
           {lightboxIdx !== null && photoUrls[lightboxIdx] && (
             <div className="relative">

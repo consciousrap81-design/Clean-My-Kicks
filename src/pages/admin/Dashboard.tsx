@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ListChecks, Clock, CheckCircle2, DollarSign, AlertCircle, Timer } from "lucide-react";
+import { ListChecks, Clock, CheckCircle2, DollarSign, AlertCircle, Timer, Send, FileCheck2, Percent, TrendingUp, Gauge } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
 
 function StatCard({ icon: Icon, label, value, sub }: any) {
@@ -29,16 +29,18 @@ export default function Dashboard() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-metrics"],
     queryFn: async () => {
-      const [jobsRes, paymentsRes, servicesRes, sourcesRes] = await Promise.all([
+      const [jobsRes, paymentsRes, servicesRes, sourcesRes, quotesRes] = await Promise.all([
         supabase.from("jobs").select("id,status,quoted_price,intake_date,completion_date,service_id,lead_source_id"),
         supabase.from("payments").select("amount"),
         supabase.from("services").select("id,name"),
         supabase.from("lead_sources").select("id,name"),
+        supabase.from("quotes").select("id,status,quote_amount"),
       ]);
       const jobs = jobsRes.data || [];
       const payments = paymentsRes.data || [];
       const services = servicesRes.data || [];
       const sources = sourcesRes.data || [];
+      const quotes = quotesRes.data || [];
 
       const totalJobs = jobs.length;
       const completedSet = new Set(["completed", "shipped", "picked_up"]);
@@ -72,7 +74,26 @@ export default function Dashboard() {
         .map(([id, count]) => ({ name: sources.find((s) => s.id === id)?.name || "Unknown", count }))
         .sort((a, b) => b.count - a.count);
 
-      return { totalJobs, pending, completed, totalRevenue, unpaid, avgTurnaround, topServices, leadSources };
+      // Quote metrics
+      const sentLike = new Set(["sent", "viewed", "accepted", "declined", "expired"]);
+      const quotesSent = quotes.filter((q) => sentLike.has(q.status)).length;
+      const quotesAccepted = quotes.filter((q) => q.status === "accepted").length;
+      const acceptedAmt = quotes
+        .filter((q) => q.status === "accepted")
+        .reduce((s, q) => s + Number(q.quote_amount || 0), 0);
+      const pipelineAmt = quotes
+        .filter((q) => q.status === "sent" || q.status === "viewed")
+        .reduce((s, q) => s + Number(q.quote_amount || 0), 0);
+      const avgQuote =
+        quotes.length > 0
+          ? quotes.reduce((s, q) => s + Number(q.quote_amount || 0), 0) / quotes.length
+          : 0;
+      const conversionRate = quotesSent > 0 ? (quotesAccepted / quotesSent) * 100 : 0;
+
+      return {
+        totalJobs, pending, completed, totalRevenue, unpaid, avgTurnaround, topServices, leadSources,
+        quotesSent, quotesAccepted, conversionRate, avgQuote, pipelineAmt, acceptedAmt,
+      };
     },
   });
 
@@ -83,6 +104,9 @@ export default function Dashboard() {
         queryClient.invalidateQueries({ queryKey: ["admin-metrics"] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "payments" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin-metrics"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "quotes" }, () => {
         queryClient.invalidateQueries({ queryKey: ["admin-metrics"] });
       })
       .subscribe();
@@ -107,6 +131,17 @@ export default function Dashboard() {
         <StatCard icon={DollarSign} label="Revenue" value={fmt(data.totalRevenue)} />
         <StatCard icon={AlertCircle} label="Unpaid" value={fmt(data.unpaid)} />
         <StatCard icon={Timer} label="Avg Turnaround" value={`${data.avgTurnaround.toFixed(1)}d`} />
+      </div>
+
+      <div>
+        <h2 className="text-sm uppercase tracking-wide text-muted-foreground mb-2">Quotes</h2>
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+          <StatCard icon={Send} label="Quotes Sent" value={data.quotesSent} />
+          <StatCard icon={FileCheck2} label="Accepted" value={data.quotesAccepted} sub={fmt(data.acceptedAmt)} />
+          <StatCard icon={Percent} label="Conversion" value={`${data.conversionRate.toFixed(0)}%`} />
+          <StatCard icon={Gauge} label="Avg Quote" value={fmt(data.avgQuote)} />
+          <StatCard icon={TrendingUp} label="Pipeline" value={fmt(data.pipelineAmt)} sub="Open quotes" />
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

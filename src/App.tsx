@@ -17,6 +17,8 @@ import Customers from "./pages/admin/Customers";
 import Services from "./pages/admin/Services";
 import Settings from "./pages/admin/Settings";
 import Requests from "./pages/admin/Requests";
+import Quotes from "./pages/admin/Quotes";
+import QuoteView from "./pages/QuoteView";
 
 const queryClient = new QueryClient();
 
@@ -30,9 +32,11 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/quote/:token" element={<QuoteView />} />
             <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
               <Route index element={<Dashboard />} />
               <Route path="requests" element={<Requests />} />
+              <Route path="quotes" element={<Quotes />} />
               <Route path="jobs" element={<Jobs />} />
               <Route path="jobs/new" element={<JobNew />} />
               <Route path="jobs/:id" element={<JobDetail />} />
