@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Loader2, Trash2, Upload } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { ShippingPanel } from "@/components/admin/ShippingPanel";
 
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>();
