@@ -25,6 +25,7 @@ import ShopOrders from "./pages/admin/ShopOrders";
 import QuoteView from "./pages/QuoteView";
 import ProductDetail from "./pages/ProductDetail";
 import ShopOrderSuccess from "./pages/ShopOrderSuccess";
+import RecoverCart from "./pages/RecoverCart";
 import Unsubscribe from "./pages/Unsubscribe";
 import RequestPhotos from "./pages/RequestPhotos";
 import SetPassword from "./pages/auth/SetPassword";
@@ -52,6 +53,7 @@ const App = () => (
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/shop/order/success" element={<ShopOrderSuccess />} />
             <Route path="/shop/:id" element={<ProductDetail />} />
+            <Route path="/recover-cart" element={<RecoverCart />} />
             <Route path="/account" element={<CustomerRoute><AccountLayout /></CustomerRoute>}>
               <Route index element={<AccountDashboard />} />
               <Route path="orders/:jobId" element={<OrderDetail />} />

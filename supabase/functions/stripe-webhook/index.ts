@@ -103,6 +103,25 @@ Deno.serve(async (req) => {
           reserved_session_id: null,
         }).eq("id", productId);
 
+        // Mark any matching abandoned-cart row as recovered (covers both
+        // the original Stripe session and any recovery session we spawned).
+        await supabase
+          .from("shop_abandoned_carts")
+          .update({
+            status: "recovered",
+            recovered_at: new Date().toISOString(),
+            customer_email: email || null,
+          })
+          .or(`stripe_session_id.eq.${sessionId},last_recovery_session_id.eq.${sessionId}`)
+          .eq("status", "pending");
+
+        // Any other still-pending carts for this product can never be recovered now
+        await supabase
+          .from("shop_abandoned_carts")
+          .update({ status: "sold_to_other" })
+          .eq("product_id", productId)
+          .eq("status", "pending");
+
         // Send confirmation email
         if (email) {
           const displayName = [
