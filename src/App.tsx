@@ -16,6 +16,7 @@ import JobDetail from "./pages/admin/JobDetail";
 import Customers from "./pages/admin/Customers";
 import Services from "./pages/admin/Services";
 import Settings from "./pages/admin/Settings";
+import EmailPreview from "./pages/admin/EmailPreview";
 import Requests from "./pages/admin/Requests";
 import Quotes from "./pages/admin/Quotes";
 import QuoteView from "./pages/QuoteView";
@@ -57,6 +58,7 @@ const App = () => (
               <Route path="customers" element={<Customers />} />
               <Route path="services" element={<Services />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="email-preview" element={<EmailPreview />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ListChecks, Users, Wrench, Settings, LogOut, Sparkles, Inbox, FileText } from "lucide-react";
+import { LayoutDashboard, ListChecks, Users, Wrench, Settings, LogOut, Sparkles, Inbox, FileText, Mail } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
@@ -15,6 +15,7 @@ const nav = [
   { to: "/admin/jobs", label: "Jobs", icon: ListChecks },
   { to: "/admin/customers", label: "Customers", icon: Users },
   { to: "/admin/services", label: "Services", icon: Wrench },
+  { to: "/admin/email-preview", label: "Email Preview", icon: Mail },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
