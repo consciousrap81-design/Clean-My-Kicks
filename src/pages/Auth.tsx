@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function Auth() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = params.get("next");
   const { user, isAdmin, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,9 +22,9 @@ export default function Auth() {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate(isAdmin ? "/admin" : "/");
+      navigate(next || (isAdmin ? "/admin" : "/account"));
     }
-  }, [loading, user, isAdmin, navigate]);
+  }, [loading, user, isAdmin, navigate, next]);
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -38,7 +40,7 @@ export default function Auth() {
     setBusy(true);
     const { error } = await supabase.auth.signUp({
       email, password,
-      options: { emailRedirectTo: window.location.origin + "/admin" },
+      options: { emailRedirectTo: window.location.origin + (next || "/account") },
     });
     setBusy(false);
     if (error) toast.error(error.message);
@@ -48,7 +50,7 @@ export default function Auth() {
   async function handleGoogle() {
     setBusy(true);
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/admin",
+      redirect_uri: window.location.origin + (next || "/account"),
     });
     if (result.error) {
       setBusy(false);
