@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ListChecks, Users, Wrench, Settings, LogOut, Sparkles } from "lucide-react";
+import { LayoutDashboard, ListChecks, Users, Wrench, Settings, LogOut, Sparkles, Inbox } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const nav = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/admin/requests", label: "Requests", icon: Inbox },
   { to: "/admin/jobs", label: "Jobs", icon: ListChecks },
   { to: "/admin/customers", label: "Customers", icon: Users },
   { to: "/admin/services", label: "Services", icon: Wrench },

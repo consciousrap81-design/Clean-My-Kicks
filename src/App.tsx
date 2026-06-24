@@ -16,6 +16,7 @@ import JobDetail from "./pages/admin/JobDetail";
 import Customers from "./pages/admin/Customers";
 import Services from "./pages/admin/Services";
 import Settings from "./pages/admin/Settings";
+import Requests from "./pages/admin/Requests";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
               <Route index element={<Dashboard />} />
+              <Route path="requests" element={<Requests />} />
               <Route path="jobs" element={<Jobs />} />
               <Route path="jobs/new" element={<JobNew />} />
               <Route path="jobs/:id" element={<JobDetail />} />
