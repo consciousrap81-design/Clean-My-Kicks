@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Clock, ArrowRight, Sparkles, Wrench, Paintbrush } from "lucide-react";
+import { Eye, Clock, ArrowRight, Sparkles, Wrench, Paintbrush, Search, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -58,6 +59,7 @@ export default function ShopPage() {
   const [brand, setBrand] = useState<string>("All");
   const [size, setSize] = useState<string>("All");
   const [condition, setCondition] = useState<string>("All");
+  const [query, setQuery] = useState<string>("");
 
   useEffect(() => {
     let mounted = true;
@@ -141,6 +143,14 @@ export default function ShopPage() {
     if (brand !== "All" && normalizeBrand(p.brand) !== brand) return false;
     if (size !== "All" && p.size !== size) return false;
     if (condition !== "All" && p.condition !== condition) return false;
+    const q = query.trim().toLowerCase();
+    if (q) {
+      const hay = [p.name, p.brand, p.model, p.colorway, p.description]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
     return true;
   });
 
@@ -148,6 +158,7 @@ export default function ShopPage() {
     setBrand("All");
     setSize("All");
     setCondition("All");
+    setQuery("");
   };
 
   return (
