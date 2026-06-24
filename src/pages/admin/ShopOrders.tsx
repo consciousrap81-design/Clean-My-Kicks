@@ -154,6 +154,9 @@ type Order = {
   paid_at: string | null;
   shipped_at: string | null;
   created_at: string;
+  shipping_method?: string | null;
+  promo_code?: string | null;
+  discount_cents?: number | null;
 };
 
 const STATUS_STYLES: Record<string, string> = {
