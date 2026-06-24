@@ -439,7 +439,37 @@ export default function Requests() {
       .eq("id", selected.id);
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success("Marked as awaiting more photos");
+    if (selected.email) {
+      try {
+        const { error: emailError } = await supabase.functions.invoke(
+          "send-transactional-email",
+          {
+            body: {
+              templateName: "request-more-photos",
+              recipientEmail: selected.email,
+              idempotencyKey: `request-more-photos-${selected.id}-${Date.now()}`,
+              templateData: {
+                customerName: selected.customer_name,
+                shoeBrand: selected.shoe_brand,
+                shoeModel: selected.shoe_model,
+                adminNotes: adminNotes || null,
+              },
+            },
+          }
+        );
+        if (emailError) {
+          toast.warning("Marked as awaiting photos, but email failed to send");
+          console.error("request-more-photos email error", emailError);
+        } else {
+          toast.success(`Marked as awaiting photos · emailed ${selected.email}`);
+        }
+      } catch (e) {
+        toast.warning("Marked as awaiting photos, but email failed to send");
+        console.error(e);
+      }
+    } else {
+      toast.success("Marked as awaiting more photos (no email on file)");
+    }
     setSelected(null);
     queryClient.invalidateQueries({ queryKey: ["booking-requests"] });
   }
