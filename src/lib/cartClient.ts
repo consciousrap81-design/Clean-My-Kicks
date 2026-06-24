@@ -23,7 +23,5 @@ export const cartSupabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLIS
     storage: typeof window !== "undefined" ? localStorage : undefined,
     persistSession: true,
     autoRefreshToken: true,
-    // Same storage key as the main client so signed-in sessions are shared.
-    storageKey: `sb-${new URL(SUPABASE_URL).hostname.split(".")[0]}-auth-token`,
   },
 });
