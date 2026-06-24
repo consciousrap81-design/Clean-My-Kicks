@@ -10,7 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Inbox, CheckCircle2, XCircle, Archive, Loader2, Camera, X } from "lucide-react";
+import { Inbox, CheckCircle2, XCircle, Archive, Loader2, Camera, X, FileText, Send, Copy, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Request = {
@@ -30,7 +30,24 @@ type Request = {
   quoted_price: number;
   admin_notes: string | null;
   converted_job_id: string | null;
+  accepted_quote_id: string | null;
   submitted_at: string;
+};
+
+type Quote = {
+  id: string;
+  status: "draft" | "sent" | "viewed" | "accepted" | "declined" | "expired";
+  quote_amount: number;
+  service_recommended: string | null;
+  notes: string | null;
+  expires_at: string | null;
+  addons: Array<{ name: string; price: number }>;
+  public_token: string;
+  sent_at: string | null;
+  first_viewed_at: string | null;
+  view_count: number;
+  responded_at: string | null;
+  customer_response: string | null;
 };
 
 const STATUS_LABEL: Record<Request["status"], string> = {
@@ -68,6 +85,13 @@ export default function Requests() {
   const [busy, setBusy] = useState(false);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [qService, setQService] = useState("");
+  const [qAmount, setQAmount] = useState("0");
+  const [qNotes, setQNotes] = useState("");
+  const [qExpires, setQExpires] = useState("");
+  const [qAddons, setQAddons] = useState<Array<{ name: string; price: string }>>([]);
 
   const { data: requests, isLoading } = useQuery({
     queryKey: ["booking-requests", statusFilter],
@@ -99,6 +123,7 @@ export default function Requests() {
     setAdminNotes(r.admin_notes ?? "");
     setPhotoUrls([]);
     setLightboxIdx(null);
+    setQuote(null);
   }
 
   useEffect(() => {
@@ -113,6 +138,111 @@ export default function Requests() {
     })();
     return () => { cancelled = true; };
   }, [selected?.id]);
+
+  // Load latest quote for the selected request (and refresh on realtime)
+  useEffect(() => {
+    if (!selected) { setQuote(null); return; }
+    let cancelled = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from("quotes")
+        .select("*")
+        .eq("request_id", selected.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled) setQuote((data as any) ?? null);
+    };
+    load();
+    const ch = supabase
+      .channel(`quote-${selected.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "quotes", filter: `request_id=eq.${selected.id}` }, load)
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(ch); };
+  }, [selected?.id]);
+
+  function openQuoteDialog() {
+    if (!selected) return;
+    if (quote) {
+      setQService(quote.service_recommended ?? selected.service_requested ?? "");
+      setQAmount(String(quote.quote_amount ?? 0));
+      setQNotes(quote.notes ?? "");
+      setQExpires(quote.expires_at ? quote.expires_at.slice(0, 10) : "");
+      setQAddons((quote.addons ?? []).map((a) => ({ name: a.name, price: String(a.price ?? 0) })));
+    } else {
+      setQService(selected.service_requested ?? "");
+      setQAmount(String(selected.quoted_price ?? 0));
+      setQNotes("");
+      const d = new Date(); d.setDate(d.getDate() + 14);
+      setQExpires(d.toISOString().slice(0, 10));
+      setQAddons([]);
+    }
+    setQuoteOpen(true);
+  }
+
+  async function saveQuote(send: boolean) {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      const payload = {
+        request_id: selected.id,
+        customer_name: selected.customer_name,
+        customer_email: selected.email,
+        customer_phone: selected.phone,
+        shoe_brand: selected.shoe_brand,
+        shoe_model: selected.shoe_model,
+        service_recommended: qService || null,
+        quote_amount: Number(qAmount) || 0,
+        addons: qAddons
+          .filter((a) => a.name.trim())
+          .map((a) => ({ name: a.name.trim(), price: Number(a.price) || 0 })),
+        notes: qNotes || null,
+        expires_at: qExpires ? new Date(qExpires + "T23:59:59").toISOString() : null,
+        photos: selected.photos ?? [],
+        status: send ? "sent" : "draft",
+        sent_at: send ? new Date().toISOString() : null,
+      };
+      let saved: any;
+      if (quote) {
+        const { data, error } = await supabase
+          .from("quotes")
+          .update(payload)
+          .eq("id", quote.id)
+          .select("*")
+          .single();
+        if (error) throw error;
+        saved = data;
+      } else {
+        const { data, error } = await supabase
+          .from("quotes")
+          .insert(payload)
+          .select("*")
+          .single();
+        if (error) throw error;
+        saved = data;
+      }
+      setQuote(saved);
+      const link = `${window.location.origin}/quote/${saved.public_token}`;
+      if (send) {
+        await navigator.clipboard.writeText(link).catch(() => {});
+        toast.success("Quote sent — link copied to clipboard");
+      } else {
+        toast.success("Quote saved as draft");
+      }
+      setQuoteOpen(false);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save quote");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function copyQuoteLink() {
+    if (!quote) return;
+    const link = `${window.location.origin}/quote/${quote.public_token}`;
+    navigator.clipboard.writeText(link);
+    toast.success("Link copied");
+  }
 
   async function saveDraft() {
     if (!selected) return;
@@ -129,6 +259,10 @@ export default function Requests() {
 
   async function approveAndConvert() {
     if (!selected) return;
+    if (!quote || quote.status !== "accepted") {
+      toast.error("Customer must accept a quote before converting to a job");
+      return;
+    }
     setBusy(true);
     try {
       // 1. Find or create customer
@@ -186,7 +320,7 @@ export default function Requests() {
           shoe_model: selected.shoe_model,
           condition_notes: conditionParts.join("\n") || null,
           admin_notes: adminNotes || null,
-          quoted_price: Number(quoted) || 0,
+          quoted_price: Number(quote.quote_amount) || Number(quoted) || 0,
           status: "new_request",
           payment_status: "unpaid",
           intake_date: new Date().toISOString().slice(0, 10),
