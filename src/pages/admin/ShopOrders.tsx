@@ -21,6 +21,29 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { trackingUrlFor, carrierLabel, detectCarrierFromTracking } from "@/lib/tracking";
 
+function addBusinessDays(start: Date, days: number) {
+  const d = new Date(start);
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) added++;
+  }
+  return d;
+}
+
+function etaRange(order: Order): { label: string; range: string } | null {
+  if (!order.paid_at && !order.created_at) return null;
+  const base = new Date(order.paid_at || order.created_at);
+  const method = (order.shipping_method || "standard").toLowerCase();
+  const [minD, maxD] = method === "express" ? [1, 3] : [5, 7];
+  const min = addBusinessDays(base, minD);
+  const max = addBusinessDays(base, maxD);
+  return {
+    label: method === "express" ? "Express" : "Standard",
+    range: `${format(min, "MMM d")} – ${format(max, "MMM d")}`,
+  };
+}
+
 async function sendShippedEmail(
   order: Order,
   carrier: string,
