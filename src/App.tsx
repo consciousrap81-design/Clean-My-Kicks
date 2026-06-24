@@ -19,7 +19,11 @@ import Settings from "./pages/admin/Settings";
 import EmailPreview from "./pages/admin/EmailPreview";
 import Requests from "./pages/admin/Requests";
 import Quotes from "./pages/admin/Quotes";
+import Products from "./pages/admin/Products";
+import ProductEdit from "./pages/admin/ProductEdit";
 import QuoteView from "./pages/QuoteView";
+import ProductDetail from "./pages/ProductDetail";
+import ShopOrderSuccess from "./pages/ShopOrderSuccess";
 import Unsubscribe from "./pages/Unsubscribe";
 import RequestPhotos from "./pages/RequestPhotos";
 import SetPassword from "./pages/auth/SetPassword";
@@ -44,6 +48,8 @@ const App = () => (
             <Route path="/quote/:token" element={<QuoteView />} />
             <Route path="/request/:token/photos" element={<RequestPhotos />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/shop/order/success" element={<ShopOrderSuccess />} />
+            <Route path="/shop/:id" element={<ProductDetail />} />
             <Route path="/account" element={<CustomerRoute><AccountLayout /></CustomerRoute>}>
               <Route index element={<AccountDashboard />} />
               <Route path="orders/:jobId" element={<OrderDetail />} />
@@ -57,6 +63,9 @@ const App = () => (
               <Route path="jobs/:id" element={<JobDetail />} />
               <Route path="customers" element={<Customers />} />
               <Route path="services" element={<Services />} />
+              <Route path="products" element={<Products />} />
+              <Route path="products/new" element={<ProductEdit />} />
+              <Route path="products/:id" element={<ProductEdit />} />
               <Route path="settings" element={<Settings />} />
               <Route path="email-preview" element={<EmailPreview />} />
             </Route>
