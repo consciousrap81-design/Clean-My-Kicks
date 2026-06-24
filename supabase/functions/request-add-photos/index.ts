@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
     const { data: reqRow, error: rErr } = await supabase
       .from("booking_requests")
-      .select("id, status, photos")
+      .select("id, status, photos, email, customer_name, shoe_brand, shoe_model")
       .eq("public_token", token)
       .maybeSingle();
 
@@ -76,6 +76,27 @@ Deno.serve(async (req) => {
       .eq("id", reqRow.id);
 
     if (uErr) throw uErr;
+
+    // Fire-and-forget customer confirmation email
+    if (reqRow.email) {
+      try {
+        await supabase.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "photos-received",
+            recipientEmail: reqRow.email,
+            idempotencyKey: `photos-received-${reqRow.id}-${safePaths.join(',').slice(0, 80)}`,
+            templateData: {
+              customerName: reqRow.customer_name,
+              shoeBrand: reqRow.shoe_brand,
+              shoeModel: reqRow.shoe_model,
+              photoCount: safePaths.length,
+            },
+          },
+        });
+      } catch (e) {
+        console.error("photos-received email failed", e);
+      }
+    }
 
     return new Response(JSON.stringify({ ok: true, count: safePaths.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
