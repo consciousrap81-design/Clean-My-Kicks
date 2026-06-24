@@ -16,7 +16,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Package, Truck, Mail, MapPin, ExternalLink, Send } from "lucide-react";
+import { Package, Truck, Mail, MapPin, ExternalLink, Send, Loader2, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { trackingUrlFor, carrierLabel, detectCarrierFromTracking } from "@/lib/tracking";
@@ -27,7 +27,7 @@ async function sendShippedEmail(
   tracking: string,
   forceNew = false,
   customUrl?: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; messageId?: string; idempotencyKey?: string }> {
   try {
     const snap = order.product_snapshot || {};
     const productName =
@@ -36,7 +36,7 @@ async function sendShippedEmail(
     const base = `shop-shipped-${order.id}-${tracking.trim()}`;
     const idempotencyKey = forceNew ? `${base}-resend-${Date.now()}` : base;
     const url = (customUrl?.trim() || trackingUrlFor(carrier, tracking.trim())) || undefined;
-    const { error } = await supabase.functions.invoke("send-transactional-email", {
+    const { data, error } = await supabase.functions.invoke("send-transactional-email", {
       body: {
         templateName: "shop-order-shipped",
         recipientEmail: order.customer_email,
@@ -53,7 +53,11 @@ async function sendShippedEmail(
       },
     });
     if (error) return { ok: false, error: error.message };
-    return { ok: true };
+    return {
+      ok: true,
+      messageId: (data as any)?.message_id,
+      idempotencyKey: (data as any)?.idempotency_key,
+    };
   } catch (e: any) {
     return { ok: false, error: e?.message || "Unknown error" };
   }
