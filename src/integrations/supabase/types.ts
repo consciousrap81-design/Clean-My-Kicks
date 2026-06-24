@@ -373,7 +373,7 @@ export type Database = {
         | "picked_up"
         | "cancelled"
       payment_status: "unpaid" | "partial" | "paid" | "refunded"
-      request_status: "pending" | "approved" | "declined"
+      request_status: "pending" | "approved" | "declined" | "awaiting_photos"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -514,7 +514,7 @@ export const Constants = {
         "cancelled",
       ],
       payment_status: ["unpaid", "partial", "paid", "refunded"],
-      request_status: ["pending", "approved", "declined"],
+      request_status: ["pending", "approved", "declined", "awaiting_photos"],
     },
   },
 } as const
