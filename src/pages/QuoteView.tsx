@@ -33,11 +33,6 @@ export default function QuoteView() {
   useEffect(() => {
     (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("quote-view", {
-          method: "GET",
-          // edge function reads ?token from URL — pass via query string
-        } as any);
-        // Fallback: use raw fetch with apikey since invoke doesn't easily set query strings on GET
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-view?token=${encodeURIComponent(token)}`;
         const res = await fetch(url, {
           headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string },
@@ -45,7 +40,6 @@ export default function QuoteView() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Could not load quote");
         setQuote(json.quote);
-        void data; void error;
       } catch (e: any) {
         setError(e?.message ?? "Could not load quote");
       } finally {
