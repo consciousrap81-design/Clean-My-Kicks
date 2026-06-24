@@ -199,7 +199,7 @@ export default function Requests() {
         notes: qNotes || null,
         expires_at: qExpires ? new Date(qExpires + "T23:59:59").toISOString() : null,
         photos: selected.photos ?? [],
-        status: send ? "sent" : "draft",
+        status: (send ? "sent" : "draft") as "sent" | "draft",
         sent_at: send ? new Date().toISOString() : null,
       };
       let saved: any;
