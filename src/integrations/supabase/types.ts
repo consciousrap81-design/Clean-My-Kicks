@@ -612,6 +612,71 @@ export type Database = {
         }
         Relationships: []
       }
+      shop_abandoned_carts: {
+        Row: {
+          created_at: string
+          customer_email: string | null
+          customer_name: string | null
+          first_email_message_id: string | null
+          first_email_sent_at: string | null
+          id: string
+          last_recovery_session_id: string | null
+          product_id: string
+          recovered_at: string | null
+          recovery_token: string
+          reserved_session_id: string | null
+          second_email_message_id: string | null
+          second_email_sent_at: string | null
+          status: string
+          stripe_session_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          first_email_message_id?: string | null
+          first_email_sent_at?: string | null
+          id?: string
+          last_recovery_session_id?: string | null
+          product_id: string
+          recovered_at?: string | null
+          recovery_token?: string
+          reserved_session_id?: string | null
+          second_email_message_id?: string | null
+          second_email_sent_at?: string | null
+          status?: string
+          stripe_session_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          first_email_message_id?: string | null
+          first_email_sent_at?: string | null
+          id?: string
+          last_recovery_session_id?: string | null
+          product_id?: string
+          recovered_at?: string | null
+          recovery_token?: string
+          reserved_session_id?: string | null
+          second_email_message_id?: string | null
+          second_email_sent_at?: string | null
+          status?: string
+          stripe_session_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_abandoned_carts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shop_order_events: {
         Row: {
           actor_user_id: string | null
