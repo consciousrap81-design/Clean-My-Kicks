@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
     const cartId = typeof body.cartId === "string" ? body.cartId : "";
     if (cartId) {
       if (!/^[0-9a-f-]{36}$/i.test(cartId)) return json({ error: "Invalid cart" }, 400);
-      return await handleCartCheckout(stripe, supabase, cartId, req);
+      return await handleCartCheckout(stripe, supabase, cartId, body);
     }
 
     // ============= LEGACY SINGLE-PRODUCT PATH =============
@@ -107,10 +107,9 @@ Deno.serve(async (req) => {
   }
 });
 
-async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string, req: Request) {
-  const reqBody = await safeBody(req);
-  const promoCodeInput = String(reqBody?.promoCode ?? "").trim().toUpperCase();
-  const shippingMethod = reqBody?.shippingMethod === "express" ? "express" : "standard";
+async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string, body: any) {
+  const promoCodeInput = String(body?.promoCode ?? "").trim().toUpperCase();
+  const shippingMethod = body?.shippingMethod === "express" ? "express" : "standard";
 
   // Load cart items
   const { data: items } = await supabase
@@ -341,11 +340,6 @@ async function handleCartCheckout(stripe: Stripe, supabase: any, cartId: string,
   return json({ url: stripeSession.url });
 }
 
-async function safeBody(req: Request): Promise<any> {
-  // Body is already consumed in main handler — re-read won't work. We instead pass via closure.
-  // This helper exists so the call site reads cleanly; main handler hands us the parsed body.
-  return (req as any)._parsedBody ?? null;
-}
 
 async function firstPhotoUrl(supabase: any, productId: string): Promise<string | null> {
   const { data: photos } = await supabase
