@@ -266,6 +266,7 @@ export default function ShopOrders() {
         {filtered.map((o) => {
           const snap = o.product_snapshot || {};
           const display = [snap.brand, snap.model].filter(Boolean).join(" ") || snap.name || "Shop item";
+          const eta = etaRange(o);
           return (
             <Card key={o.id} className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setEditing(o)}>
               <CardContent className="p-4 flex items-center gap-4 flex-wrap">
@@ -276,6 +277,40 @@ export default function ShopOrders() {
                     {snap.size && <span>Size {snap.size}</span>}
                     <span>· {o.customer_name || o.customer_email}</span>
                     <span>· {format(new Date(o.created_at), "MMM d, yyyy h:mma")}</span>
+                  </div>
+                  <div className="text-xs flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                    {o.shipping_method && (
+                      <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <Truck className="w-3 h-3" />
+                        {o.shipping_method.charAt(0).toUpperCase() + o.shipping_method.slice(1)}
+                      </span>
+                    )}
+                    {eta && (
+                      <span className="text-muted-foreground">
+                        ETA: <span className="text-foreground">{eta.range}</span>
+                      </span>
+                    )}
+                    {o.promo_code && (
+                      <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                        Promo: {o.promo_code}
+                        {o.discount_cents ? ` (−$${(o.discount_cents / 100).toFixed(2)})` : ""}
+                      </Badge>
+                    )}
+                    {o.stripe_session_id && (
+                      <span
+                        className="font-mono text-[10px] text-muted-foreground truncate max-w-[220px]"
+                        title={o.stripe_session_id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(o.stripe_session_id!).then(
+                            () => toast.success("Session ID copied"),
+                            () => toast.error("Copy failed"),
+                          );
+                        }}
+                      >
+                        {o.stripe_session_id.slice(0, 18)}…
+                      </span>
+                    )}
                   </div>
                   {o.tracking_number && (
                     <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
