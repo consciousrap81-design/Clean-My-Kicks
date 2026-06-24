@@ -224,8 +224,35 @@ export default function Requests() {
       setQuote(saved);
       const link = `${window.location.origin}/quote/${saved.public_token}`;
       if (send) {
+        let emailed = false;
+        if (selected.email) {
+          const { data: emailRes, error: emailErr } = await supabase.functions.invoke(
+            "send-transactional-email",
+            {
+              body: {
+                templateName: "quote-sent",
+                recipientEmail: selected.email,
+                idempotencyKey: `quote-sent-${saved.id}-${Date.now()}`,
+                templateData: {
+                  customerName: selected.customer_name,
+                  shoeBrand: selected.shoe_brand,
+                  shoeModel: selected.shoe_model,
+                  serviceRecommended: saved.service_recommended,
+                  quoteAmount: Number(saved.quote_amount) || 0,
+                  expiresAt: saved.expires_at,
+                  quoteUrl: link,
+                },
+              },
+            },
+          );
+          if (!emailErr && !emailRes?.error) emailed = true;
+        }
         await navigator.clipboard.writeText(link).catch(() => {});
-        toast.success("Quote sent — link copied to clipboard");
+        toast.success(
+          emailed
+            ? `Quote emailed to ${selected.email}`
+            : "Quote sent — link copied (email pending domain verification)",
+        );
       } else {
         toast.success("Quote saved as draft");
       }
