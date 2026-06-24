@@ -140,6 +140,18 @@ export default function ShopOrderDetail() {
         </CardContent>
       </Card>
 
+      {(order.status === "shipped" || order.status === "delivered") && order.product_id && (
+        <Card>
+          <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-sm">
+              <Star className="w-4 h-4 text-orange-500" />
+              <span>Loving them? Help other shoppers — leave a quick review.</span>
+            </div>
+            <Button size="sm" onClick={() => setReviewOpen(true)}>Write a review</Button>
+          </CardContent>
+        </Card>
+      )}
+
       {order.tracking_number && (
         <Card>
           <CardContent className="p-4 space-y-2">
