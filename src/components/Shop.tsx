@@ -5,6 +5,7 @@ import { Eye, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signedPhotoUrls, type ShopProduct } from "@/lib/shop";
 import { formatDistanceToNow } from "date-fns";
+import BuyNowButton from "@/components/shop/BuyNowButton";
 
 type Row = ShopProduct & { photo_path: string | null };
 
@@ -153,9 +154,22 @@ const Shop = () => {
                         </span>
                       )}
                     </div>
-                    <Button variant="default" className="w-full h-9 md:h-10 text-xs md:text-sm mt-3">
-                      {reserved ? "View Details" : "Shop This Pair"}
-                    </Button>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        className="h-9 md:h-10 text-xs md:text-sm"
+                      >
+                        View
+                      </Button>
+                      <BuyNowButton
+                        productId={p.id}
+                        status={p.status}
+                        reservedUntil={(p as any).reserved_until}
+                        reservedSessionId={(p as any).reserved_session_id}
+                        price={Number(p.price)}
+                        className="h-9 md:h-10 text-xs md:text-sm w-full"
+                      />
+                    </div>
                   </div>
                 </Link>
               );
