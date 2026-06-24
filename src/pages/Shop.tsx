@@ -267,7 +267,7 @@ export default function ShopPage() {
                 ))}
               </select>
             </div>
-            {(brand !== "All" || size !== "All" || condition !== "All") && (
+            {(brand !== "All" || size !== "All" || condition !== "All" || query) && (
               <button onClick={resetFilters} className="text-primary underline underline-offset-2 text-xs">
                 Reset
               </button>
