@@ -271,7 +271,7 @@ export default function Requests() {
     const { error } = await supabase
       .from("booking_requests")
       .update({
-        status: "awaiting_photos",
+        status: "awaiting_photos" as any,
         quoted_price: Number(quoted) || 0,
         admin_notes: adminNotes || null,
       })
