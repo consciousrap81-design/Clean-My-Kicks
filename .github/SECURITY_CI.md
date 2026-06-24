@@ -9,7 +9,7 @@ Every PR and push to `main` runs `.github/workflows/security.yml`, which contain
 | **SQL / RLS policy check** | Greps `supabase/migrations/*.sql` for unsafe patterns | A migration that creates a `public.*` table without `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY`, and a `GRANT` — or one that flips a storage bucket public via raw SQL |
 | **Static analysis** | Semgrep with `p/typescript`, `p/react`, `p/owasp-top-ten`, `p/secrets` | Any error-severity finding |
 
-The workflow also runs every Monday at 06:00 UTC to catch newly disclosed CVEs in pinned dependencies.
+The workflow also runs daily at 06:00 UTC to catch newly disclosed CVEs and policy regressions even when no PR is open.
 
 ## Local checks
 

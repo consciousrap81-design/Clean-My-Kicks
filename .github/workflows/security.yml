@@ -6,8 +6,8 @@ on:
   push:
     branches: [main]
   schedule:
-    # Weekly scan to catch newly disclosed vulnerabilities in pinned deps.
-    - cron: "0 6 * * 1"
+    # Daily scan at 06:00 UTC so issues surface even without a PR.
+    - cron: "0 6 * * *"
 
 permissions:
   contents: read
