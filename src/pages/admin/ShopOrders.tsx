@@ -16,7 +16,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Package, Truck, Mail, MapPin, ExternalLink, Send, Loader2 } from "lucide-react";
+import { Package, Truck, Mail, MapPin, ExternalLink, Send, Loader2, History, CheckCircle2, RotateCcw, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { trackingUrlFor, carrierLabel, detectCarrierFromTracking } from "@/lib/tracking";
@@ -212,6 +212,7 @@ function OrderDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const qc = useQueryClient();
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
   const [status, setStatus] = useState("paid");
@@ -226,6 +227,37 @@ function OrderDialog({
       () => toast.success("Message ID copied"),
       () => toast.error("Copy failed"),
     );
+  }
+
+  const eventsQuery = useQuery({
+    queryKey: ["shop-order-events", order?.id],
+    enabled: !!order?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("shop_order_events")
+        .select("*")
+        .eq("order_id", order!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  async function logEvent(
+    eventType: "shipped" | "email_resent" | "tracking_updated" | "status_changed" | "email_failed",
+    message: string,
+    metadata: Record<string, unknown> = {},
+  ) {
+    if (!order) return;
+    const { data: u } = await supabase.auth.getUser();
+    await supabase.from("shop_order_events").insert({
+      order_id: order.id,
+      event_type: eventType,
+      message,
+      metadata: metadata as any,
+      actor_user_id: u.user?.id ?? null,
+    });
+    qc.invalidateQueries({ queryKey: ["shop-order-events", order.id] });
   }
 
   const PRESETS = ["USPS", "UPS", "FedEx", "DHL"];
@@ -286,6 +318,16 @@ function OrderDialog({
       return;
     }
 
+    await logEvent(
+      "shipped",
+      `Marked shipped via ${effectiveCarrier || "carrier"}${tracking.trim() ? ` (${tracking.trim()})` : ""}`,
+      {
+        carrier: effectiveCarrier || null,
+        tracking_number: tracking.trim(),
+        tracking_url: previewUrl || null,
+      },
+    );
+
     const sent = await sendShippedEmail(order!, effectiveCarrier, tracking, false, customUrl);
     if (sent.ok) {
       toast.success("Marked shipped — tracking email queued", {
@@ -294,11 +336,21 @@ function OrderDialog({
         action: sent.messageId ? { label: "Copy ID", onClick: () => copyId(sent.messageId!) } : undefined,
         duration: 8000,
       });
+      await logEvent("email_resent", "Shipping notification sent", {
+        recipient: order!.customer_email,
+        message_id: sent.messageId,
+        tracking_url: previewUrl || null,
+        initial: true,
+      });
     } else {
       toast.warning("Marked shipped, but email failed to send", {
         id: t,
         description: sent.error,
         duration: 10000,
+      });
+      await logEvent("email_failed", "Shipping notification failed to send", {
+        recipient: order!.customer_email,
+        error: sent.error,
       });
     }
 
@@ -325,11 +377,22 @@ function OrderDialog({
         action: sent.messageId ? { label: "Copy ID", onClick: () => copyId(sent.messageId!) } : undefined,
         duration: 8000,
       });
+      await logEvent("email_resent", "Shipping email resent", {
+        recipient: order!.customer_email,
+        message_id: sent.messageId,
+        carrier: effectiveCarrier || null,
+        tracking_number: tracking.trim(),
+        tracking_url: previewUrl || null,
+      });
     } else {
       toast.error("Failed to resend email", {
         id: t,
         description: sent.error,
         duration: 10000,
+      });
+      await logEvent("email_failed", "Resend failed", {
+        recipient: order!.customer_email,
+        error: sent.error,
       });
     }
   }
@@ -359,9 +422,33 @@ function OrderDialog({
       patch.tracking_number = tracking.trim();
       patch.tracking_carrier = effectiveCarrier || null;
     }
+    const carrierChanged = (order!.tracking_carrier || "") !== (effectiveCarrier || "");
+    const trackingChanged = (order!.tracking_number || "") !== tracking.trim();
+    const statusChanged = order!.status !== status;
     const { error } = await supabase.from("shop_orders").update(patch).eq("id", order!.id);
     setSaving(false);
     if (error) return toast.error(error.message);
+
+    if (statusChanged) {
+      await logEvent("status_changed", `Status changed from ${order!.status} → ${status}`, {
+        from: order!.status,
+        to: status,
+      });
+    }
+    if (carrierChanged || trackingChanged) {
+      await logEvent(
+        "tracking_updated",
+        `Tracking updated: ${effectiveCarrier || "—"} ${tracking.trim() || "—"}`,
+        {
+          carrier_from: order!.tracking_carrier,
+          carrier_to: effectiveCarrier || null,
+          tracking_from: order!.tracking_number,
+          tracking_to: tracking.trim() || null,
+          tracking_url: previewUrl || null,
+        },
+      );
+    }
+
     toast.success("Order updated");
     onSaved();
   }
@@ -508,6 +595,8 @@ function OrderDialog({
               View in Stripe <ExternalLink className="w-3 h-3" />
             </a>
           )}
+
+          <Timeline events={eventsQuery.data || []} loading={eventsQuery.isLoading} orderCreatedAt={order.created_at} />
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2">
@@ -576,6 +665,85 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
     <div className="grid grid-cols-[90px_1fr] gap-2">
       <div className="text-xs uppercase tracking-wide text-muted-foreground pt-0.5">{label}</div>
       <div className="min-w-0">{value}</div>
+    </div>
+  );
+}
+
+type TimelineEvent = {
+  id: string;
+  event_type: string;
+  message: string | null;
+  metadata: any;
+  created_at: string;
+};
+
+const EVENT_ICONS: Record<string, { icon: typeof Truck; cls: string }> = {
+  shipped: { icon: Truck, cls: "bg-blue-100 text-blue-700" },
+  email_resent: { icon: Send, cls: "bg-emerald-100 text-emerald-700" },
+  email_failed: { icon: Mail, cls: "bg-red-100 text-red-700" },
+  tracking_updated: { icon: Pencil, cls: "bg-amber-100 text-amber-800" },
+  status_changed: { icon: RotateCcw, cls: "bg-slate-200 text-slate-700" },
+};
+
+function Timeline({
+  events, loading, orderCreatedAt,
+}: { events: TimelineEvent[]; loading: boolean; orderCreatedAt: string }) {
+  return (
+    <div className="rounded-md border p-3 space-y-3">
+      <div className="text-xs uppercase text-muted-foreground tracking-wide flex items-center gap-1">
+        <History className="w-3 h-3" /> Timeline
+      </div>
+      {loading ? (
+        <div className="text-xs text-muted-foreground">Loading…</div>
+      ) : events.length === 0 ? (
+        <div className="text-xs text-muted-foreground">
+          No shipment activity yet. Order placed {format(new Date(orderCreatedAt), "PPp")}.
+        </div>
+      ) : (
+        <ol className="space-y-3">
+          {events.map((ev) => {
+            const cfg = EVENT_ICONS[ev.event_type] || { icon: CheckCircle2, cls: "bg-slate-200 text-slate-700" };
+            const Icon = cfg.icon;
+            const m = ev.metadata || {};
+            return (
+              <li key={ev.id} className="flex gap-3">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${cfg.cls}`}>
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{ev.message || ev.event_type}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {format(new Date(ev.created_at), "PPp")}
+                  </div>
+                  {(m.carrier || m.tracking_number) && (
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {[m.carrier, m.tracking_number].filter(Boolean).join(" · ")}
+                    </div>
+                  )}
+                  {m.tracking_url && (
+                    <a
+                      href={m.tracking_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-primary hover:underline break-all inline-flex items-center gap-1 mt-0.5"
+                    >
+                      <ExternalLink className="w-3 h-3" /> {m.tracking_url}
+                    </a>
+                  )}
+                  {m.message_id && (
+                    <div className="text-[11px] text-muted-foreground mt-0.5 font-mono break-all">
+                      msg {m.message_id}
+                    </div>
+                  )}
+                  {m.error && (
+                    <div className="text-xs text-red-600 mt-0.5">{m.error}</div>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </div>
   );
 }
