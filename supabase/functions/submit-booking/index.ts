@@ -31,6 +31,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Validate photos: max 10 https URLs, each <= 2048 chars
+    let safePhotos: string[] = [];
+    if (Array.isArray(photos)) {
+      safePhotos = photos
+        .filter((u): u is string => typeof u === "string" && u.length <= 2048)
+        .filter((u) => {
+          try {
+            const parsed = new URL(u);
+            return parsed.protocol === "https:";
+          } catch {
+            return false;
+          }
+        })
+        .slice(0, 10);
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -46,7 +62,7 @@ Deno.serve(async (req) => {
       shoe_size: shoeSize ?? null,
       drop_off_method: dropOffMethod ?? null,
       notes: notes ?? null,
-      photos: Array.isArray(photos) ? photos : [],
+      photos: safePhotos,
       source: "Website",
       status: "pending",
     });
@@ -57,7 +73,7 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("submit-booking error", e);
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
