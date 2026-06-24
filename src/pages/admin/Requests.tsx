@@ -429,18 +429,23 @@ export default function Requests() {
   async function requestMorePhotos() {
     if (!selected) return;
     setBusy(true);
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("booking_requests")
       .update({
         status: "awaiting_photos" as any,
         quoted_price: Number(quoted) || 0,
         admin_notes: adminNotes || null,
       })
-      .eq("id", selected.id);
+      .eq("id", selected.id)
+      .select("public_token")
+      .maybeSingle();
     setBusy(false);
     if (error) return toast.error(error.message);
     if (selected.email) {
       try {
+        const uploadUrl = updated?.public_token
+          ? `${window.location.origin}/request/${updated.public_token}/photos`
+          : undefined;
         const { error: emailError } = await supabase.functions.invoke(
           "send-transactional-email",
           {
@@ -453,6 +458,7 @@ export default function Requests() {
                 shoeBrand: selected.shoe_brand,
                 shoeModel: selected.shoe_model,
                 adminNotes: adminNotes || null,
+                uploadUrl,
               },
             },
           }
