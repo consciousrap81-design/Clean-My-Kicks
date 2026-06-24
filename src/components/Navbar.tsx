@@ -2,6 +2,7 @@ import { Menu, X, Phone, MessageCircle, Instagram } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import heroK from "@/assets/hero-k.png";
+import CartButton from "@/components/shop/CartButton";
 const navItems = [
   { label: "Services", href: "#services" },
   { label: "Shop", href: "/shop" },
@@ -73,15 +74,20 @@ const Navbar = () => {
             <Button variant="hero" size="sm" onClick={scrollToBooking}>
               Book Now
             </Button>
+            <CartButton />
           </div>
 
           {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 text-white"
-          >
-            {isOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+          <div className="md:hidden flex items-center gap-1">
+            <CartButton />
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="p-2 text-white"
+              aria-label="Toggle menu"
+            >
+              {isOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Navigation */}
