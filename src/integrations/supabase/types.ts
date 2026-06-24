@@ -726,6 +726,7 @@ export type Database = {
           paid_at: string | null
           product_id: string | null
           product_snapshot: Json
+          review_request_sent_at: string | null
           shipped_at: string | null
           shipping_address: Json | null
           status: string
@@ -746,6 +747,7 @@ export type Database = {
           paid_at?: string | null
           product_id?: string | null
           product_snapshot: Json
+          review_request_sent_at?: string | null
           shipped_at?: string | null
           shipping_address?: Json | null
           status?: string
@@ -766,6 +768,7 @@ export type Database = {
           paid_at?: string | null
           product_id?: string | null
           product_snapshot?: Json
+          review_request_sent_at?: string | null
           shipped_at?: string | null
           shipping_address?: Json | null
           status?: string
@@ -907,6 +910,75 @@ export type Database = {
         }
         Relationships: []
       }
+      shop_reviews: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          body: string
+          created_at: string
+          id: string
+          order_id: string | null
+          photo_path: string | null
+          product_id: string
+          rating: number
+          rejection_reason: string | null
+          reviewer_name: string | null
+          status: Database["public"]["Enums"]["shop_review_status"]
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          photo_path?: string | null
+          product_id: string
+          rating: number
+          rejection_reason?: string | null
+          reviewer_name?: string | null
+          status?: Database["public"]["Enums"]["shop_review_status"]
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          photo_path?: string | null
+          product_id?: string
+          rating?: number
+          rejection_reason?: string | null
+          reviewer_name?: string | null
+          status?: Database["public"]["Enums"]["shop_review_status"]
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "shop_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppressed_emails: {
         Row: {
           created_at: string
@@ -1016,6 +1088,7 @@ export type Database = {
         | "declined"
         | "expired"
       request_status: "pending" | "approved" | "declined" | "awaiting_photos"
+      shop_review_status: "pending" | "approved" | "rejected" | "hidden"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1166,6 +1239,7 @@ export const Constants = {
         "expired",
       ],
       request_status: ["pending", "approved", "declined", "awaiting_photos"],
+      shop_review_status: ["pending", "approved", "rejected", "hidden"],
     },
   },
 } as const

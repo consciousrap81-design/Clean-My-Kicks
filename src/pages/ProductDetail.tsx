@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { getShopSessionId, signedPhotoUrls, type ShopProduct } from "@/lib/shop";
+import ReviewsSection from "@/components/shop/ReviewsSection";
 
 type Photo = { id: string; storage_path: string; is_primary: boolean; sort_order: number };
 
@@ -207,6 +208,8 @@ export default function ProductDetail() {
             </div>
           </div>
         </div>
+
+        <ReviewsSection productId={product.id} productName={display} />
       </div>
       <Footer />
     </div>

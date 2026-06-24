@@ -1,12 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Truck, Package, MapPin, ExternalLink, History, Send, Pencil, RotateCcw, Mail, CheckCircle2 } from "lucide-react";
+import { Star } from "lucide-react";
 import { format } from "date-fns";
 import { trackingUrlFor, carrierLabel } from "@/lib/tracking";
+import { useEffect, useState } from "react";
+import WriteReviewDialog from "@/components/shop/WriteReviewDialog";
 
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800",
@@ -44,6 +47,12 @@ const EVENT_LABELS: Record<string, string> = {
 
 export default function ShopOrderDetail() {
   const { id } = useParams<{ id: string }>();
+  const [search] = useSearchParams();
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  useEffect(() => {
+    if (search.get("review") === "1") setReviewOpen(true);
+  }, [search]);
 
   const { data: order, isLoading } = useQuery({
     queryKey: ["customer-shop-order", id],
@@ -130,6 +139,18 @@ export default function ShopOrderDetail() {
           <p className="text-sm text-muted-foreground">{STATUS_COPY[order.status] || ""}</p>
         </CardContent>
       </Card>
+
+      {(order.status === "shipped" || order.status === "delivered") && order.product_id && (
+        <Card>
+          <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-sm">
+              <Star className="w-4 h-4 text-orange-500" />
+              <span>Loving them? Help other shoppers — leave a quick review.</span>
+            </div>
+            <Button size="sm" onClick={() => setReviewOpen(true)}>Write a review</Button>
+          </CardContent>
+        </Card>
+      )}
 
       {order.tracking_number && (
         <Card>
@@ -242,6 +263,16 @@ export default function ShopOrderDetail() {
           )}
         </CardContent>
       </Card>
+
+      {order.product_id && (
+        <WriteReviewDialog
+          open={reviewOpen}
+          onOpenChange={setReviewOpen}
+          productId={order.product_id}
+          productName={display}
+          defaultName={order.customer_name || undefined}
+        />
+      )}
     </div>
   );
 }

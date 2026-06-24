@@ -9,6 +9,8 @@ import { template as shopOrderShipped } from './shop-order-shipped.tsx'
 import { template as shopOrderTrackingUpdated } from './shop-order-tracking-updated.tsx'
 import { template as shopOrderStatusChanged } from './shop-order-status-changed.tsx'
 import { template as shopAbandonedCart } from './shop-abandoned-cart.tsx'
+import { template as shopReviewRequest } from './shop-review-request.tsx'
+import { template as shopReviewThanks } from './shop-review-thanks.tsx'
 
 export interface TemplateEntry {
   component: ComponentType<any>
@@ -28,4 +30,6 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'shop-order-tracking-updated': shopOrderTrackingUpdated,
   'shop-order-status-changed': shopOrderStatusChanged,
   'shop-abandoned-cart': shopAbandonedCart,
+  'shop-review-request': shopReviewRequest,
+  'shop-review-thanks': shopReviewThanks,
 }
