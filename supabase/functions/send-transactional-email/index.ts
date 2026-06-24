@@ -6,15 +6,23 @@ import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
 
 // Configuration baked in at scaffold time — do NOT change these manually.
 // To update, re-run the email domain setup flow.
-const SITE_NAME = "clean-kick-creations"
+// Branding + addressing — overridable per deployment via env vars.
+// Defaults below were baked in at scaffold time; set the matching secret to override
+// without code edits.
+const SITE_NAME = Deno.env.get('EMAIL_SITE_NAME') ?? "clean-kick-creations"
 // SENDER_DOMAIN is the verified sender subdomain FQDN (e.g., "notify.example.com").
 // It MUST match the subdomain delegated to Lovable's nameservers — never the root domain.
-// The email API looks up this exact domain; a mismatch causes "No email domain record found".
-const SENDER_DOMAIN = "quotes.cleanmykicks.com"
-// FROM_DOMAIN is the domain shown in the From: header (e.g., "example.com").
-// When display_from_root is enabled, this can be the root domain for cleaner branding,
-// even though actual sending uses the subdomain above.
-const FROM_DOMAIN = "cleanmykicks.com"
+const SENDER_DOMAIN = Deno.env.get('EMAIL_SENDER_DOMAIN') ?? "quotes.cleanmykicks.com"
+// FROM_DOMAIN is the domain shown in the From: header. With display_from_root enabled
+// this can be the root domain for cleaner branding.
+const FROM_DOMAIN = Deno.env.get('EMAIL_FROM_DOMAIN') ?? "cleanmykicks.com"
+const FROM_DISPLAY_NAME = Deno.env.get('EMAIL_FROM_DISPLAY_NAME') ?? "Clean My Kicks"
+const FROM_LOCAL_PART = Deno.env.get('EMAIL_TX_FROM_LOCAL_PART') ?? "quotes"
+// Full From override takes precedence over the parts above.
+const FROM_ADDRESS = Deno.env.get('EMAIL_TX_FROM_ADDRESS')
+  ?? Deno.env.get('EMAIL_FROM_ADDRESS')
+  ?? `${FROM_DISPLAY_NAME} <${FROM_LOCAL_PART}@${FROM_DOMAIN}>`
+const REPLY_TO = Deno.env.get('EMAIL_TX_REPLY_TO') ?? Deno.env.get('EMAIL_REPLY_TO') ?? undefined
 
 // Generate a cryptographically random 32-byte hex token
 function generateToken(): string {
@@ -308,7 +316,8 @@ Deno.serve(async (req) => {
     payload: {
       message_id: messageId,
       to: effectiveRecipient,
-      from: `Clean My Kicks <quotes@${FROM_DOMAIN}>`,
+      from: FROM_ADDRESS,
+      reply_to: REPLY_TO,
       sender_domain: SENDER_DOMAIN,
       subject: resolvedSubject,
       html,
