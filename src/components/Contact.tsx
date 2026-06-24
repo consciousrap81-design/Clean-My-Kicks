@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Mail, MapPin, Phone, Send, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const FORMSPREE_ENDPOINT = "https://formspree.io/f/xvzojebk";
 
@@ -19,12 +20,26 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
     const formData = new FormData(e.currentTarget);
 
     try {
+      // Fire admin dashboard job creation in parallel (non-blocking for Formspree)
+      const payload = {
+        fullName: formData.get("fullName"),
+        email: formData.get("email"),
+        phone: formData.get("phone"),
+        serviceLevel: formData.get("serviceLevel"),
+        shoeBrand: formData.get("shoeBrand"),
+        shoeModel: formData.get("shoeModel"),
+        shoeSize: formData.get("shoeSize"),
+        dropOffMethod: formData.get("dropOffMethod"),
+        notes: formData.get("notes"),
+      };
+      supabase.functions
+        .invoke("submit-booking", { body: payload })
+        .catch((err) => console.error("submit-booking failed", err));
+
       const response = await fetch(FORMSPREE_ENDPOINT, {
         method: "POST",
         body: formData,
-        headers: {
-          Accept: "application/json",
-        },
+        headers: { Accept: "application/json" },
       });
 
       if (response.ok) {
