@@ -57,12 +57,19 @@ Deno.serve(async (req) => {
     const trackingStatus = verified?.tracking_status?.status as string | undefined;
     const mapped = (trackingStatus && STATUS_MAP[trackingStatus]) || "in_transit";
     const eventAt = verified?.tracking_status?.status_date || new Date().toISOString();
+    const statusDetail: string | null =
+      verified?.tracking_status?.status_details ||
+      verified?.tracking_status?.substatus?.text ||
+      verified?.tracking_status?.status ||
+      null;
+    const eta: string | null = verified?.eta || null;
+    const carrierName: string | null = verified?.carrier || carrier || null;
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const { data: shipment } = await admin
       .from("shipments")
-      .select("id, request_id, direction, status")
+      .select("id, request_id, direction, status, tracking_status_detail, eta")
       .eq("tracking_number", trackingNumber)
       .maybeSingle();
 
@@ -70,12 +77,21 @@ Deno.serve(async (req) => {
       return ok({ unknown_shipment: true });
     }
 
-    if (shipment.status !== mapped) {
-      await admin.from("shipments").update({
+    const statusChanged = shipment.status !== mapped;
+    const detailChanged = (shipment as any).tracking_status_detail !== statusDetail;
+    const etaChanged = ((shipment as any).eta || null) !== eta;
+
+    if (statusChanged || detailChanged || etaChanged) {
+      const update: Record<string, unknown> = {
         status: mapped,
         last_event_at: eventAt,
-      }).eq("id", shipment.id);
+        tracking_status_detail: statusDetail,
+        eta,
+      };
+      if (carrierName) update.carrier = carrierName.toUpperCase() === "USPS" ? "USPS" : carrierName;
+      await admin.from("shipments").update(update).eq("id", shipment.id);
 
+      if (statusChanged) {
       // Append to job timeline if there's a linked job
       const { data: br } = await admin
         .from("booking_requests")
@@ -86,12 +102,14 @@ Deno.serve(async (req) => {
           shipment.direction === "inbound"
             ? `Inbound shipment ${mapped.replace("_", " ")}`
             : `Return shipment ${mapped.replace("_", " ")}`;
+          const etaSuffix = eta ? ` · ETA ${new Date(eta).toLocaleDateString("en-US")}` : "";
         await admin.from("job_updates").insert({
           job_id: br.converted_job_id,
-          body: `${label} (USPS ${trackingNumber})`,
+            body: `${label} (${(carrierName || "USPS").toUpperCase()} ${trackingNumber})${etaSuffix}`,
           customer_visible: true,
         });
       }
+    }
     }
 
     return ok();
