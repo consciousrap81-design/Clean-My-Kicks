@@ -34,6 +34,106 @@ Deno.serve(async (req) => {
       if (session.payment_status !== "paid") return new Response("ok", { status: 200 });
 
       const meta = session.metadata || {};
+      const orderKind = meta.order_kind || (meta.quote_id ? "quote" : "");
+
+      // ============= SHOP ORDER PATH =============
+      if (orderKind === "shop") {
+        const productId = meta.shop_product_id;
+        if (!productId) return new Response("ok", { status: 200 });
+        const email = (session.customer_details?.email || "").toLowerCase();
+        const amount = (session.amount_total ?? 0) / 100;
+        const currency = (session.currency ?? "usd").toLowerCase();
+        const sessionId = session.id;
+        const intentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null;
+
+        // Idempotency
+        const { data: existingOrder } = await supabase
+          .from("shop_orders")
+          .select("id")
+          .eq("stripe_session_id", sessionId)
+          .maybeSingle();
+        if (existingOrder) return new Response("ok", { status: 200 });
+
+        const { data: product } = await supabase
+          .from("shop_products")
+          .select("id, name, brand, model, size, condition, price")
+          .eq("id", productId)
+          .maybeSingle();
+
+        const productSnapshot = product ?? { id: productId };
+        const shippingDetails = (session as any).shipping_details ?? (session as any).collected_information?.shipping_details ?? null;
+
+        // Provision user account (same as quotes flow)
+        let userId: string | null = null;
+        if (email) {
+          const { data: existing } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
+          const found = existing?.users?.find((u) => (u.email || "").toLowerCase() === email);
+          if (found) {
+            userId = found.id;
+          } else {
+            const { data: created } = await supabase.auth.admin.createUser({ email, email_confirm: true });
+            userId = created?.user?.id ?? null;
+          }
+          if (userId) {
+            await supabase.from("user_roles").insert({ user_id: userId, role: "customer" }).then(() => {}).catch(() => {});
+          }
+        }
+
+        const { data: newOrder } = await supabase.from("shop_orders").insert({
+          product_id: productId,
+          product_snapshot: productSnapshot,
+          user_id: userId,
+          customer_email: email,
+          customer_name: session.customer_details?.name || null,
+          shipping_address: shippingDetails,
+          amount,
+          currency,
+          status: "paid",
+          stripe_session_id: sessionId,
+          stripe_payment_intent: intentId,
+          paid_at: new Date().toISOString(),
+        }).select("id").single();
+
+        // Mark product sold
+        await supabase.from("shop_products").update({
+          status: "sold",
+          sold_at: new Date().toISOString(),
+          sold_order_id: newOrder?.id ?? null,
+          reserved_until: null,
+          reserved_session_id: null,
+        }).eq("id", productId);
+
+        // Send confirmation email
+        if (email) {
+          const displayName = [
+            (productSnapshot as any).brand,
+            (productSnapshot as any).model,
+            (productSnapshot as any).name,
+          ].filter(Boolean).join(" ");
+          await supabase.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "shop-order-confirmation",
+              recipientEmail: email,
+              idempotencyKey: `shop-order-${sessionId}`,
+              templateData: {
+                customerName: session.customer_details?.name || "",
+                productName: displayName || (productSnapshot as any).name,
+                productSize: (productSnapshot as any).size || null,
+                productCondition: (productSnapshot as any).condition || null,
+                amount: amount.toFixed(2),
+                orderUrl: `${SITE_URL}/account`,
+              },
+            },
+          });
+        }
+
+        return new Response(JSON.stringify({ received: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // ============= QUOTE PAYMENT PATH =============
       const quoteId = meta.quote_id;
       const kind = (meta.payment_kind || "full") as "deposit" | "full" | "balance";
       const email = (session.customer_details?.email || meta.customer_email || "").toLowerCase();
