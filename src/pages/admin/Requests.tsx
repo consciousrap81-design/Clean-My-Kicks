@@ -671,6 +671,7 @@ export default function Requests() {
 
       {/* Lightbox */}
       <Dialog open={lightboxIdx !== null} onOpenChange={(o) => !o && setLightboxIdx(null)}>
+        {/* (lightbox below) */}
         <DialogContent className="max-w-4xl p-2 sm:p-4 bg-background">
           {lightboxIdx !== null && photoUrls[lightboxIdx] && (
             <div className="relative">
