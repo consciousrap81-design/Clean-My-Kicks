@@ -707,6 +707,7 @@ export type Database = {
           id: string
           label_url: string | null
           last_event_at: string | null
+          notifications_enabled: boolean
           rate_cents: number | null
           request_id: string
           service: string | null
@@ -725,6 +726,7 @@ export type Database = {
           id?: string
           label_url?: string | null
           last_event_at?: string | null
+          notifications_enabled?: boolean
           rate_cents?: number | null
           request_id: string
           service?: string | null
@@ -743,6 +745,7 @@ export type Database = {
           id?: string
           label_url?: string | null
           last_event_at?: string | null
+          notifications_enabled?: boolean
           rate_cents?: number | null
           request_id?: string
           service?: string | null
