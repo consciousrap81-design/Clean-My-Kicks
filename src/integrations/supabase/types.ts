@@ -27,6 +27,7 @@ export type Database = {
           notes: string | null
           phone: string | null
           photos: string[]
+          public_token: string
           quoted_price: number
           service_requested: string | null
           shoe_brand: string | null
@@ -49,6 +50,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           photos?: string[]
+          public_token?: string
           quoted_price?: number
           service_requested?: string | null
           shoe_brand?: string | null
@@ -71,6 +73,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           photos?: string[]
+          public_token?: string
           quoted_price?: number
           service_requested?: string | null
           shoe_brand?: string | null
