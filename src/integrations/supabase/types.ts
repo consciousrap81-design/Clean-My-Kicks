@@ -14,6 +14,80 @@ export type Database = {
   }
   public: {
     Tables: {
+      booking_requests: {
+        Row: {
+          admin_notes: string | null
+          converted_job_id: string | null
+          created_at: string
+          customer_name: string
+          drop_off_method: string | null
+          email: string | null
+          id: string
+          notes: string | null
+          phone: string | null
+          photos: string[]
+          quoted_price: number
+          service_requested: string | null
+          shoe_brand: string | null
+          shoe_model: string | null
+          shoe_size: string | null
+          source: string
+          status: Database["public"]["Enums"]["request_status"]
+          submitted_at: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          converted_job_id?: string | null
+          created_at?: string
+          customer_name: string
+          drop_off_method?: string | null
+          email?: string | null
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          photos?: string[]
+          quoted_price?: number
+          service_requested?: string | null
+          shoe_brand?: string | null
+          shoe_model?: string | null
+          shoe_size?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["request_status"]
+          submitted_at?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          converted_job_id?: string | null
+          created_at?: string
+          customer_name?: string
+          drop_off_method?: string | null
+          email?: string | null
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          photos?: string[]
+          quoted_price?: number
+          service_requested?: string | null
+          shoe_brand?: string | null
+          shoe_model?: string | null
+          shoe_size?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["request_status"]
+          submitted_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_requests_converted_job_id_fkey"
+            columns: ["converted_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           created_at: string
@@ -299,6 +373,7 @@ export type Database = {
         | "picked_up"
         | "cancelled"
       payment_status: "unpaid" | "partial" | "paid" | "refunded"
+      request_status: "pending" | "approved" | "declined"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -439,6 +514,7 @@ export const Constants = {
         "cancelled",
       ],
       payment_status: ["unpaid", "partial", "paid", "refunded"],
+      request_status: ["pending", "approved", "declined"],
     },
   },
 } as const
