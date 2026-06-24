@@ -1,79 +1,93 @@
-# Clean My Kicks — Admin Dashboard Plan
+# Customer Accounts & Portal
 
-## 1. Backend (Lovable Cloud)
+End-to-end plan for auto-creating customer accounts on payment, linking quotes/jobs to the right user, and giving customers a mobile-friendly self-service portal.
 
-Enable Lovable Cloud, then create migrations:
+## 1. Payments (prerequisite)
 
-**Enums**
-- `app_role`: `admin`, `user`
-- `job_status`: `new_request`, `awaiting_shoes`, `received`, `in_progress`, `ready_for_payment`, `completed`, `shipped`, `picked_up`, `cancelled`
-- `payment_status`: `unpaid`, `partial`, `paid`, `refunded`
+- Enable Lovable's built-in **Stripe payments** (seamless, no API key needed).
+- Add tax calculation & collection only (`automatic_tax`) — this is a hands-on service, not eligible for full merchant-of-record handling.
+- For each accepted quote, create a one-time Stripe Checkout session for the quote total. On `checkout.session.completed`, mark the quote `paid` and trigger account creation.
+- Add a "Pay Now" CTA on the public `/quote/:token` page that appears only when the quote status is `accepted`.
 
-**Tables (all in `public`, with GRANTs + RLS)**
-- `user_roles` (user_id, role) — separate from profiles; `has_role()` security-definer function
-- `lead_sources` (id, name, active)
-- `services` (id, name, description, base_price, active)
-- `customers` (id, name, phone, email, notes, lead_source_id, created_at)
-- `jobs` (id, customer_id, service_id, shoe_brand, shoe_model, condition_notes, quoted_price, payment_status, status, intake_date, due_date, completion_date, admin_notes, lead_source_id, created_at, updated_at)
-- `payments` (id, job_id, amount, method, paid_at, notes)
-- `job_photos` (id, job_id, url, kind: 'before'|'after', uploaded_at)
+## 2. Database changes (one migration)
 
-**Storage**: `job-photos` bucket (public read) for before/after uploads.
+- New enum value `app_role.customer` (admin already exists).
+- Add `user_id uuid` columns on `customers`, `quotes`, `jobs`, `booking_requests`, `payments` so rows can be scoped to a customer's auth user.
+- Add `customer_visible boolean default false` to `job_photos` and an existing notes field, plus a new `job_updates` table for the timeline (admin-authored, marked customer-visible).
+- New `payments` columns: `stripe_session_id`, `stripe_payment_intent`, `status`, `amount`, `paid_at`.
+- RLS: customers can `SELECT` only rows where `user_id = auth.uid()`; admins keep current full access via `has_role(auth.uid(), 'admin')`. Storage policies on `request-photos` and `job-photos` buckets restrict customer reads to their own folders.
+- Helper RPC `link_customer_user(_email, _user_id)` (security definer) attaches a newly-confirmed user to all existing customer/quote/job/request rows that match the email.
 
-**RLS**: All admin tables — only `has_role(auth.uid(),'admin')` can select/insert/update/delete. `user_roles` readable by authenticated.
+## 3. Account creation flow
 
-Seed: a few default services and lead sources.
+A new edge function `stripe-webhook` (no JWT) receives Stripe events:
 
-## 2. Auth
+1. Verify signature.
+2. On `checkout.session.completed`:
+   - Insert `payments` row, mark quote `paid`.
+   - Look up auth user by email via admin API.
+   - If missing: `admin.createUser({ email, email_confirm: false })`, assign role `customer` in `user_roles`.
+   - Either way: call `link_customer_user(email, user_id)` to attach all matching rows.
+   - Send a branded "Set your password" email (`generateLink({ type: 'recovery', redirectTo: '/auth/set-password' })`) through the existing app-email pipeline.
 
-- Email/password + Google sign-in via Lovable Cloud.
-- `/auth` page (login + signup).
-- `ProtectedRoute` wrapper checks session + admin role; non-admins redirected to `/` with toast.
-- First user that signs up: instructions to manually assign `admin` role via SQL (documented in chat). No self-elevation.
+New app-email template `customer-welcome.tsx` with the password-setup link and a portal preview.
 
-## 3. Routes
+## 4. Customer portal
 
-- `/auth` — login/signup
-- `/admin` — dashboard overview (metrics)
-- `/admin/jobs` — jobs list with filters (status, payment, search)
-- `/admin/jobs/new` — create job (+ inline customer create)
-- `/admin/jobs/:id` — job detail (edit fields, status, payments, before/after photo uploads, notes)
-- `/admin/customers` — customer list
-- `/admin/services` — manage services
-- `/admin/settings` — lead sources
+New routes (public-shell, not under `/admin`):
 
-All under an `AdminLayout` with sidebar (shadcn sidebar) — logo, nav, sign-out, mobile-collapsible.
+- `/auth/set-password` — handles the recovery link, lets the user set a password, then redirects to `/account`.
+- `/account` — protected by a new `CustomerRoute` guard (must be signed in; must NOT be admin → if admin, send to `/admin`).
+- `/account/orders/:jobId` — order detail.
 
-## 4. Dashboard Metrics
+Portal layout: top bar with logo + sign out, single-column mobile-first content, sticky bottom nav on small screens.
 
-Computed client-side from queries:
-- Total jobs, pending (not completed/picked_up/shipped/cancelled), completed (completed/shipped/picked_up)
-- Total revenue (sum of payments)
-- Unpaid balance (sum of quoted_price where payment_status in unpaid/partial, minus payments)
-- Avg turnaround = avg(completion_date - intake_date) for completed
-- Top services (count grouped)
-- Lead sources (count grouped)
+**Dashboard `/account`** (titled "My Clean My Kicks Orders"):
+- List of orders (one card per accepted quote / job) with: shoe, service, status badge, payment status, total, "View" link.
 
-Cards + small bar chart (recharts) for status distribution and lead sources.
+**Order detail `/account/orders/:jobId`**:
+- Accepted quote summary + total.
+- Payment status (Paid / Pending).
+- Active job status + pickup/shipping status.
+- Progress timeline built from `jobs.status` history + `job_updates` rows where `customer_visible = true`, chronological with timestamps.
+- Before photos (from `request-photos` for the linked request).
+- After photos (from `job-photos` where `customer_visible = true`).
+- Updates feed (admin notes flagged customer-visible).
 
-## 5. UI / Branding
+## 5. Auth / role separation
 
-- Reuse existing Clean My Kicks tokens from `src/index.css` (no hardcoded colors).
-- Cards, badges colored per status, responsive grid (1 col mobile, 2-3 desktop), sticky topbar with `SidebarTrigger`.
-- Status badge component with semantic color mapping via design tokens.
+- `useAuth` already exposes `isAdmin`. Add `isCustomer` (has role `customer` and not admin).
+- `ProtectedRoute` (admin) already blocks non-admins → unchanged.
+- New `CustomerRoute` redirects admins to `/admin` and unauthenticated users to `/auth?next=/account`.
+- `/auth` page: detect `next` query param and route appropriately after login.
 
-## 6. Technical notes
+## 6. Admin additions (minimal)
 
-- Use `@supabase/supabase-js` client already wired by Cloud.
-- `onAuthStateChange` listener + `getUser()` validation in `useAuth` hook.
-- React Query for data fetching/caching.
-- Photo uploads via Storage SDK to `job-photos/{job_id}/{before|after}/{uuid}`.
-- Zod validation on job/customer forms.
+- Job detail page: checkbox on each photo "Visible to customer", and a "Post update" composer that writes to `job_updates` with a `customer_visible` toggle.
+- That's it — no other admin workflow changes.
 
-## 7. Out of scope (for this iteration)
+## 7. Out of scope
 
-- Customer-facing booking form writing to `jobs` (can be added later).
-- Email notifications.
-- Multi-admin invite flow UI (manual SQL for now).
+- Customer self-signup (accounts are only created via payment flow).
+- Two-way messaging.
+- Refund flow (admin can refund directly in Stripe dashboard).
 
-Approve and I'll build it.
+## Files to add / change (technical)
+
+```text
+supabase/migrations/<ts>_customer_portal.sql
+supabase/functions/create-checkout/index.ts        # creates Stripe session
+supabase/functions/stripe-webhook/index.ts         # verifies + provisions account
+supabase/functions/_shared/transactional-email-templates/customer-welcome.tsx
+src/pages/account/Dashboard.tsx
+src/pages/account/OrderDetail.tsx
+src/pages/auth/SetPassword.tsx
+src/components/account/CustomerRoute.tsx
+src/components/account/AccountLayout.tsx
+src/pages/QuoteView.tsx                            # add Pay Now button
+src/pages/admin/JobDetail.tsx                      # photo visibility + updates composer
+src/App.tsx                                        # new routes
+src/hooks/useAuth.tsx                              # isCustomer
+```
+
+Approve and I'll start with Stripe enablement, then ship the migration, edge functions, and portal in that order.
