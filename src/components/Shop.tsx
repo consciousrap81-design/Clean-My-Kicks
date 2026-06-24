@@ -78,6 +78,12 @@ const Shop = () => {
               One-of-one restored pairs. When it's gone, it's gone.
             </p>
           </div>
+          <Link
+            to="/shop"
+            className="hidden md:inline-flex items-center text-primary text-sm hover:underline mt-4 md:mt-0"
+          >
+            Browse all pairs →
+          </Link>
         </div>
 
         {recentlySold.length > 0 && (
@@ -154,6 +160,16 @@ const Shop = () => {
                 </Link>
               );
             })}
+          </div>
+        )}
+
+        {products.length > 0 && (
+          <div className="mt-8 md:mt-12 text-center">
+            <Link to="/shop">
+              <Button variant="outline" size="lg">
+                Shop all pairs →
+              </Button>
+            </Link>
           </div>
         )}
       </div>

@@ -27,6 +27,7 @@ import AdminReviews from "./pages/admin/Reviews";
 import QuoteView from "./pages/QuoteView";
 import ProductDetail from "./pages/ProductDetail";
 import ShopOrderSuccess from "./pages/ShopOrderSuccess";
+import ShopPage from "./pages/Shop";
 import RecoverCart from "./pages/RecoverCart";
 import Unsubscribe from "./pages/Unsubscribe";
 import RequestPhotos from "./pages/RequestPhotos";
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/request/:token/photos" element={<RequestPhotos />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/shop/order/success" element={<ShopOrderSuccess />} />
+            <Route path="/shop" element={<ShopPage />} />
             <Route path="/shop/:id" element={<ProductDetail />} />
             <Route path="/recover-cart" element={<RecoverCart />} />
             <Route path="/account" element={<CustomerRoute><AccountLayout /></CustomerRoute>}>
