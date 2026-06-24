@@ -3,8 +3,22 @@ import { supabase } from "@/integrations/supabase/client";
 
 const CART_KEY = "cmk_cart_id";
 
+function maybeAdoptResumeCart() {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams(window.location.search);
+  const resume = params.get("resumeCart");
+  if (resume && /^[0-9a-f-]{36}$/i.test(resume)) {
+    localStorage.setItem(CART_KEY, resume);
+    params.delete("resumeCart");
+    const qs = params.toString();
+    const newUrl = window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash;
+    window.history.replaceState({}, "", newUrl);
+  }
+}
+
 export function getCartId(): string {
   if (typeof window === "undefined") return "ssr";
+  maybeAdoptResumeCart();
   let id = localStorage.getItem(CART_KEY);
   if (!id) {
     id = crypto.randomUUID();
@@ -32,10 +46,13 @@ export type CartItemRow = {
 export type EnrichedCartItem = CartItemRow & {
   display_name: string;
   subtitle?: string | null;
+  variant_name?: string | null;
+  sku?: string | null;
   photo_path?: string | null;
   max_qty?: number | null; // stock limit for accessories, 1 for sneakers
   available: boolean; // false if reserved by other / sold / out of stock
   unavailable_reason?: string;
+  reservation_expired?: boolean; // sneakers only
 };
 
 type CartCtx = {
@@ -95,7 +112,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       variantIds.length
         ? supabase
             .from("shop_accessory_variants")
-            .select("id, name, stock_qty, active, accessory_id, shop_accessories!inner(id, name, slug, active, shop_accessory_photos(storage_path, sort_order))")
+            .select("id, name, sku, stock_qty, active, accessory_id, shop_accessories!inner(id, name, slug, active, shop_accessory_photos(storage_path, sort_order))")
             .in("id", variantIds)
         : Promise.resolve({ data: [] as any[] }),
     ]);
@@ -115,16 +132,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
           (a: any, b: any) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0) || a.sort_order - b.sort_order,
         );
         const isSold = s.status === "sold";
-        const stillReserved = s.reserved_until && new Date(s.reserved_until) > new Date();
+        const now = new Date();
+        const stillReserved = s.reserved_until && new Date(s.reserved_until) > now;
         const heldByOther = !!stillReserved && s.reserved_session_id !== cartId;
+        const ourReservation = !heldByOther && row.reserved_until ? new Date(row.reserved_until) : null;
+        const reservationExpired =
+          !isSold && !heldByOther && (!stillReserved || (ourReservation !== null && ourReservation <= now));
         return {
           ...row,
           display_name: [s.brand, s.model, s.name].filter(Boolean).join(" ") || s.name,
           subtitle: s.size ? `Size ${s.size}` : null,
           photo_path: photos[0]?.storage_path ?? null,
           max_qty: 1,
-          available: !isSold && !heldByOther,
-          unavailable_reason: isSold ? "Sold" : heldByOther ? "Reserved by another buyer" : undefined,
+          available: !isSold && !heldByOther && !reservationExpired,
+          unavailable_reason: isSold
+            ? "Sold"
+            : heldByOther
+            ? "Reserved by another buyer"
+            : reservationExpired
+            ? "Reservation expired — re-add to checkout"
+            : undefined,
+          reservation_expired: reservationExpired,
         };
       } else if (row.item_type === "accessory" && row.accessory_variant_id) {
         const v = variantMap.get(row.accessory_variant_id);
@@ -134,10 +162,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const acc = v.shop_accessories;
         const photos = (acc?.shop_accessory_photos ?? []).slice().sort((a: any, b: any) => a.sort_order - b.sort_order);
         const inStock = v.active && v.stock_qty > 0;
+        const variantLabel = v.name && v.name !== "Default" ? v.name : null;
+        const subtitleParts = [variantLabel, v.sku ? `SKU ${v.sku}` : null].filter(Boolean);
         return {
           ...row,
           display_name: acc?.name || "Accessory",
-          subtitle: v.name && v.name !== "Default" ? v.name : null,
+          subtitle: subtitleParts.length ? subtitleParts.join(" · ") : null,
+          variant_name: variantLabel,
+          sku: v.sku ?? null,
           photo_path: photos[0]?.storage_path ?? null,
           max_qty: v.stock_qty,
           available: inStock && row.qty <= v.stock_qty,
