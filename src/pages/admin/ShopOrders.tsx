@@ -12,6 +12,10 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Package, Truck, Mail, MapPin, ExternalLink, Send } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -210,6 +214,7 @@ function OrderDialog({
   const [saving, setSaving] = useState(false);
   const [customCarrier, setCustomCarrier] = useState("");
   const [customUrl, setCustomUrl] = useState("");
+  const [confirmMode, setConfirmMode] = useState<null | "mark" | "resend">(null);
 
   const PRESETS = ["USPS", "UPS", "FedEx", "DHL"];
 
@@ -244,7 +249,7 @@ function OrderDialog({
   const country = addr.country || addr.address?.country;
   const recipient = addr.name || order.customer_name;
 
-  async function markShipped() {
+  async function runMarkShipped() {
     if (!tracking.trim()) {
       toast.error("Enter a tracking number");
       return;
@@ -273,7 +278,7 @@ function OrderDialog({
     onSaved();
   }
 
-  async function resendShipped() {
+  async function runResendShipped() {
     if (!tracking.trim()) {
       toast.error("Enter a tracking number before resending");
       return;
@@ -283,6 +288,21 @@ function OrderDialog({
     setSaving(false);
     if (sent.ok) toast.success(`Resent to ${order!.customer_email}`);
     else toast.error("Failed to resend email", { description: sent.error });
+  }
+
+  function requestConfirm(mode: "mark" | "resend") {
+    if (!tracking.trim()) {
+      toast.error("Enter a tracking number");
+      return;
+    }
+    setConfirmMode(mode);
+  }
+
+  async function handleConfirm() {
+    const mode = confirmMode;
+    setConfirmMode(null);
+    if (mode === "mark") await runMarkShipped();
+    else if (mode === "resend") await runResendShipped();
   }
 
   async function saveStatus() {
@@ -450,16 +470,63 @@ function OrderDialog({
           <Button variant="outline" onClick={onClose} disabled={saving}>Close</Button>
           <Button variant="outline" onClick={saveStatus} disabled={saving}>Save changes</Button>
           {order.status === "shipped" ? (
-            <Button onClick={resendShipped} disabled={saving || !tracking.trim()}>
+            <Button onClick={() => requestConfirm("resend")} disabled={saving || !tracking.trim()}>
               <Send className="w-4 h-4 mr-1" /> Resend email
             </Button>
           ) : (
-            <Button onClick={markShipped} disabled={saving || !tracking.trim()}>
+            <Button onClick={() => requestConfirm("mark")} disabled={saving || !tracking.trim()}>
               <Truck className="w-4 h-4 mr-1" /> Mark shipped
             </Button>
           )}
         </DialogFooter>
+
+        <AlertDialog open={!!confirmMode} onOpenChange={(o) => !o && setConfirmMode(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {confirmMode === "resend" ? "Resend shipping email?" : "Send shipping email?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Review what the customer will receive. This goes out immediately.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <div className="text-sm space-y-2 rounded-md border p-3 bg-muted/30">
+              <Row label="To" value={`${order.customer_name ? order.customer_name + " · " : ""}${order.customer_email}`} />
+              <Row label="Carrier" value={effectiveCarrier || <span className="text-amber-600">— none —</span>} />
+              <Row label="Tracking #" value={<span className="font-mono">{tracking.trim()}</span>} />
+              <Row
+                label="Tracking link"
+                value={
+                  previewUrl ? (
+                    <a href={previewUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline break-all">
+                      {previewUrl}
+                    </a>
+                  ) : (
+                    <span className="text-amber-600">No link — email will omit the track button.</span>
+                  )
+                }
+              />
+            </div>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirm} disabled={saving}>
+                {confirmMode === "resend" ? "Resend email" : "Mark shipped & send"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[90px_1fr] gap-2">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground pt-0.5">{label}</div>
+      <div className="min-w-0">{value}</div>
+    </div>
   );
 }
