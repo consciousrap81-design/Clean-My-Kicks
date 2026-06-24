@@ -34,6 +34,7 @@ import ShopOrderSuccess from "./pages/ShopOrderSuccess";
 import ShopPage from "./pages/Shop";
 import RecoverCart from "./pages/RecoverCart";
 import Unsubscribe from "./pages/Unsubscribe";
+import Track from "./pages/Track";
 import RequestPhotos from "./pages/RequestPhotos";
 import SetPassword from "./pages/auth/SetPassword";
 import AccountDashboard from "./pages/account/Dashboard";
@@ -62,6 +63,7 @@ const App = () => (
             <Route path="/quote/:token" element={<QuoteView />} />
             <Route path="/request/:token/photos" element={<RequestPhotos />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/track" element={<Track />} />
             <Route path="/shop/order/success" element={<ShopOrderSuccess />} />
             <Route path="/shop" element={<ShopPage />} />
             <Route path="/shop/:id" element={<ProductDetail />} />
