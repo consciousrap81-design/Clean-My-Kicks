@@ -60,6 +60,7 @@ export default function ShopPage() {
   const [size, setSize] = useState<string>("All");
   const [condition, setCondition] = useState<string>("All");
   const [query, setQuery] = useState<string>("");
+  const [sort, setSort] = useState<"newest" | "price_asc" | "price_desc" | "popular">("newest");
 
   useEffect(() => {
     let mounted = true;
@@ -154,11 +155,33 @@ export default function ShopPage() {
     return true;
   });
 
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    switch (sort) {
+      case "price_asc":
+        arr.sort((a, b) => Number(a.price) - Number(b.price));
+        break;
+      case "price_desc":
+        arr.sort((a, b) => Number(b.price) - Number(a.price));
+        break;
+      case "popular":
+        arr.sort((a, b) => (b.view_count ?? 0) - (a.view_count ?? 0));
+        break;
+      case "newest":
+      default:
+        arr.sort(
+          (a, b) => new Date(b.created_at as any).getTime() - new Date(a.created_at as any).getTime(),
+        );
+    }
+    return arr;
+  }, [filtered, sort]);
+
   const resetFilters = () => {
     setBrand("All");
     setSize("All");
     setCondition("All");
     setQuery("");
+    setSort("newest");
   };
 
   return (
