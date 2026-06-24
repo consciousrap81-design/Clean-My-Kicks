@@ -35,11 +35,18 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
   reauthentication: ReauthenticationEmail,
 }
 
-// Configuration
-const SITE_NAME = "clean-kick-creations"
-const SENDER_DOMAIN = "quotes.cleanmykicks.com"
-const ROOT_DOMAIN = "cleanmykicks.com"
-const FROM_DOMAIN = "cleanmykicks.com" // Domain shown in From address (may be root or sender subdomain)
+// Configuration — overridable per deployment via env vars.
+// Defaults below were baked in at scaffold time; set the matching secret to override.
+const SITE_NAME = Deno.env.get('EMAIL_SITE_NAME') ?? "clean-kick-creations"
+const SENDER_DOMAIN = Deno.env.get('EMAIL_SENDER_DOMAIN') ?? "quotes.cleanmykicks.com"
+const ROOT_DOMAIN = Deno.env.get('EMAIL_ROOT_DOMAIN') ?? "cleanmykicks.com"
+const FROM_DOMAIN = Deno.env.get('EMAIL_FROM_DOMAIN') ?? "cleanmykicks.com"
+const FROM_LOCAL_PART = Deno.env.get('EMAIL_FROM_LOCAL_PART') ?? "noreply"
+// Full From override (e.g. "Brand <hello@example.com>"). Takes precedence over the parts above.
+const FROM_ADDRESS = Deno.env.get('EMAIL_AUTH_FROM_ADDRESS')
+  ?? Deno.env.get('EMAIL_FROM_ADDRESS')
+  ?? `${SITE_NAME} <${FROM_LOCAL_PART}@${FROM_DOMAIN}>`
+const REPLY_TO = Deno.env.get('EMAIL_AUTH_REPLY_TO') ?? Deno.env.get('EMAIL_REPLY_TO') ?? undefined
 
 // Sample data for preview mode ONLY (not used in actual email sending).
 // URLs are baked in at scaffold time from the project's real data.
@@ -258,7 +265,8 @@ async function handleWebhook(req: Request): Promise<Response> {
       run_id,
       message_id: messageId,
       to: payload.data.email,
-      from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
+      from: FROM_ADDRESS,
+      reply_to: REPLY_TO,
       sender_domain: SENDER_DOMAIN,
       subject: EMAIL_SUBJECTS[emailType] || 'Notification',
       html,
