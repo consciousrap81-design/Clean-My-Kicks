@@ -16,7 +16,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Package, Truck, Mail, MapPin, ExternalLink, Send, Loader2 } from "lucide-react";
+import { Package, Truck, Mail, MapPin, ExternalLink, Send, Loader2, History, CheckCircle2, RotateCcw, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { trackingUrlFor, carrierLabel, detectCarrierFromTracking } from "@/lib/tracking";
@@ -212,6 +212,7 @@ function OrderDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const qc = useQueryClient();
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
   const [status, setStatus] = useState("paid");
@@ -226,6 +227,37 @@ function OrderDialog({
       () => toast.success("Message ID copied"),
       () => toast.error("Copy failed"),
     );
+  }
+
+  const eventsQuery = useQuery({
+    queryKey: ["shop-order-events", order?.id],
+    enabled: !!order?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("shop_order_events")
+        .select("*")
+        .eq("order_id", order!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  async function logEvent(
+    eventType: "shipped" | "email_resent" | "tracking_updated" | "status_changed" | "email_failed",
+    message: string,
+    metadata: Record<string, unknown> = {},
+  ) {
+    if (!order) return;
+    const { data: u } = await supabase.auth.getUser();
+    await supabase.from("shop_order_events").insert({
+      order_id: order.id,
+      event_type: eventType,
+      message,
+      metadata,
+      actor_user_id: u.user?.id ?? null,
+    });
+    qc.invalidateQueries({ queryKey: ["shop-order-events", order.id] });
   }
 
   const PRESETS = ["USPS", "UPS", "FedEx", "DHL"];
@@ -286,6 +318,16 @@ function OrderDialog({
       return;
     }
 
+    await logEvent(
+      "shipped",
+      `Marked shipped via ${effectiveCarrier || "carrier"}${tracking.trim() ? ` (${tracking.trim()})` : ""}`,
+      {
+        carrier: effectiveCarrier || null,
+        tracking_number: tracking.trim(),
+        tracking_url: previewUrl || null,
+      },
+    );
+
     const sent = await sendShippedEmail(order!, effectiveCarrier, tracking, false, customUrl);
     if (sent.ok) {
       toast.success("Marked shipped — tracking email queued", {
@@ -294,11 +336,21 @@ function OrderDialog({
         action: sent.messageId ? { label: "Copy ID", onClick: () => copyId(sent.messageId!) } : undefined,
         duration: 8000,
       });
+      await logEvent("email_resent", "Shipping notification sent", {
+        recipient: order!.customer_email,
+        message_id: sent.messageId,
+        tracking_url: previewUrl || null,
+        initial: true,
+      });
     } else {
       toast.warning("Marked shipped, but email failed to send", {
         id: t,
         description: sent.error,
         duration: 10000,
+      });
+      await logEvent("email_failed", "Shipping notification failed to send", {
+        recipient: order!.customer_email,
+        error: sent.error,
       });
     }
 
@@ -325,11 +377,22 @@ function OrderDialog({
         action: sent.messageId ? { label: "Copy ID", onClick: () => copyId(sent.messageId!) } : undefined,
         duration: 8000,
       });
+      await logEvent("email_resent", "Shipping email resent", {
+        recipient: order!.customer_email,
+        message_id: sent.messageId,
+        carrier: effectiveCarrier || null,
+        tracking_number: tracking.trim(),
+        tracking_url: previewUrl || null,
+      });
     } else {
       toast.error("Failed to resend email", {
         id: t,
         description: sent.error,
         duration: 10000,
+      });
+      await logEvent("email_failed", "Resend failed", {
+        recipient: order!.customer_email,
+        error: sent.error,
       });
     }
   }
@@ -359,9 +422,33 @@ function OrderDialog({
       patch.tracking_number = tracking.trim();
       patch.tracking_carrier = effectiveCarrier || null;
     }
+    const carrierChanged = (order!.tracking_carrier || "") !== (effectiveCarrier || "");
+    const trackingChanged = (order!.tracking_number || "") !== tracking.trim();
+    const statusChanged = order!.status !== status;
     const { error } = await supabase.from("shop_orders").update(patch).eq("id", order!.id);
     setSaving(false);
     if (error) return toast.error(error.message);
+
+    if (statusChanged) {
+      await logEvent("status_changed", `Status changed from ${order!.status} → ${status}`, {
+        from: order!.status,
+        to: status,
+      });
+    }
+    if (carrierChanged || trackingChanged) {
+      await logEvent(
+        "tracking_updated",
+        `Tracking updated: ${effectiveCarrier || "—"} ${tracking.trim() || "—"}`,
+        {
+          carrier_from: order!.tracking_carrier,
+          carrier_to: effectiveCarrier || null,
+          tracking_from: order!.tracking_number,
+          tracking_to: tracking.trim() || null,
+          tracking_url: previewUrl || null,
+        },
+      );
+    }
+
     toast.success("Order updated");
     onSaved();
   }
