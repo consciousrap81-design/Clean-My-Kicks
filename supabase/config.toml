@@ -37,3 +37,5 @@ project_id = "xxuyhpszppnjdrmfdylv"
     verify_jwt = false
   [functions.shippo-webhook]
     verify_jwt = false
+  [functions.track-shipment]
+    verify_jwt = false
