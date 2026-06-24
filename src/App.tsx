@@ -30,6 +30,7 @@ import RequestPhotos from "./pages/RequestPhotos";
 import SetPassword from "./pages/auth/SetPassword";
 import AccountDashboard from "./pages/account/Dashboard";
 import OrderDetail from "./pages/account/OrderDetail";
+import ShopOrderDetail from "./pages/account/ShopOrderDetail";
 import AccountLayout from "@/components/account/AccountLayout";
 import CustomerRoute from "@/components/account/CustomerRoute";
 
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/account" element={<CustomerRoute><AccountLayout /></CustomerRoute>}>
               <Route index element={<AccountDashboard />} />
               <Route path="orders/:jobId" element={<OrderDetail />} />
+              <Route path="shop-orders/:id" element={<ShopOrderDetail />} />
             </Route>
             <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
               <Route index element={<Dashboard />} />
