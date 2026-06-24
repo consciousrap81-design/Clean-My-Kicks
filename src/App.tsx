@@ -23,6 +23,8 @@ import Products from "./pages/admin/Products";
 import ProductEdit from "./pages/admin/ProductEdit";
 import Accessories from "./pages/admin/Accessories";
 import AccessoryEdit from "./pages/admin/AccessoryEdit";
+import PromoCodes from "./pages/admin/PromoCodes";
+import PromoCodeEdit from "./pages/admin/PromoCodeEdit";
 import ShopOrders from "./pages/admin/ShopOrders";
 import AbandonedCarts from "./pages/admin/AbandonedCarts";
 import AdminReviews from "./pages/admin/Reviews";
@@ -84,6 +86,9 @@ const App = () => (
               <Route path="accessories" element={<Accessories />} />
               <Route path="accessories/new" element={<AccessoryEdit />} />
               <Route path="accessories/:id" element={<AccessoryEdit />} />
+              <Route path="promo-codes" element={<PromoCodes />} />
+              <Route path="promo-codes/new" element={<PromoCodeEdit />} />
+              <Route path="promo-codes/:id" element={<PromoCodeEdit />} />
               <Route path="shop-orders" element={<ShopOrders />} />
               <Route path="abandoned-carts" element={<AbandonedCarts />} />
               <Route path="reviews" element={<AdminReviews />} />
