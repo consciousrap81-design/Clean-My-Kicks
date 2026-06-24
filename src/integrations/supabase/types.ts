@@ -662,6 +662,7 @@ export type Database = {
           carrier: string | null
           created_at: string
           direction: string
+          eta: string | null
           id: string
           label_url: string | null
           last_event_at: string | null
@@ -671,6 +672,7 @@ export type Database = {
           shippo_transaction_id: string | null
           status: string
           tracking_number: string | null
+          tracking_status_detail: string | null
           tracking_url: string | null
           updated_at: string
         }
@@ -678,6 +680,7 @@ export type Database = {
           carrier?: string | null
           created_at?: string
           direction: string
+          eta?: string | null
           id?: string
           label_url?: string | null
           last_event_at?: string | null
@@ -687,6 +690,7 @@ export type Database = {
           shippo_transaction_id?: string | null
           status?: string
           tracking_number?: string | null
+          tracking_status_detail?: string | null
           tracking_url?: string | null
           updated_at?: string
         }
@@ -694,6 +698,7 @@ export type Database = {
           carrier?: string | null
           created_at?: string
           direction?: string
+          eta?: string | null
           id?: string
           label_url?: string | null
           last_event_at?: string | null
@@ -703,6 +708,7 @@ export type Database = {
           shippo_transaction_id?: string | null
           status?: string
           tracking_number?: string | null
+          tracking_status_detail?: string | null
           tracking_url?: string | null
           updated_at?: string
         }
