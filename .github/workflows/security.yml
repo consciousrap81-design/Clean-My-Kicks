@@ -1,0 +1,99 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Weekly scan to catch newly disclosed vulnerabilities in pinned deps.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install (no scripts)
+        run: npm ci --ignore-scripts
+      - name: npm audit (high+)
+        run: npm audit --audit-level=high
+
+  secrets:
+    name: Secret scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sql-policy-check:
+    name: SQL / RLS policy check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for CREATE TABLE in public without RLS or GRANT
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          fail=0
+          files=(supabase/migrations/*.sql)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No migration files found, skipping."
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            # Only check migrations that create tables in the public schema.
+            if grep -Eiq 'create[[:space:]]+table[[:space:]]+(if[[:space:]]+not[[:space:]]+exists[[:space:]]+)?public\.' "$f"; then
+              missing=()
+              grep -Eiq 'enable[[:space:]]+row[[:space:]]+level[[:space:]]+security' "$f" || missing+=("ENABLE ROW LEVEL SECURITY")
+              grep -Eiq 'create[[:space:]]+policy' "$f"                              || missing+=("CREATE POLICY")
+              grep -Eiq '^[[:space:]]*grant[[:space:]]'  "$f"                        || missing+=("GRANT")
+              if [ ${#missing[@]} -gt 0 ]; then
+                echo "::error file=$f::Migration creates a public table but is missing: ${missing[*]}"
+                fail=1
+              fi
+            fi
+
+            # Block public-bucket flips made via raw SQL — must use the storage API.
+            if grep -Eiq "(insert[[:space:]]+into|update)[[:space:]]+storage\.buckets" "$f"; then
+              if grep -Eiq "public[[:space:]]*[:=]+[[:space:]]*true" "$f"; then
+                echo "::error file=$f::Do not toggle storage buckets to public via SQL."
+                fail=1
+              fi
+            fi
+
+            # Flag overly permissive policies.
+            if grep -Eniq "using[[:space:]]*\([[:space:]]*true[[:space:]]*\)" "$f"; then
+              echo "::warning file=$f::Policy uses USING (true) — confirm this table is intentionally public."
+            fi
+          done
+          exit $fail
+
+  static-analysis:
+    name: Static analysis (semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep scan
+        run: |
+          semgrep ci \
+            --config p/typescript \
+            --config p/react \
+            --config p/owasp-top-ten \
+            --config p/secrets \
+            --error
