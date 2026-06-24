@@ -595,6 +595,8 @@ function OrderDialog({
               View in Stripe <ExternalLink className="w-3 h-3" />
             </a>
           )}
+
+          <Timeline events={eventsQuery.data || []} loading={eventsQuery.isLoading} orderCreatedAt={order.created_at} />
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2">
