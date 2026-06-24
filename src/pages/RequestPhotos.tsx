@@ -17,7 +17,13 @@ type RequestInfo = {
 };
 
 type Status = "queued" | "uploading" | "done" | "error";
-type Pending = { file: File; previewUrl: string; status: Status; error?: string };
+type Pending = {
+  file: File;
+  previewUrl: string;
+  status: Status;
+  error?: string;
+  path?: string; // storage path once successfully uploaded — reused on retry to avoid duplicates
+};
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
@@ -34,6 +40,7 @@ export default function RequestPhotos() {
   const [phase, setPhase] = useState<"idle" | "uploading" | "finalizing">("idle");
   const [uploadedCount, setUploadedCount] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cancelRef = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -79,6 +86,10 @@ export default function RequestPhotos() {
     });
   }
 
+  function cancelUpload() {
+    cancelRef.current = true;
+  }
+
   function setPhotoStatus(idx: number, patch: Partial<Pending>) {
     setPhotos((p) => {
       const next = [...p];
@@ -90,27 +101,33 @@ export default function RequestPhotos() {
   async function uploadAll(current: Pending[]) {
     const folder = crypto.randomUUID();
     const paths: string[] = [];
-    setUploadedCount(0);
+    let completed = current.filter((p) => p.status === "done" && p.path).length;
+    setUploadedCount(completed);
     for (let i = 0; i < current.length; i++) {
-      const { file, status } = current[i];
-      if (status === "done") {
-        setUploadedCount((c) => c + 1);
+      if (cancelRef.current) throw new Error("__cancelled__");
+      const item = current[i];
+      // Reuse already-uploaded storage path so a retry never produces a
+      // duplicate object or a duplicate entry in the request's photos[].
+      if (item.status === "done" && item.path) {
+        paths.push(item.path);
         continue;
       }
       setPhotoStatus(i, { status: "uploading", error: undefined });
-      const extMatch = file.name.match(/\.([A-Za-z0-9]+)$/);
+      const extMatch = item.file.name.match(/\.([A-Za-z0-9]+)$/);
       const ext = (extMatch?.[1] || "jpg").toLowerCase();
       const safeExt = ext.replace(/[^a-z0-9]/g, "").slice(0, 5) || "jpg";
       const path = `${folder}/${crypto.randomUUID()}.${safeExt}`;
       const { error } = await supabase.storage
         .from("request-photos")
-        .upload(path, file, { contentType: file.type || undefined, upsert: false });
+        .upload(path, item.file, { contentType: item.file.type || undefined, upsert: false });
+      if (cancelRef.current) throw new Error("__cancelled__");
       if (error) {
         setPhotoStatus(i, { status: "error", error: error.message });
-        throw new Error(`Couldn't upload ${file.name}. Please try again.`);
+        throw new Error(`Couldn't upload ${item.file.name}. Please try again.`);
       }
-      setPhotoStatus(i, { status: "done" });
-      setUploadedCount((c) => c + 1);
+      setPhotoStatus(i, { status: "done", path });
+      completed += 1;
+      setUploadedCount(completed);
       paths.push(path);
     }
     return paths;
@@ -121,11 +138,13 @@ export default function RequestPhotos() {
       toast.error("Add at least one photo first.");
       return;
     }
+    cancelRef.current = false;
     setSubmitError(null);
     setSubmitting(true);
     setPhase("uploading");
     try {
       const paths = await uploadAll(photos);
+      if (cancelRef.current) throw new Error("__cancelled__");
       setPhase("finalizing");
       const { data, error: invErr } = await supabase.functions.invoke("request-add-photos", {
         body: { token, photos: paths },
@@ -137,10 +156,20 @@ export default function RequestPhotos() {
       setDone(true);
       toast.success("Photos sent! We'll follow up shortly.");
     } catch (e: any) {
-      const msg = e?.message ?? "Failed to send photos";
-      setSubmitError(msg);
-      toast.error(msg);
+      if (e?.message === "__cancelled__") {
+        // Reset any in-flight item back to queued so it'll re-upload on retry,
+        // but keep already-done items so we don't re-upload them.
+        setPhotos((p) =>
+          p.map((x) => (x.status === "uploading" ? { ...x, status: "queued" } : x)),
+        );
+        toast.message("Upload cancelled");
+      } else {
+        const msg = e?.message ?? "Failed to send photos";
+        setSubmitError(msg);
+        toast.error(msg);
+      }
     } finally {
+      cancelRef.current = false;
       setSubmitting(false);
       setPhase("idle");
     }
@@ -292,6 +321,17 @@ export default function RequestPhotos() {
                       ? "Finishing up…"
                       : `Uploading photo ${Math.min(uploadedCount + 1, photos.length)} of ${photos.length}…`}
                   </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-muted-foreground"
+                    onClick={cancelUpload}
+                    disabled={cancelRef.current || phase === "finalizing"}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    {cancelRef.current ? "Cancelling…" : "Cancel upload"}
+                  </Button>
                 </div>
               )}
 
