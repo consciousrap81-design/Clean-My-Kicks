@@ -668,3 +668,82 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
     </div>
   );
 }
+
+type TimelineEvent = {
+  id: string;
+  event_type: string;
+  message: string | null;
+  metadata: any;
+  created_at: string;
+};
+
+const EVENT_ICONS: Record<string, { icon: typeof Truck; cls: string }> = {
+  shipped: { icon: Truck, cls: "bg-blue-100 text-blue-700" },
+  email_resent: { icon: Send, cls: "bg-emerald-100 text-emerald-700" },
+  email_failed: { icon: Mail, cls: "bg-red-100 text-red-700" },
+  tracking_updated: { icon: Pencil, cls: "bg-amber-100 text-amber-800" },
+  status_changed: { icon: RotateCcw, cls: "bg-slate-200 text-slate-700" },
+};
+
+function Timeline({
+  events, loading, orderCreatedAt,
+}: { events: TimelineEvent[]; loading: boolean; orderCreatedAt: string }) {
+  return (
+    <div className="rounded-md border p-3 space-y-3">
+      <div className="text-xs uppercase text-muted-foreground tracking-wide flex items-center gap-1">
+        <History className="w-3 h-3" /> Timeline
+      </div>
+      {loading ? (
+        <div className="text-xs text-muted-foreground">Loading…</div>
+      ) : events.length === 0 ? (
+        <div className="text-xs text-muted-foreground">
+          No shipment activity yet. Order placed {format(new Date(orderCreatedAt), "PPp")}.
+        </div>
+      ) : (
+        <ol className="space-y-3">
+          {events.map((ev) => {
+            const cfg = EVENT_ICONS[ev.event_type] || { icon: CheckCircle2, cls: "bg-slate-200 text-slate-700" };
+            const Icon = cfg.icon;
+            const m = ev.metadata || {};
+            return (
+              <li key={ev.id} className="flex gap-3">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${cfg.cls}`}>
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{ev.message || ev.event_type}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {format(new Date(ev.created_at), "PPp")}
+                  </div>
+                  {(m.carrier || m.tracking_number) && (
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {[m.carrier, m.tracking_number].filter(Boolean).join(" · ")}
+                    </div>
+                  )}
+                  {m.tracking_url && (
+                    <a
+                      href={m.tracking_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-primary hover:underline break-all inline-flex items-center gap-1 mt-0.5"
+                    >
+                      <ExternalLink className="w-3 h-3" /> {m.tracking_url}
+                    </a>
+                  )}
+                  {m.message_id && (
+                    <div className="text-[11px] text-muted-foreground mt-0.5 font-mono break-all">
+                      msg {m.message_id}
+                    </div>
+                  )}
+                  {m.error && (
+                    <div className="text-xs text-red-600 mt-0.5">{m.error}</div>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
+  );
+}
