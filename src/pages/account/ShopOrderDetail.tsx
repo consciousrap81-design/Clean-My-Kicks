@@ -1,12 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Truck, Package, MapPin, ExternalLink, History, Send, Pencil, RotateCcw, Mail, CheckCircle2 } from "lucide-react";
+import { Star } from "lucide-react";
 import { format } from "date-fns";
 import { trackingUrlFor, carrierLabel } from "@/lib/tracking";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import WriteReviewDialog from "@/components/shop/WriteReviewDialog";
 
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800",
@@ -44,6 +48,12 @@ const EVENT_LABELS: Record<string, string> = {
 
 export default function ShopOrderDetail() {
   const { id } = useParams<{ id: string }>();
+  const [search] = useSearchParams();
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  useEffect(() => {
+    if (search.get("review") === "1") setReviewOpen(true);
+  }, [search]);
 
   const { data: order, isLoading } = useQuery({
     queryKey: ["customer-shop-order", id],
