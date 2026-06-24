@@ -5,6 +5,7 @@ import { template as requestMorePhotos } from './request-more-photos.tsx'
 import { template as photosReceived } from './photos-received.tsx'
 import { template as customerWelcome } from './customer-welcome.tsx'
 import { template as shopOrderConfirmation } from './shop-order-confirmation.tsx'
+import { template as shopOrderShipped } from './shop-order-shipped.tsx'
 
 export interface TemplateEntry {
   component: ComponentType<any>
@@ -20,4 +21,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'photos-received': photosReceived,
   'customer-welcome': customerWelcome,
   'shop-order-confirmation': shopOrderConfirmation,
+  'shop-order-shipped': shopOrderShipped,
 }

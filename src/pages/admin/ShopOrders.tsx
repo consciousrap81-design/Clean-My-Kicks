@@ -16,6 +16,23 @@ import { Package, Truck, Mail, MapPin, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
+function trackingUrlFor(carrier: string | null | undefined, tracking: string): string | undefined {
+  if (!tracking) return undefined;
+  const t = encodeURIComponent(tracking.trim());
+  switch ((carrier || "").toLowerCase()) {
+    case "usps":
+      return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${t}`;
+    case "ups":
+      return `https://www.ups.com/track?tracknum=${t}`;
+    case "fedex":
+      return `https://www.fedex.com/fedextrack/?trknbr=${t}`;
+    case "dhl":
+      return `https://www.dhl.com/en/express/tracking.html?AWB=${t}`;
+    default:
+      return undefined;
+  }
+}
+
 type Order = {
   id: string;
   product_id: string | null;
@@ -197,18 +214,53 @@ function OrderDialog({
       return;
     }
     setSaving(true);
+    const shippedAt = new Date().toISOString();
     const { error } = await supabase
       .from("shop_orders")
       .update({
         status: "shipped",
         tracking_carrier: carrier.trim() || null,
         tracking_number: tracking.trim(),
-        shipped_at: new Date().toISOString(),
+        shipped_at: shippedAt,
       })
       .eq("id", order!.id);
+    if (error) {
+      setSaving(false);
+      return toast.error(error.message);
+    }
+
+    // Send shipping notification (don't block UX if it fails)
+    try {
+      const snap = order!.product_snapshot || {};
+      const productName =
+        [snap.brand, snap.model].filter(Boolean).join(" ") || snap.name || "your sneakers";
+      const origin = window.location.origin;
+      const { error: emailError } = await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "shop-order-shipped",
+          recipientEmail: order!.customer_email,
+          idempotencyKey: `shop-shipped-${order!.id}-${tracking.trim()}`,
+          templateData: {
+            customerName: order!.customer_name || undefined,
+            productName,
+            productSize: snap.size || null,
+            carrier: carrier.trim() || undefined,
+            trackingNumber: tracking.trim(),
+            trackingUrl: trackingUrlFor(carrier, tracking.trim()),
+            orderUrl: `${origin}/account`,
+          },
+        },
+      });
+      if (emailError) {
+        toast.warning("Marked shipped, but email failed to send", { description: emailError.message });
+      } else {
+        toast.success("Marked shipped — tracking email sent");
+      }
+    } catch (e: any) {
+      toast.warning("Marked shipped, but email failed to send", { description: e?.message });
+    }
+
     setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Order marked as shipped");
     onSaved();
   }
 
