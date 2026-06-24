@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_reminders: {
+        Row: {
+          body: string | null
+          created_at: string
+          dismissed: boolean
+          due_at: string
+          id: string
+          key: string
+          repeat_days: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          dismissed?: boolean
+          due_at: string
+          id?: string
+          key: string
+          repeat_days?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          dismissed?: boolean
+          due_at?: string
+          id?: string
+          key?: string
+          repeat_days?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       booking_requests: {
         Row: {
           accepted_quote_id: string | null
@@ -23,6 +59,7 @@ export type Database = {
           customer_name: string
           drop_off_method: string | null
           email: string | null
+          fulfillment_method: string
           id: string
           notes: string | null
           phone: string | null
@@ -30,6 +67,8 @@ export type Database = {
           public_token: string
           quoted_price: number
           service_requested: string | null
+          ship_from_address: Json | null
+          shipping_quote_cents: number | null
           shoe_brand: string | null
           shoe_model: string | null
           shoe_size: string | null
@@ -47,6 +86,7 @@ export type Database = {
           customer_name: string
           drop_off_method?: string | null
           email?: string | null
+          fulfillment_method?: string
           id?: string
           notes?: string | null
           phone?: string | null
@@ -54,6 +94,8 @@ export type Database = {
           public_token?: string
           quoted_price?: number
           service_requested?: string | null
+          ship_from_address?: Json | null
+          shipping_quote_cents?: number | null
           shoe_brand?: string | null
           shoe_model?: string | null
           shoe_size?: string | null
@@ -71,6 +113,7 @@ export type Database = {
           customer_name?: string
           drop_off_method?: string | null
           email?: string | null
+          fulfillment_method?: string
           id?: string
           notes?: string | null
           phone?: string | null
@@ -78,6 +121,8 @@ export type Database = {
           public_token?: string
           quoted_price?: number
           service_requested?: string | null
+          ship_from_address?: Json | null
+          shipping_quote_cents?: number | null
           shoe_brand?: string | null
           shoe_model?: string | null
           shoe_size?: string | null
@@ -611,6 +656,65 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      shipments: {
+        Row: {
+          carrier: string | null
+          created_at: string
+          direction: string
+          id: string
+          label_url: string | null
+          last_event_at: string | null
+          rate_cents: number | null
+          request_id: string
+          service: string | null
+          shippo_transaction_id: string | null
+          status: string
+          tracking_number: string | null
+          tracking_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          carrier?: string | null
+          created_at?: string
+          direction: string
+          id?: string
+          label_url?: string | null
+          last_event_at?: string | null
+          rate_cents?: number | null
+          request_id: string
+          service?: string | null
+          shippo_transaction_id?: string | null
+          status?: string
+          tracking_number?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          carrier?: string | null
+          created_at?: string
+          direction?: string
+          id?: string
+          label_url?: string | null
+          last_event_at?: string | null
+          rate_cents?: number | null
+          request_id?: string
+          service?: string | null
+          shippo_transaction_id?: string | null
+          status?: string
+          tracking_number?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "booking_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shop_abandoned_carts: {
         Row: {

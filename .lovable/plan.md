@@ -1,71 +1,73 @@
-# Cart & Checkout Enhancements
+# Mail-In Order Service
 
-Five additions, building on the existing combined-cart system.
+Adds a "Mail in" fulfillment option alongside existing drop-off, powered by Shippo for live carrier rates and prepaid round-trip labels. US-only at launch.
 
-## 1. Promo codes (admin-managed)
+## Customer flow
 
-**New table** `shop_promo_codes`:
-- `code` (unique, uppercased), `discount_type` ('percent' | 'fixed'), `amount` (int — % or cents), `min_subtotal_cents`, `max_redemptions`, `redemption_count`, `expires_at`, `active`, `applies_to` ('all' | 'accessories' | 'sneakers')
+1. On the booking form, customer picks **Drop off** or **Mail in**. Mail-in path asks for pickup address (used for return label + inbound rate).
+2. After submit, customer lands on a **shipping kit page** (`/requests/:token/ship`) showing:
+   - Prepaid inbound USPS/UPS label (PDF) generated via Shippo
+   - Packing instructions + printable order slip with QR code
+   - Tracking timeline: Label created → In transit → Received → Cleaning → Shipped back → Delivered
+3. Same `/requests/:token` view gains a "Shipping" section so the customer can re-download labels and watch status.
+4. Once we mark the job done, admin clicks "Generate return label" → customer gets email with tracking; return label uses the address captured at booking.
 
-**New table** `shop_promo_redemptions`:
-- `promo_id`, `cart_id`, `order_id`, redeemed_at — used to enforce one-per-cart and increment counts safely from the webhook.
+## Admin flow
 
-**Admin page** `/admin/promo-codes`: list + create/edit form (toggle active, set expiry, limits).
+- `booking_requests` gains `fulfillment_method` ('drop_off' | 'mail_in'), `ship_from_address` (jsonb).
+- New `shipments` table: `id`, `request_id`, `direction` ('inbound' | 'outbound'), `carrier`, `service`, `tracking_number`, `tracking_url`, `label_url`, `rate_cents`, `status`, `last_event_at`, timestamps.
+- Admin Requests + Jobs detail pages get a **Shipping panel**: shows both shipments, status, tracking link, "Mark received", "Generate return label" (re-quotes Shippo for outbound from shop address → customer address), "Void label" while unused.
+- Pricing on the quote auto-includes round-trip shipping cost (inbound rate + estimated outbound rate, both pulled from Shippo at booking time, stored on the request as `shipping_quote_cents`). Customer sees one shipping line item.
 
-**Cart drawer**: promo input + Apply button → calls new edge function `validate-promo-code` (rate-limited, returns discount preview). Applied code stored on `shop_carts.applied_promo_code` (new nullable column). Displays discount line in summary.
+## Cost handling
 
-**Checkout**: `create-shop-checkout` re-validates the code server-side, creates a Stripe one-shot coupon (`stripe.coupons.create` with `duration: "once"`), attaches via `discounts: [{coupon}]` on the session. Webhook records redemption + increments `redemption_count` on payment success.
+- Inbound rate fetched at booking using customer address → shop address, cheapest USPS Ground Advantage / UPS Ground.
+- Outbound rate estimated at the same time (reverse direction) and added to the round-trip total.
+- Round-trip cost is rolled into the quote total — customer pays it via existing Stripe checkout. No separate shipping charge.
+- If actual outbound rate at ship time exceeds the estimate by >$3, admin sees a warning before purchasing the label (can absorb or contact customer).
 
-## 2. Detailed shipping breakdown in cart summary
+## Tracking
 
-In `CartDrawer.tsx` summary section, before checkout button:
-- Rate name + price (Standard / Express)
-- Estimated delivery window (already computed) shown as date range
-- "Free shipping over $100" hint with remaining-to-go progress when under threshold; "✓ Free shipping unlocked" when over
-- Shipping method picker (radio): Standard / Express — selection passed to `create-shop-checkout` as `shippingMethod` so Stripe session pre-selects it (still editable on Stripe page)
+- Shippo webhook → new edge function `shippo-webhook` updates `shipments.status` and `last_event_at`, appends to `job_updates`, and fires existing transactional emails (`shop-order-tracking-updated` template — reuse, or add `mail-in-status-changed`).
 
-## 3. Address collection
+## International (deferred)
 
-Per user choice: **Stripe Checkout collects + validates the address.** Already configured. We only need to ensure `shipping_address_collection` is enabled on the session with allowed countries (US only for now — confirm in implementation). No new on-site form.
+- Reminder task in `.lovable/plan.md` and a recurring admin Settings banner "International mail-in: revisit on <date>" that updates every 2 weeks until dismissed. Implemented as a simple `admin_reminders` table with `key`, `due_at`, `dismissed`. AdminLayout checks for due reminders.
 
-## 4. Order status page (replaces /shop/order/success)
+## Technical details
 
-Rebuild `src/pages/ShopOrderSuccess.tsx`:
-- Reads `?session_id=...`, calls new edge function `get-shop-order-status` which looks up the order by Stripe session id and returns: order #, items (with SKU + variant), shipping method, ETA window, shipping address, subtotal/discount/shipping/total, payment status, current order status.
-- Polls every 3s until status moves from `pending` → `paid` (webhook race), then stops.
-- Shows clear states: "Processing payment…", "Payment confirmed — order #1234", with expected delivery date prominent.
-- Links to `/account/shop-orders/:id` for signed-in users.
+**New migration:**
+- `booking_requests`: add `fulfillment_method`, `ship_from_address`, `shipping_quote_cents`
+- `shipments` table (RLS: admin-only writes; public read via request public_token through edge function)
+- `admin_reminders` table (RLS: admin only)
+- Seed one row: `key='international_mail_in'`, `due_at = now() + 14 days`
 
-## 5. Real-time stock warnings + checkout lockout
+**New secrets:** `SHIPPO_API_KEY`, `SHIPPO_WEBHOOK_SECRET`, `SHOP_ADDRESS_*` (origin address for outbound + destination for inbound). Stored via add_secret.
 
-In `src/lib/cart.ts` (`refresh()` already pulls `stock_qty`):
-- Subscribe to `shop_accessory_variants` realtime channel on mount (postgres_changes UPDATE filter by variant ids in cart) → triggers `refresh()`.
-- `EnrichedCartItem` already exposes `available` + `unavailable_reason` — make sure cart drawer shows red warning badge when `qty > max_qty` or `max_qty === 0`.
+**New edge functions:**
+- `shippo-quote` — called from booking form; returns inbound + estimated outbound rate
+- `shippo-purchase-label` — admin-triggered; buys label, persists to `shipments`
+- `shippo-webhook` — receives status events, verifies signature
+- `shipping-kit-view` — public, looks up by request token, returns label URLs + status
 
-In `CartDrawer.tsx`:
-- Compute `hasBlockingIssue = items.some(i => !i.available)`.
-- Disable Checkout button when true; show inline message "Resolve item issues to continue."
-- Out-of-stock items get destructive border + "Remove" CTA prominent; over-qty items get a "Set to max (N)" quick action.
+**Edited:**
+- `src/components/BookingForm` (or current booking flow): add fulfillment_method radio, address fields when mail-in
+- `src/pages/RequestView` (public): shipping kit section
+- `src/pages/admin/Requests.tsx` + `JobDetail.tsx`: shipping panel
+- `src/components/admin/AdminLayout.tsx`: reminder banner
+- `supabase/functions/submit-booking/index.ts`: call `shippo-quote`, store quote + address
 
-`create-shop-checkout` already re-validates stock and returns errors — keep as final safeguard.
-
-## Technical notes
-
-- Promo coupon math: percent → `percent_off`; fixed → `amount_off` + `currency: "usd"`. Min subtotal enforced server-side before creating the coupon.
-- Stock realtime requires `shop_accessory_variants` in the supabase realtime publication (migration adds it).
-- No schema change to `shop_orders` needed for promo — store `discount_cents` + `promo_code` (add two columns).
+**New pages:**
+- `src/pages/admin/Reminders.tsx` (simple list to view/dismiss/snooze)
 
 ## Out of scope
 
-- Stacking multiple promos
-- BOGO / per-product discounts
-- Address autocomplete on our site (deferred — Stripe handles it)
-- International shipping zones
+- International shipping (reminder set instead)
+- Insurance upsell
+- Customer-supplied labels
+- Multi-package shipments
 
-## Files
+## What I need from you before building
 
-**Migrations:** new `shop_promo_codes`, `shop_promo_redemptions`; add `applied_promo_code` to `shop_carts`; add `discount_cents`, `promo_code` to `shop_orders`; enable realtime on `shop_accessory_variants`.
-
-**New:** `supabase/functions/validate-promo-code/index.ts`, `supabase/functions/get-shop-order-status/index.ts`, `src/pages/admin/PromoCodes.tsx`, `src/pages/admin/PromoCodeEdit.tsx`.
-
-**Edited:** `src/lib/cart.ts`, `src/components/shop/CartDrawer.tsx`, `src/pages/ShopOrderSuccess.tsx`, `supabase/functions/create-shop-checkout/index.ts`, `supabase/functions/stripe-webhook/index.ts`, `src/App.tsx`, `src/components/admin/AdminLayout.tsx`.
+1. Confirm shop **origin address** (street, city, state, ZIP) to use for label generation.
+2. You'll need to create a Shippo account and grab your API key + webhook secret — I'll request them via add_secret when we're ready to build.
