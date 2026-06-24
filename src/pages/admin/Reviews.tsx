@@ -63,7 +63,7 @@ export default function AdminReviews() {
         `)
         .order("created_at", { ascending: false })
         .limit(200);
-      if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      if (statusFilter !== "all") q = q.eq("status", statusFilter as Row["status"]);
       const { data, error } = await q;
       if (error) throw error;
       return (data as unknown as Row[]) || [];
