@@ -77,6 +77,40 @@ Deno.serve(async (req) => {
       return ok({ unknown_shipment: true });
     }
 
+    // Log raw events for audit. Use full tracking_history when present,
+    // otherwise just the current tracking_status snapshot.
+    const history: any[] = Array.isArray(verified?.tracking_history) && verified.tracking_history.length
+      ? verified.tracking_history
+      : (verified?.tracking_status ? [verified.tracking_status] : []);
+    if (history.length) {
+      const { data: existing } = await admin
+        .from("shipment_events")
+        .select("occurred_at, status")
+        .eq("shipment_id", shipment.id);
+      const seen = new Set((existing || []).map((e: any) => `${e.occurred_at}|${e.status || ""}`));
+      const rows = history
+        .map((h: any) => {
+          const occurred_at = h?.status_date || h?.object_updated || new Date().toISOString();
+          const status = h?.status || null;
+          const key = `${new Date(occurred_at).toISOString()}|${status || ""}`;
+          if (seen.has(key)) return null;
+          const loc = h?.location;
+          const location = loc
+            ? [loc.city, loc.state, loc.zip, loc.country].filter(Boolean).join(", ")
+            : null;
+          return {
+            shipment_id: shipment.id,
+            occurred_at,
+            status,
+            status_detail: h?.status_details || h?.substatus?.text || null,
+            location,
+            raw: h,
+          };
+        })
+        .filter(Boolean);
+      if (rows.length) await admin.from("shipment_events").insert(rows as any[]);
+    }
+
     const statusChanged = shipment.status !== mapped;
     const detailChanged = (shipment as any).tracking_status_detail !== statusDetail;
     const etaChanged = ((shipment as any).eta || null) !== eta;
