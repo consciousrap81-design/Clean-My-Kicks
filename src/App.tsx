@@ -21,6 +21,11 @@ import Quotes from "./pages/admin/Quotes";
 import QuoteView from "./pages/QuoteView";
 import Unsubscribe from "./pages/Unsubscribe";
 import RequestPhotos from "./pages/RequestPhotos";
+import SetPassword from "./pages/auth/SetPassword";
+import AccountDashboard from "./pages/account/Dashboard";
+import OrderDetail from "./pages/account/OrderDetail";
+import AccountLayout from "@/components/account/AccountLayout";
+import CustomerRoute from "@/components/account/CustomerRoute";
 
 const queryClient = new QueryClient();
 
@@ -34,9 +39,14 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/set-password" element={<SetPassword />} />
             <Route path="/quote/:token" element={<QuoteView />} />
             <Route path="/request/:token/photos" element={<RequestPhotos />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/account" element={<CustomerRoute><AccountLayout /></CustomerRoute>}>
+              <Route index element={<AccountDashboard />} />
+              <Route path="orders/:jobId" element={<OrderDetail />} />
+            </Route>
             <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
               <Route index element={<Dashboard />} />
               <Route path="requests" element={<Requests />} />
