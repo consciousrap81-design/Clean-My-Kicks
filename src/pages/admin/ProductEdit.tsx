@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Loader2, Star, Trash2, Upload } from "lucide-react";
 import { signedPhotoUrls } from "@/lib/shop";
+import { PRODUCT_TEMPLATES } from "@/lib/productTemplates";
 
 type Photo = { id: string; storage_path: string; is_primary: boolean; sort_order: number };
 
@@ -32,6 +33,22 @@ export default function ProductEdit() {
     price: "",
     status: "draft",
   });
+
+  function applyTemplate(id: string) {
+    const t = PRODUCT_TEMPLATES.find((x) => x.id === id);
+    if (!t) return;
+    setForm((f) => ({
+      ...f,
+      name: f.name || `${t.brand} ${t.model}`,
+      brand: t.brand,
+      model: t.model,
+      size: f.size || t.size,
+      condition: f.condition || t.condition,
+      description: f.description || t.description,
+      price: f.price || String(t.price),
+    }));
+    toast.success(`Applied template: ${t.label}`);
+  }
 
   useEffect(() => {
     if (isNew) return;
@@ -154,6 +171,18 @@ export default function ProductEdit() {
       <Card>
         <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <Label>Start from template</Label>
+            <Select onValueChange={applyTemplate}>
+              <SelectTrigger><SelectValue placeholder="Pick a Jordan or Nike model to auto-fill" /></SelectTrigger>
+              <SelectContent>
+                {PRODUCT_TEMPLATES.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.label} — ${t.price}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">Fills empty fields only — won't overwrite anything you've already entered.</p>
+          </div>
           <div className="md:col-span-2"><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Jordan 4 Oxidized Green" /></div>
           <div><Label>Brand</Label><Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="Jordan" /></div>
           <div><Label>Model</Label><Input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="4 Retro" /></div>
