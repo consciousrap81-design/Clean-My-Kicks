@@ -94,8 +94,18 @@ export function ShippingPanel({ jobId }: { jobId: string }) {
                 )}
               </div>
               {s && (
-                <div className="text-xs text-muted-foreground flex flex-wrap gap-3">
+                <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+                  <span>{s.carrier || "USPS"} {s.service || "Priority Mail"}</span>
                   <span>Tracking: <span className="font-mono">{s.tracking_number}</span></span>
+                  {s.tracking_status_detail && (
+                    <span className="w-full text-foreground">{s.tracking_status_detail}</span>
+                  )}
+                  {s.eta && (
+                    <span>ETA: {new Date(s.eta).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                  )}
+                  {s.last_event_at && (
+                    <span>Updated: {new Date(s.last_event_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                  )}
                   {s.label_url && (
                     <a className="inline-flex items-center gap-1 text-primary" href={s.label_url} target="_blank" rel="noreferrer">
                       Label PDF <ExternalLink className="h-3 w-3" />
