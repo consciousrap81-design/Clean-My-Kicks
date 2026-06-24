@@ -63,6 +63,80 @@ async function sendShippedEmail(
   }
 }
 
+function productNameOf(order: Order) {
+  const snap = order.product_snapshot || {};
+  return [snap.brand, snap.model].filter(Boolean).join(" ") || snap.name || "your sneakers";
+}
+
+async function sendTrackingUpdatedEmail(
+  order: Order,
+  prevCarrier: string | null,
+  prevTracking: string | null,
+  carrier: string,
+  tracking: string,
+  customUrl?: string,
+): Promise<{ ok: boolean; error?: string; messageId?: string }> {
+  try {
+    const snap = order.product_snapshot || {};
+    const origin = window.location.origin;
+    const url = (customUrl?.trim() || trackingUrlFor(carrier, tracking.trim())) || undefined;
+    const idempotencyKey = `shop-tracking-${order.id}-${tracking.trim()}-${carrier || "x"}`;
+    const { data, error } = await supabase.functions.invoke("send-transactional-email", {
+      body: {
+        templateName: "shop-order-tracking-updated",
+        recipientEmail: order.customer_email,
+        idempotencyKey,
+        templateData: {
+          customerName: order.customer_name || undefined,
+          productName: productNameOf(order),
+          productSize: snap.size || null,
+          previousCarrier: prevCarrier || null,
+          previousTrackingNumber: prevTracking || null,
+          carrier: (carrier?.trim() || carrierLabel(carrier, tracking.trim())) || undefined,
+          trackingNumber: tracking.trim(),
+          trackingUrl: url,
+          orderUrl: `${origin}/account`,
+        },
+      },
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, messageId: (data as any)?.message_id };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Unknown error" };
+  }
+}
+
+async function sendStatusChangedEmail(
+  order: Order,
+  fromStatus: string,
+  toStatus: string,
+): Promise<{ ok: boolean; error?: string; messageId?: string }> {
+  try {
+    const snap = order.product_snapshot || {};
+    const origin = window.location.origin;
+    const idempotencyKey = `shop-status-${order.id}-${toStatus}`;
+    const { data, error } = await supabase.functions.invoke("send-transactional-email", {
+      body: {
+        templateName: "shop-order-status-changed",
+        recipientEmail: order.customer_email,
+        idempotencyKey,
+        templateData: {
+          customerName: order.customer_name || undefined,
+          productName: productNameOf(order),
+          productSize: snap.size || null,
+          fromStatus,
+          toStatus,
+          orderUrl: `${origin}/account`,
+        },
+      },
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, messageId: (data as any)?.message_id };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Unknown error" };
+  }
+}
+
 type Order = {
   id: string;
   product_id: string | null;
@@ -434,6 +508,32 @@ function OrderDialog({
         from: order!.status,
         to: status,
       });
+      const notifyStatuses = new Set(["delivered", "cancelled", "refunded"]);
+      if (notifyStatuses.has(status) && order!.customer_email) {
+        const sent = await sendStatusChangedEmail(order!, order!.status, status);
+        if (sent.ok) {
+          toast.success(`Status email sent to ${order!.customer_email}`, {
+            description: sent.messageId ? `Message ID: ${sent.messageId}` : undefined,
+            action: sent.messageId ? { label: "Copy ID", onClick: () => copyId(sent.messageId!) } : undefined,
+            duration: 8000,
+          });
+          await logEvent("email_resent", `Status email sent (${status})`, {
+            recipient: order!.customer_email,
+            message_id: sent.messageId,
+            status_to: status,
+            status_from: order!.status,
+          });
+        } else {
+          toast.warning("Status updated, but email failed to send", {
+            description: sent.error,
+            duration: 10000,
+          });
+          await logEvent("email_failed", `Status email failed (${status})`, {
+            recipient: order!.customer_email,
+            error: sent.error,
+          });
+        }
+      }
     }
     if (carrierChanged || trackingChanged) {
       await logEvent(
@@ -447,6 +547,40 @@ function OrderDialog({
           tracking_url: previewUrl || null,
         },
       );
+      const wasShipped = !!order!.shipped_at || order!.status === "shipped" || order!.status === "delivered";
+      if (wasShipped && tracking.trim() && order!.customer_email) {
+        const sent = await sendTrackingUpdatedEmail(
+          order!,
+          order!.tracking_carrier,
+          order!.tracking_number,
+          effectiveCarrier,
+          tracking,
+          customUrl,
+        );
+        if (sent.ok) {
+          toast.success(`Tracking update email sent to ${order!.customer_email}`, {
+            description: sent.messageId ? `Message ID: ${sent.messageId}` : undefined,
+            action: sent.messageId ? { label: "Copy ID", onClick: () => copyId(sent.messageId!) } : undefined,
+            duration: 8000,
+          });
+          await logEvent("email_resent", "Tracking update email sent", {
+            recipient: order!.customer_email,
+            message_id: sent.messageId,
+            carrier: effectiveCarrier || null,
+            tracking_number: tracking.trim(),
+            tracking_url: previewUrl || null,
+          });
+        } else {
+          toast.warning("Tracking saved, but email failed to send", {
+            description: sent.error,
+            duration: 10000,
+          });
+          await logEvent("email_failed", "Tracking update email failed", {
+            recipient: order!.customer_email,
+            error: sent.error,
+          });
+        }
+      }
     }
 
     toast.success("Order updated");
