@@ -28,6 +28,7 @@ import PromoCodeEdit from "./pages/admin/PromoCodeEdit";
 import ShopOrders from "./pages/admin/ShopOrders";
 import AbandonedCarts from "./pages/admin/AbandonedCarts";
 import AdminReviews from "./pages/admin/Reviews";
+import AdminStatus from "./pages/admin/Status";
 import QuoteView from "./pages/QuoteView";
 import ProductDetail from "./pages/ProductDetail";
 import ShopOrderSuccess from "./pages/ShopOrderSuccess";
