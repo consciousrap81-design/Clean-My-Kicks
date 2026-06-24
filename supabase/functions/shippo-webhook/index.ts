@@ -15,6 +15,14 @@ const STATUS_MAP: Record<string, string> = {
   FAILURE: "failed",
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  label_created: "Label Created",
+  in_transit: "In Transit",
+  delivered: "Delivered",
+  returned: "Returned",
+  failed: "Delivery Issue",
+};
+
 async function shippoGet(path: string) {
   const key = Deno.env.get("SHIPPO_API_KEY");
   if (!key) throw new Error("SHIPPO_API_KEY not configured");
@@ -69,7 +77,7 @@ Deno.serve(async (req) => {
 
     const { data: shipment } = await admin
       .from("shipments")
-      .select("id, request_id, direction, status, tracking_status_detail, eta")
+      .select("id, request_id, direction, status, tracking_status_detail, eta, tracking_number, tracking_url, carrier, notifications_enabled")
       .eq("tracking_number", trackingNumber)
       .maybeSingle();
 
@@ -144,6 +152,43 @@ Deno.serve(async (req) => {
         });
       }
     }
+
+      // Notify customer on status OR eta change (skip pure detail-only changes)
+      if ((statusChanged || etaChanged) && (shipment as any).notifications_enabled !== false) {
+        try {
+          const { data: br2 } = await admin
+            .from("booking_requests")
+            .select("email, customer_name")
+            .eq("id", shipment.request_id).maybeSingle();
+          const to = br2?.email;
+          if (to) {
+            const origin = Deno.env.get("PUBLIC_SITE_URL") || "https://cleanmykicks.com";
+            const trackPageUrl = `${origin}/track?n=${encodeURIComponent(trackingNumber)}`;
+            await admin.functions.invoke("send-transactional-email", {
+              body: {
+                templateName: "shipment-update",
+                recipientEmail: to,
+                idempotencyKey: `shipment-${shipment.id}-${mapped}-${eta || "noeta"}`,
+                templateData: {
+                  customerName: br2?.customer_name?.split(" ")[0],
+                  direction: shipment.direction,
+                  statusLabel: STATUS_LABEL[mapped] || mapped,
+                  statusDetail,
+                  carrier: (carrierName || "USPS").toUpperCase(),
+                  trackingNumber,
+                  trackingUrl: (shipment as any).tracking_url,
+                  eta,
+                  etaChanged,
+                  trackPageUrl,
+                  manageUrl: trackPageUrl,
+                },
+              },
+            });
+          }
+        } catch (mailErr) {
+          console.error("shipment-update email failed", (mailErr as Error).message);
+        }
+      }
     }
 
     return ok();
