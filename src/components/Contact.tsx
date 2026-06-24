@@ -2,16 +2,88 @@ import { forwardRef, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Mail, MapPin, Phone, Send, Loader2, CheckCircle } from "lucide-react";
+import { Mail, MapPin, Phone, Send, Loader2, CheckCircle, ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 const FORMSPREE_ENDPOINT = "https://formspree.io/f/xvzojebk";
+const MAX_PHOTOS = 10;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MB
+const ACCEPTED_MIME = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+]);
+const ACCEPTED_EXT = /\.(jpe?g|png|webp|heic|heif)$/i;
+
+type PendingPhoto = { file: File; previewUrl: string };
 
 const Contact = forwardRef<HTMLElement>((_, ref) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [photos, setPhotos] = useState<PendingPhoto[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function addFiles(files: FileList | File[]) {
+    const incoming = Array.from(files);
+    const accepted: PendingPhoto[] = [];
+    for (const file of incoming) {
+      if (photos.length + accepted.length >= MAX_PHOTOS) {
+        toast.error(`You can upload up to ${MAX_PHOTOS} photos.`);
+        break;
+      }
+      const validType = ACCEPTED_MIME.has(file.type) || ACCEPTED_EXT.test(file.name);
+      if (!validType) {
+        toast.error(`${file.name}: unsupported file type. Use JPG, PNG, HEIC or WEBP.`);
+        continue;
+      }
+      if (file.size > MAX_PHOTO_BYTES) {
+        toast.error(`${file.name}: file is larger than 10 MB.`);
+        continue;
+      }
+      accepted.push({ file, previewUrl: URL.createObjectURL(file) });
+    }
+    if (accepted.length) setPhotos((p) => [...p, ...accepted]);
+  }
+
+  function removePhoto(idx: number) {
+    setPhotos((p) => {
+      const next = [...p];
+      const [removed] = next.splice(idx, 1);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return next;
+    });
+  }
+
+  function clearPhotos() {
+    photos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+    setPhotos([]);
+  }
+
+  async function uploadPhotos(): Promise<string[]> {
+    if (!photos.length) return [];
+    const folder = crypto.randomUUID();
+    const paths: string[] = [];
+    for (const { file } of photos) {
+      const extMatch = file.name.match(/\.([A-Za-z0-9]+)$/);
+      const ext = (extMatch?.[1] || "jpg").toLowerCase();
+      const safeExt = ext.replace(/[^a-z0-9]/g, "").slice(0, 5) || "jpg";
+      const path = `${folder}/${crypto.randomUUID()}.${safeExt}`;
+      const { error } = await supabase.storage
+        .from("request-photos")
+        .upload(path, file, { contentType: file.type || undefined, upsert: false });
+      if (error) {
+        console.error("photo upload failed", error);
+        throw new Error(`Photo upload failed: ${file.name}`);
+      }
+      paths.push(path);
+    }
+    return paths;
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -20,7 +92,17 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
     const formData = new FormData(e.currentTarget);
 
     try {
-      // Fire admin dashboard job creation in parallel (non-blocking for Formspree)
+      // Upload photos first so we can attach paths to the request record
+      let photoPaths: string[] = [];
+      try {
+        photoPaths = await uploadPhotos();
+      } catch (err: any) {
+        toast.error(err?.message ?? "Photo upload failed");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Fire admin dashboard request creation in parallel (non-blocking for Formspree)
       const payload = {
         fullName: formData.get("fullName"),
         email: formData.get("email"),
@@ -31,10 +113,16 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
         shoeSize: formData.get("shoeSize"),
         dropOffMethod: formData.get("dropOffMethod"),
         notes: formData.get("notes"),
+        photos: photoPaths,
       };
       supabase.functions
         .invoke("submit-booking", { body: payload })
         .catch((err) => console.error("submit-booking failed", err));
+
+      // Attach photo count to Formspree for visibility
+      if (photoPaths.length) {
+        formData.set("photoCount", String(photoPaths.length));
+      }
 
       const response = await fetch(FORMSPREE_ENDPOINT, {
         method: "POST",
@@ -46,6 +134,7 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
         setIsSubmitted(true);
         toast.success("Request sent — we'll contact you soon.");
         formRef.current?.reset();
+        clearPhotos();
       } else {
         toast.error("Something went wrong. Please try again or call us directly.");
       }
@@ -59,6 +148,7 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
   const resetForm = () => {
     setIsSubmitted(false);
     formRef.current?.reset();
+    clearPhotos();
   };
 
   return (
@@ -266,6 +356,68 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
                   rows={3}
                   className="bg-card border-border focus:border-primary resize-none text-sm md:text-base"
                 />
+              </div>
+
+              {/* Photo uploads */}
+              <div>
+                <label className="font-body text-xs md:text-sm text-muted-foreground uppercase tracking-wider block mb-1.5 md:mb-2">
+                  Upload Photos of Your Shoes
+                </label>
+                <p className="font-body text-xs md:text-sm text-muted-foreground mb-2 md:mb-3">
+                  Clear photos help us assess the condition of your shoes and provide an accurate quote.
+                </p>
+                <p className="font-body text-[11px] md:text-xs text-muted-foreground mb-3">
+                  Suggested views: left side, right side, front, back/heel, soles, and any damage areas.
+                </p>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files) addFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={photos.length >= MAX_PHOTOS}
+                  className="w-full flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-border bg-card hover:border-primary hover:bg-card/80 transition-colors p-5 md:p-6 text-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ImagePlus className="w-6 h-6 text-primary" />
+                  <span className="font-body text-sm text-foreground">
+                    {photos.length === 0 ? "Tap to add photos" : "Add more photos"}
+                  </span>
+                  <span className="font-body text-[11px] text-muted-foreground">
+                    JPG, PNG, HEIC or WEBP · up to 10 MB each · {photos.length}/{MAX_PHOTOS}
+                  </span>
+                </button>
+
+                {photos.length > 0 && (
+                  <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                    {photos.map((p, i) => (
+                      <div key={i} className="relative aspect-square rounded-md overflow-hidden bg-muted border border-border">
+                        <img
+                          src={p.previewUrl}
+                          alt={`Upload preview ${i + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(i)}
+                          aria-label={`Remove photo ${i + 1}`}
+                          className="absolute top-1 right-1 bg-background/90 hover:bg-background border border-border rounded-full p-1 shadow"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Submit */}

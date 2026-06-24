@@ -10,7 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Inbox, CheckCircle2, XCircle, Archive, Loader2 } from "lucide-react";
+import { Inbox, CheckCircle2, XCircle, Archive, Loader2, Camera, X } from "lucide-react";
 import { toast } from "sonner";
 
 type Request = {
@@ -26,7 +26,7 @@ type Request = {
   notes: string | null;
   photos: string[] | null;
   source: string;
-  status: "pending" | "approved" | "declined";
+  status: "pending" | "approved" | "declined" | "awaiting_photos";
   quoted_price: number;
   admin_notes: string | null;
   converted_job_id: string | null;
@@ -37,6 +37,7 @@ const STATUS_LABEL: Record<Request["status"], string> = {
   pending: "Pending",
   approved: "Approved",
   declined: "Declined",
+  awaiting_photos: "Awaiting Photos",
 };
 
 function StatusBadge({ status }: { status: Request["status"] }) {
@@ -45,8 +46,17 @@ function StatusBadge({ status }: { status: Request["status"] }) {
       ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
       : status === "approved"
       ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+      : status === "awaiting_photos"
+      ? "bg-sky-500/15 text-sky-600 border-sky-500/30"
       : "bg-muted text-muted-foreground border-border";
   return <Badge variant="outline" className={cls}>{STATUS_LABEL[status]}</Badge>;
+}
+
+async function resolvePhotoUrl(entry: string): Promise<string | null> {
+  if (!entry) return null;
+  if (entry.startsWith("http://") || entry.startsWith("https://")) return entry;
+  const { data } = await supabase.storage.from("request-photos").createSignedUrl(entry, 3600);
+  return data?.signedUrl ?? null;
 }
 
 export default function Requests() {
@@ -56,6 +66,8 @@ export default function Requests() {
   const [quoted, setQuoted] = useState<string>("0");
   const [adminNotes, setAdminNotes] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   const { data: requests, isLoading } = useQuery({
     queryKey: ["booking-requests", statusFilter],
@@ -85,7 +97,22 @@ export default function Requests() {
     setSelected(r);
     setQuoted(String(r.quoted_price ?? 0));
     setAdminNotes(r.admin_notes ?? "");
+    setPhotoUrls([]);
+    setLightboxIdx(null);
   }
+
+  useEffect(() => {
+    if (!selected?.photos?.length) {
+      setPhotoUrls([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const resolved = await Promise.all(selected.photos!.map(resolvePhotoUrl));
+      if (!cancelled) setPhotoUrls(resolved.filter((u): u is string => !!u));
+    })();
+    return () => { cancelled = true; };
+  }, [selected?.id]);
 
   async function saveDraft() {
     if (!selected) return;
@@ -168,7 +195,35 @@ export default function Requests() {
         .single();
       if (jErr) throw jErr;
 
-      // 4. Mark request approved + link
+      // 4. Carry uploaded photos over to the job as "before" photos.
+      //    Copy each object from request-photos -> job-photos and create a
+            //    job_photos row referencing the new path.
+      const photoEntries = (selected.photos ?? []).filter(Boolean);
+      for (const entry of photoEntries) {
+        try {
+          // Only storage paths can be copied. External URLs are skipped.
+          if (/^https?:\/\//i.test(entry)) continue;
+          const { data: blob, error: dlErr } = await supabase.storage
+            .from("request-photos")
+            .download(entry);
+          if (dlErr || !blob) continue;
+          const ext = entry.split(".").pop()?.toLowerCase() || "jpg";
+          const destPath = `${job.id}/before/${crypto.randomUUID()}.${ext}`;
+          const { error: upErr } = await supabase.storage
+            .from("job-photos")
+            .upload(destPath, blob, { contentType: blob.type || undefined, upsert: false });
+          if (upErr) continue;
+          await supabase.from("job_photos").insert({
+            job_id: job.id,
+            url: destPath,
+            kind: "before",
+          });
+        } catch (err) {
+          console.warn("photo carry-over failed", err);
+        }
+      }
+
+      // 5. Mark request approved + link
       const { error: uErr } = await supabase
         .from("booking_requests")
         .update({
@@ -210,6 +265,24 @@ export default function Requests() {
     queryClient.invalidateQueries({ queryKey: ["booking-requests"] });
   }
 
+  async function requestMorePhotos() {
+    if (!selected) return;
+    setBusy(true);
+    const { error } = await supabase
+      .from("booking_requests")
+      .update({
+        status: "awaiting_photos" as any,
+        quoted_price: Number(quoted) || 0,
+        admin_notes: adminNotes || null,
+      })
+      .eq("id", selected.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("Marked as awaiting more photos");
+    setSelected(null);
+    queryClient.invalidateQueries({ queryKey: ["booking-requests"] });
+  }
+
   const list = requests ?? [];
 
   return (
@@ -223,6 +296,7 @@ export default function Requests() {
           <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="awaiting_photos">Awaiting Photos</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="declined">Declined</SelectItem>
             <SelectItem value="all">All</SelectItem>
@@ -316,18 +390,30 @@ export default function Requests() {
                   </div>
                 )}
 
-                {selected.photos && selected.photos.length > 0 && (
-                  <div>
-                    <div className="text-xs uppercase text-muted-foreground mb-1">Photos</div>
-                    <div className="flex flex-wrap gap-2">
-                      {selected.photos.map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noreferrer">
-                          <img src={url} alt={`photo ${i + 1}`} className="h-20 w-20 object-cover rounded-md border" />
-                        </a>
+                <div>
+                  <div className="text-xs uppercase text-muted-foreground mb-1 flex items-center gap-1.5">
+                    <Camera className="h-3.5 w-3.5" />
+                    Photos {selected.photos?.length ? `(${selected.photos.length})` : ""}
+                  </div>
+                  {!selected.photos?.length ? (
+                    <div className="text-sm text-muted-foreground italic">No photos uploaded.</div>
+                  ) : photoUrls.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">Loading photos…</div>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {photoUrls.map((url, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setLightboxIdx(i)}
+                          className="aspect-square rounded-md overflow-hidden border border-border bg-muted hover:border-primary transition-colors"
+                        >
+                          <img src={url} alt={`Request photo ${i + 1}`} className="w-full h-full object-cover" />
+                        </button>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -365,18 +451,21 @@ export default function Requests() {
               </div>
 
               <DialogFooter className="flex-wrap gap-2 sm:gap-2">
-                {selected.status === "pending" ? (
+                {selected.status === "pending" || selected.status === "awaiting_photos" ? (
                   <>
                     <Button variant="outline" onClick={saveDraft} disabled={busy}>
                       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                       Save
                     </Button>
+                    <Button variant="outline" onClick={requestMorePhotos} disabled={busy}>
+                      <Camera className="h-4 w-4" /> Request More Photos
+                    </Button>
                     <Button variant="outline" onClick={decline} disabled={busy}>
-                      <XCircle className="h-4 w-4" /> Decline
+                      <XCircle className="h-4 w-4" /> Decline / Archive
                     </Button>
                     <Button onClick={approveAndConvert} disabled={busy}>
                       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                      Approve & Convert to Job
+                      Approve & Create Job
                     </Button>
                   </>
                 ) : (
@@ -386,6 +475,32 @@ export default function Requests() {
                 )}
               </DialogFooter>
             </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Lightbox */}
+      <Dialog open={lightboxIdx !== null} onOpenChange={(o) => !o && setLightboxIdx(null)}>
+        <DialogContent className="max-w-4xl p-2 sm:p-4 bg-background">
+          {lightboxIdx !== null && photoUrls[lightboxIdx] && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setLightboxIdx(null)}
+                aria-label="Close"
+                className="absolute -top-1 -right-1 z-10 rounded-full bg-background/90 border border-border p-1.5 shadow"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <img
+                src={photoUrls[lightboxIdx]}
+                alt={`Request photo ${lightboxIdx + 1}`}
+                className="w-full max-h-[80vh] object-contain rounded-md"
+              />
+              <div className="text-center text-xs text-muted-foreground mt-2">
+                {lightboxIdx + 1} / {photoUrls.length}
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
