@@ -6,9 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Sparkles, CheckCircle2, XCircle, MessageCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
-const FN_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+import { supabase } from "@/integrations/supabase/client";
 
 type Quote = {
   customer_name: string;
@@ -35,12 +33,19 @@ export default function QuoteView() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${FN_BASE}/quote-view?token=${encodeURIComponent(token)}`, {
-          headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
+        const { data, error } = await supabase.functions.invoke("quote-view", {
+          method: "GET",
+          // edge function reads ?token from URL — pass via query string
+        } as any);
+        // Fallback: use raw fetch with apikey since invoke doesn't easily set query strings on GET
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-view?token=${encodeURIComponent(token)}`;
+        const res = await fetch(url, {
+          headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string },
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Could not load quote");
         setQuote(json.quote);
+        void data; void error;
       } catch (e: any) {
         setError(e?.message ?? "Could not load quote");
       } finally {
@@ -52,13 +57,11 @@ export default function QuoteView() {
   async function respond(action: "accept" | "decline" | "request_info") {
     setBusy(true);
     try {
-      const res = await fetch(`${FN_BASE}/quote-respond`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
-        body: JSON.stringify({ token, action, message: message || undefined }),
+      const { data, error } = await supabase.functions.invoke("quote-respond", {
+        body: { token, action, message: message || undefined },
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed");
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
       if (action === "accept") {
         toast.success("Quote accepted! We'll be in touch shortly.");
         setQuote((q) => (q ? { ...q, status: "accepted" } : q));
