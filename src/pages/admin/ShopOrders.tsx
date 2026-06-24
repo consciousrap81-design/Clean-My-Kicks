@@ -12,7 +12,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Package, Truck, Mail, MapPin, ExternalLink } from "lucide-react";
+import { Package, Truck, Mail, MapPin, ExternalLink, Send } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -229,39 +229,24 @@ function OrderDialog({
       return toast.error(error.message);
     }
 
-    // Send shipping notification (don't block UX if it fails)
-    try {
-      const snap = order!.product_snapshot || {};
-      const productName =
-        [snap.brand, snap.model].filter(Boolean).join(" ") || snap.name || "your sneakers";
-      const origin = window.location.origin;
-      const { error: emailError } = await supabase.functions.invoke("send-transactional-email", {
-        body: {
-          templateName: "shop-order-shipped",
-          recipientEmail: order!.customer_email,
-          idempotencyKey: `shop-shipped-${order!.id}-${tracking.trim()}`,
-          templateData: {
-            customerName: order!.customer_name || undefined,
-            productName,
-            productSize: snap.size || null,
-            carrier: carrier.trim() || undefined,
-            trackingNumber: tracking.trim(),
-            trackingUrl: trackingUrlFor(carrier, tracking.trim()),
-            orderUrl: `${origin}/account`,
-          },
-        },
-      });
-      if (emailError) {
-        toast.warning("Marked shipped, but email failed to send", { description: emailError.message });
-      } else {
-        toast.success("Marked shipped — tracking email sent");
-      }
-    } catch (e: any) {
-      toast.warning("Marked shipped, but email failed to send", { description: e?.message });
-    }
+    const sent = await sendShippedEmail(order!, carrier, tracking);
+    if (sent.ok) toast.success("Marked shipped — tracking email sent");
+    else toast.warning("Marked shipped, but email failed to send", { description: sent.error });
 
     setSaving(false);
     onSaved();
+  }
+
+  async function resendShipped() {
+    if (!tracking.trim()) {
+      toast.error("Enter a tracking number before resending");
+      return;
+    }
+    setSaving(true);
+    const sent = await sendShippedEmail(order!, carrier, tracking, true);
+    setSaving(false);
+    if (sent.ok) toast.success(`Resent to ${order!.customer_email}`);
+    else toast.error("Failed to resend email", { description: sent.error });
   }
 
   async function saveStatus() {
@@ -382,9 +367,15 @@ function OrderDialog({
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={onClose} disabled={saving}>Close</Button>
           <Button variant="outline" onClick={saveStatus} disabled={saving}>Save changes</Button>
-          <Button onClick={markShipped} disabled={saving || !tracking.trim()}>
-            <Truck className="w-4 h-4 mr-1" /> Mark shipped
-          </Button>
+          {order.status === "shipped" ? (
+            <Button onClick={resendShipped} disabled={saving || !tracking.trim()}>
+              <Send className="w-4 h-4 mr-1" /> Resend email
+            </Button>
+          ) : (
+            <Button onClick={markShipped} disabled={saving || !tracking.trim()}>
+              <Truck className="w-4 h-4 mr-1" /> Mark shipped
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
