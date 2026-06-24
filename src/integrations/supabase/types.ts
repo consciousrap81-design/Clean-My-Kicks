@@ -37,6 +37,7 @@ export type Database = {
           status: Database["public"]["Enums"]["request_status"]
           submitted_at: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           accepted_quote_id?: string | null
@@ -60,6 +61,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["request_status"]
           submitted_at?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           accepted_quote_id?: string | null
@@ -83,6 +85,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["request_status"]
           submitted_at?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -111,6 +114,7 @@ export type Database = {
           notes: string | null
           phone: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -121,6 +125,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -131,6 +136,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -231,6 +237,7 @@ export type Database = {
       }
       job_photos: {
         Row: {
+          customer_visible: boolean
           id: string
           job_id: string
           kind: string
@@ -238,6 +245,7 @@ export type Database = {
           url: string
         }
         Insert: {
+          customer_visible?: boolean
           id?: string
           job_id: string
           kind: string
@@ -245,6 +253,7 @@ export type Database = {
           url: string
         }
         Update: {
+          customer_visible?: boolean
           id?: string
           job_id?: string
           kind?: string
@@ -254,6 +263,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "job_photos_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_updates: {
+        Row: {
+          author_id: string | null
+          body: string
+          created_at: string
+          customer_visible: boolean
+          id: string
+          job_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          created_at?: string
+          customer_visible?: boolean
+          id?: string
+          job_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          customer_visible?: boolean
+          id?: string
+          job_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_updates_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
@@ -279,6 +326,7 @@ export type Database = {
           shoe_model: string | null
           status: Database["public"]["Enums"]["job_status"]
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           admin_notes?: string | null
@@ -297,6 +345,7 @@ export type Database = {
           shoe_model?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           admin_notes?: string | null
@@ -315,6 +364,7 @@ export type Database = {
           shoe_model?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -365,31 +415,62 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          currency: string
+          customer_id: string | null
           id: string
-          job_id: string
+          job_id: string | null
+          kind: Database["public"]["Enums"]["payment_kind"]
           method: string | null
           notes: string | null
           paid_at: string
+          quote_id: string | null
+          status: string
+          stripe_payment_intent: string | null
+          stripe_session_id: string | null
+          user_id: string | null
         }
         Insert: {
           amount: number
           created_at?: string
+          currency?: string
+          customer_id?: string | null
           id?: string
-          job_id: string
+          job_id?: string | null
+          kind?: Database["public"]["Enums"]["payment_kind"]
           method?: string | null
           notes?: string | null
           paid_at?: string
+          quote_id?: string | null
+          status?: string
+          stripe_payment_intent?: string | null
+          stripe_session_id?: string | null
+          user_id?: string | null
         }
         Update: {
           amount?: number
           created_at?: string
+          currency?: string
+          customer_id?: string | null
           id?: string
-          job_id?: string
+          job_id?: string | null
+          kind?: Database["public"]["Enums"]["payment_kind"]
           method?: string | null
           notes?: string | null
           paid_at?: string
+          quote_id?: string | null
+          status?: string
+          stripe_payment_intent?: string | null
+          stripe_session_id?: string | null
+          user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payments_job_id_fkey"
             columns: ["job_id"]
@@ -397,21 +478,31 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "payments_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       quotes: {
         Row: {
           addons: Json
+          allow_deposit: boolean
           created_at: string
           customer_email: string | null
           customer_name: string
           customer_phone: string | null
           customer_response: string | null
+          deposit_amount: number | null
           expires_at: string | null
           first_viewed_at: string | null
           id: string
           last_viewed_at: string | null
           notes: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"]
           photos: string[]
           public_token: string
           quote_amount: number
@@ -423,20 +514,24 @@ export type Database = {
           shoe_model: string | null
           status: Database["public"]["Enums"]["quote_status"]
           updated_at: string
+          user_id: string | null
           view_count: number
         }
         Insert: {
           addons?: Json
+          allow_deposit?: boolean
           created_at?: string
           customer_email?: string | null
           customer_name: string
           customer_phone?: string | null
           customer_response?: string | null
+          deposit_amount?: number | null
           expires_at?: string | null
           first_viewed_at?: string | null
           id?: string
           last_viewed_at?: string | null
           notes?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
           photos?: string[]
           public_token?: string
           quote_amount?: number
@@ -448,20 +543,24 @@ export type Database = {
           shoe_model?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
           updated_at?: string
+          user_id?: string | null
           view_count?: number
         }
         Update: {
           addons?: Json
+          allow_deposit?: boolean
           created_at?: string
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string | null
           customer_response?: string | null
+          deposit_amount?: number | null
           expires_at?: string | null
           first_viewed_at?: string | null
           id?: string
           last_viewed_at?: string | null
           notes?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
           photos?: string[]
           public_token?: string
           quote_amount?: number
@@ -473,6 +572,7 @@ export type Database = {
           shoe_model?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
           updated_at?: string
+          user_id?: string | null
           view_count?: number
         }
         Relationships: [
@@ -577,6 +677,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      link_customer_user: {
+        Args: { _email: string; _user_id: string }
+        Returns: undefined
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -596,7 +700,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "customer"
       job_status:
         | "new_request"
         | "awaiting_shoes"
@@ -607,6 +711,7 @@ export type Database = {
         | "shipped"
         | "picked_up"
         | "cancelled"
+      payment_kind: "deposit" | "full" | "balance" | "manual"
       payment_status: "unpaid" | "partial" | "paid" | "refunded"
       quote_status:
         | "draft"
@@ -743,7 +848,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "customer"],
       job_status: [
         "new_request",
         "awaiting_shoes",
@@ -755,6 +860,7 @@ export const Constants = {
         "picked_up",
         "cancelled",
       ],
+      payment_kind: ["deposit", "full", "balance", "manual"],
       payment_status: ["unpaid", "partial", "paid", "refunded"],
       quote_status: [
         "draft",
