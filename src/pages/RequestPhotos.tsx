@@ -39,6 +39,7 @@ export default function RequestPhotos() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "uploading" | "finalizing">("idle");
   const [uploadedCount, setUploadedCount] = useState(0);
+  const [cancelling, setCancelling] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cancelRef = useRef(false);
 
@@ -88,6 +89,7 @@ export default function RequestPhotos() {
 
   function cancelUpload() {
     cancelRef.current = true;
+    setCancelling(true);
   }
 
   function setPhotoStatus(idx: number, patch: Partial<Pending>) {
@@ -170,6 +172,7 @@ export default function RequestPhotos() {
       }
     } finally {
       cancelRef.current = false;
+      setCancelling(false);
       setSubmitting(false);
       setPhase("idle");
     }
@@ -327,10 +330,10 @@ export default function RequestPhotos() {
                     size="sm"
                     className="w-full text-muted-foreground"
                     onClick={cancelUpload}
-                    disabled={cancelRef.current || phase === "finalizing"}
+                    disabled={cancelling || phase === "finalizing"}
                   >
                     <X className="h-4 w-4 mr-2" />
-                    {cancelRef.current ? "Cancelling…" : "Cancel upload"}
+                    {cancelling ? "Cancelling…" : "Cancel upload"}
                   </Button>
                 </div>
               )}
