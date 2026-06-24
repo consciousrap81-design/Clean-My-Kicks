@@ -197,6 +197,28 @@ export default function ShopPage() {
       {/* Filters + grid */}
       <section className="py-10 md:py-16">
         <div className="container px-4">
+          {/* Search */}
+          <div className="relative mb-4 max-w-xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by brand, model, or keyword…"
+              className="pl-9 pr-9 h-11"
+              aria-label="Search products"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
           {/* Brand chips */}
           <div className="flex flex-wrap gap-2 mb-4">
             {brandOptions.map((b) => (
