@@ -263,6 +263,16 @@ export default function ShopOrderDetail() {
           )}
         </CardContent>
       </Card>
+
+      {order.product_id && (
+        <WriteReviewDialog
+          open={reviewOpen}
+          onOpenChange={setReviewOpen}
+          productId={order.product_id}
+          productName={display}
+          defaultName={order.customer_name || undefined}
+        />
+      )}
     </div>
   );
 }
