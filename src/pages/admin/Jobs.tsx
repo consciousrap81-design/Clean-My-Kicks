@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Plus, Search } from "lucide-react";
 export default function Jobs() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("all");
+  const queryClient = useQueryClient();
 
   const { data: jobs, isLoading } = useQuery({
     queryKey: ["jobs", status],
@@ -26,6 +27,16 @@ export default function Jobs() {
       return data;
     },
   });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-jobs-list")
+      .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const filtered = (jobs || []).filter((j: any) => {
     if (!q) return true;
