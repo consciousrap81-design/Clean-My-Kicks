@@ -24,30 +24,20 @@ export default function RecoverCart() {
         setState({ kind: "error", message: "Missing recovery token." });
         return;
       }
-      const { data, error } = await supabase.functions.invoke("recover-shop-cart", {
-        method: "GET",
-        body: undefined,
-        // pass token via query string
-      } as any);
-      if (cancelled) return;
-      // supabase-js doesn't support query strings on invoke cleanly — fall back to a direct fetch
-      if (error || !data) {
-        try {
-          const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/recover-shop-cart?token=${encodeURIComponent(token)}`;
-          const resp = await fetch(url, {
-            headers: {
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            },
-          });
-          const json = await resp.json();
-          handle(json);
-        } catch (e: any) {
-          setState({ kind: "error", message: e?.message || "Could not reach recovery service." });
-        }
-        return;
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/recover-shop-cart?token=${encodeURIComponent(token)}`;
+        const resp = await fetch(url, {
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+        });
+        const payload = await resp.json();
+        if (cancelled) return;
+        handle(payload);
+      } catch (e: any) {
+        if (!cancelled) setState({ kind: "error", message: e?.message || "Could not reach recovery service." });
       }
-      handle(data);
     }
 
     function handle(payload: any) {
