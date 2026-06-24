@@ -19,6 +19,7 @@ import Settings from "./pages/admin/Settings";
 import Requests from "./pages/admin/Requests";
 import Quotes from "./pages/admin/Quotes";
 import QuoteView from "./pages/QuoteView";
+import Unsubscribe from "./pages/Unsubscribe";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/quote/:token" element={<QuoteView />} />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
               <Route index element={<Dashboard />} />
               <Route path="requests" element={<Requests />} />
