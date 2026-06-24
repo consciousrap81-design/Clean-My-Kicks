@@ -101,11 +101,12 @@ export default function RequestPhotos() {
   }
 
   async function uploadAll(current: Pending[]) {
-    // Folder MUST be the booking request id — the storage RLS policy verifies
-    // the upload path's first segment matches a real booking_requests row that
-    // is still accepting photos. Random UUIDs will be rejected.
-    const folder = info?.id;
-    if (!folder) throw new Error("Missing request id");
+    // Folder MUST be the booking request's secret public token — the storage
+    // RLS policy verifies the path's first segment matches a real booking
+    // request that is still accepting photos. Without the token (which is
+    // only known to the recipient of the upload link), uploads are rejected.
+    const folder = token;
+    if (!folder) throw new Error("Missing upload token");
     const paths: string[] = [];
     let completed = current.filter((p) => p.status === "done" && p.path).length;
     setUploadedCount(completed);
