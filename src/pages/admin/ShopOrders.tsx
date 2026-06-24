@@ -15,13 +15,14 @@ import {
 import { Package, Truck, Mail, MapPin, ExternalLink, Send } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { trackingUrlFor, carrierLabel } from "@/lib/tracking";
+import { trackingUrlFor, carrierLabel, detectCarrierFromTracking } from "@/lib/tracking";
 
 async function sendShippedEmail(
   order: Order,
   carrier: string,
   tracking: string,
   forceNew = false,
+  customUrl?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const snap = order.product_snapshot || {};
@@ -30,6 +31,7 @@ async function sendShippedEmail(
     const origin = window.location.origin;
     const base = `shop-shipped-${order.id}-${tracking.trim()}`;
     const idempotencyKey = forceNew ? `${base}-resend-${Date.now()}` : base;
+    const url = (customUrl?.trim() || trackingUrlFor(carrier, tracking.trim())) || undefined;
     const { error } = await supabase.functions.invoke("send-transactional-email", {
       body: {
         templateName: "shop-order-shipped",
@@ -39,9 +41,9 @@ async function sendShippedEmail(
           customerName: order.customer_name || undefined,
           productName,
           productSize: snap.size || null,
-          carrier: carrierLabel(carrier, tracking.trim()) || undefined,
+          carrier: (carrier?.trim() || carrierLabel(carrier, tracking.trim())) || undefined,
           trackingNumber: tracking.trim(),
-          trackingUrl: trackingUrlFor(carrier, tracking.trim()),
+          trackingUrl: url,
           orderUrl: `${origin}/account`,
         },
       },
