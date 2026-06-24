@@ -16,7 +16,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Package, Truck, Mail, MapPin, ExternalLink, Send } from "lucide-react";
+import { Package, Truck, Mail, MapPin, ExternalLink, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { trackingUrlFor, carrierLabel, detectCarrierFromTracking } from "@/lib/tracking";
@@ -27,7 +27,7 @@ async function sendShippedEmail(
   tracking: string,
   forceNew = false,
   customUrl?: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; messageId?: string; idempotencyKey?: string }> {
   try {
     const snap = order.product_snapshot || {};
     const productName =
@@ -36,7 +36,7 @@ async function sendShippedEmail(
     const base = `shop-shipped-${order.id}-${tracking.trim()}`;
     const idempotencyKey = forceNew ? `${base}-resend-${Date.now()}` : base;
     const url = (customUrl?.trim() || trackingUrlFor(carrier, tracking.trim())) || undefined;
-    const { error } = await supabase.functions.invoke("send-transactional-email", {
+    const { data, error } = await supabase.functions.invoke("send-transactional-email", {
       body: {
         templateName: "shop-order-shipped",
         recipientEmail: order.customer_email,
@@ -53,7 +53,11 @@ async function sendShippedEmail(
       },
     });
     if (error) return { ok: false, error: error.message };
-    return { ok: true };
+    return {
+      ok: true,
+      messageId: (data as any)?.message_id,
+      idempotencyKey: (data as any)?.idempotency_key,
+    };
   } catch (e: any) {
     return { ok: false, error: e?.message || "Unknown error" };
   }
@@ -215,6 +219,14 @@ function OrderDialog({
   const [customCarrier, setCustomCarrier] = useState("");
   const [customUrl, setCustomUrl] = useState("");
   const [confirmMode, setConfirmMode] = useState<null | "mark" | "resend">(null);
+  const [sending, setSending] = useState(false);
+
+  function copyId(id: string) {
+    navigator.clipboard.writeText(id).then(
+      () => toast.success("Message ID copied"),
+      () => toast.error("Copy failed"),
+    );
+  }
 
   const PRESETS = ["USPS", "UPS", "FedEx", "DHL"];
 
@@ -255,6 +267,8 @@ function OrderDialog({
       return;
     }
     setSaving(true);
+    setSending(true);
+    const t = toast.loading("Marking shipped and sending tracking email…");
     const shippedAt = new Date().toISOString();
     const { error } = await supabase
       .from("shop_orders")
@@ -267,14 +281,29 @@ function OrderDialog({
       .eq("id", order!.id);
     if (error) {
       setSaving(false);
-      return toast.error(error.message);
+      setSending(false);
+      toast.error("Failed to mark shipped", { id: t, description: error.message });
+      return;
     }
 
     const sent = await sendShippedEmail(order!, effectiveCarrier, tracking, false, customUrl);
-    if (sent.ok) toast.success("Marked shipped — tracking email sent");
-    else toast.warning("Marked shipped, but email failed to send", { description: sent.error });
+    if (sent.ok) {
+      toast.success("Marked shipped — tracking email queued", {
+        id: t,
+        description: sent.messageId ? `Message ID: ${sent.messageId}` : undefined,
+        action: sent.messageId ? { label: "Copy ID", onClick: () => copyId(sent.messageId!) } : undefined,
+        duration: 8000,
+      });
+    } else {
+      toast.warning("Marked shipped, but email failed to send", {
+        id: t,
+        description: sent.error,
+        duration: 10000,
+      });
+    }
 
     setSaving(false);
+    setSending(false);
     onSaved();
   }
 
@@ -284,10 +313,25 @@ function OrderDialog({
       return;
     }
     setSaving(true);
+    setSending(true);
+    const t = toast.loading(`Resending shipping email to ${order!.customer_email}…`);
     const sent = await sendShippedEmail(order!, effectiveCarrier, tracking, true, customUrl);
     setSaving(false);
-    if (sent.ok) toast.success(`Resent to ${order!.customer_email}`);
-    else toast.error("Failed to resend email", { description: sent.error });
+    setSending(false);
+    if (sent.ok) {
+      toast.success(`Resent to ${order!.customer_email}`, {
+        id: t,
+        description: sent.messageId ? `Message ID: ${sent.messageId}` : undefined,
+        action: sent.messageId ? { label: "Copy ID", onClick: () => copyId(sent.messageId!) } : undefined,
+        duration: 8000,
+      });
+    } else {
+      toast.error("Failed to resend email", {
+        id: t,
+        description: sent.error,
+        duration: 10000,
+      });
+    }
   }
 
   function requestConfirm(mode: "mark" | "resend") {
@@ -300,9 +344,9 @@ function OrderDialog({
 
   async function handleConfirm() {
     const mode = confirmMode;
-    setConfirmMode(null);
     if (mode === "mark") await runMarkShipped();
     else if (mode === "resend") await runResendShipped();
+    setConfirmMode(null);
   }
 
   async function saveStatus() {
@@ -510,9 +554,14 @@ function OrderDialog({
             </div>
 
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirm} disabled={saving}>
-                {confirmMode === "resend" ? "Resend email" : "Mark shipped & send"}
+              <AlertDialogCancel disabled={sending}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => { e.preventDefault(); handleConfirm(); }}
+                disabled={sending}
+              >
+                {sending ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending…</>
+                ) : confirmMode === "resend" ? "Resend email" : "Mark shipped & send"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
