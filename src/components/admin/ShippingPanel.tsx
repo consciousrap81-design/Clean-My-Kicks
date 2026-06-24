@@ -4,7 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ExternalLink, Truck } from "lucide-react";
+import { Loader2, ExternalLink, Truck, History } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { toast } from "sonner";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -119,10 +124,63 @@ export function ShippingPanel({ jobId }: { jobId: string }) {
                   {s.rate_cents != null && <span>${(s.rate_cents / 100).toFixed(2)}</span>}
                 </div>
               )}
+              {s && <EventHistory shipmentId={s.id} />}
             </div>
           );
         })}
       </CardContent>
     </Card>
+  );
+}
+
+function EventHistory({ shipmentId }: { shipmentId: string }) {
+  const [open, setOpen] = useState(false);
+  const { data: events = [], isLoading } = useQuery({
+    queryKey: ["shipment-events", shipmentId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("shipment_events")
+        .select("id, occurred_at, status, status_detail, location")
+        .eq("shipment_id", shipmentId)
+        .order("occurred_at", { ascending: false });
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+          <History className="h-3 w-3 mr-1" />
+          {open ? "Hide" : "Show"} event history
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2">
+        {isLoading ? (
+          <div className="text-xs text-muted-foreground">Loading…</div>
+        ) : events.length === 0 ? (
+          <div className="text-xs text-muted-foreground">No events recorded yet.</div>
+        ) : (
+          <ol className="space-y-2 border-l pl-3">
+            {events.map((e: any) => (
+              <li key={e.id} className="text-xs">
+                <div className="font-medium">
+                  {e.status || "update"}
+                  <span className="text-muted-foreground font-normal">
+                    {" · "}
+                    {new Date(e.occurred_at).toLocaleString("en-US", {
+                      month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+                {e.status_detail && <div className="text-muted-foreground">{e.status_detail}</div>}
+                {e.location && <div className="text-muted-foreground">{e.location}</div>}
+              </li>
+            ))}
+          </ol>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
