@@ -254,7 +254,7 @@ function OrderDialog({
       order_id: order.id,
       event_type: eventType,
       message,
-      metadata,
+      metadata: metadata as any,
       actor_user_id: u.user?.id ?? null,
     });
     qc.invalidateQueries({ queryKey: ["shop-order-events", order.id] });
