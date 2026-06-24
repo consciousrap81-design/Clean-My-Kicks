@@ -118,9 +118,12 @@ const Contact = forwardRef<HTMLElement>((_, ref) => {
               <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-primary/20 flex items-center justify-center mb-4 md:mb-6">
                 <CheckCircle className="w-7 h-7 md:w-8 md:h-8 text-primary" />
               </div>
-              <h3 className="font-display text-xl md:text-2xl text-foreground mb-2 md:mb-3">Request Sent!</h3>
+              <h3 className="font-display text-xl md:text-2xl text-foreground mb-2 md:mb-3">
+                Request Received
+              </h3>
               <p className="font-body text-sm md:text-base text-muted-foreground mb-4 md:mb-6 max-w-md">
-                Request sent — we'll contact you soon.
+                Thanks for booking with Clean My Kicks. Your request is in — a team member
+                will follow up within 24 hours with a quote and next steps.
               </p>
               <Button variant="outline" onClick={resetForm}>
                 Submit Another Request
