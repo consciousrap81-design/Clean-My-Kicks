@@ -28,17 +28,32 @@ async function shippoGet(path: string) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const ok = (extra: Record<string, unknown> = {}) =>
+    new Response(JSON.stringify({ ok: true, ...extra }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   try {
-    const event = await req.json();
+    // Always respond 2XX to Shippo. Log failures instead of returning 500,
+    // otherwise Shippo marks the webhook as failing (incl. on Send Sample).
+    let event: any = {};
+    try { event = await req.json(); } catch { return ok({ ignored: "no_json" }); }
+
     // Shippo "Track Updated" payload: { event, test, data: { tracking_number, carrier, tracking_status, ... } }
     const carrier: string | undefined = event?.data?.carrier;
     const trackingNumber: string | undefined = event?.data?.tracking_number;
     if (!carrier || !trackingNumber) {
-      return new Response(JSON.stringify({ ok: true, ignored: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return ok({ ignored: "missing_fields", test: !!event?.test });
     }
 
-    // Re-fetch from Shippo for authenticity
-    const verified = await shippoGet(`/tracks/${carrier}/${encodeURIComponent(trackingNumber)}`);
+    // Re-fetch from Shippo for authenticity. Sample/test events reference
+    // fake tracking numbers, so swallow fetch errors as a 2XX ack.
+    let verified: any;
+    try {
+      verified = await shippoGet(`/tracks/${carrier}/${encodeURIComponent(trackingNumber)}`);
+    } catch (err) {
+      console.error("shippo re-fetch failed", (err as Error).message);
+      return ok({ ignored: "refetch_failed", test: !!event?.test });
+    }
     const trackingStatus = verified?.tracking_status?.status as string | undefined;
     const mapped = (trackingStatus && STATUS_MAP[trackingStatus]) || "in_transit";
     const eventAt = verified?.tracking_status?.status_date || new Date().toISOString();
@@ -52,7 +67,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!shipment) {
-      return new Response(JSON.stringify({ ok: true, unknown_shipment: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return ok({ unknown_shipment: true });
     }
 
     if (shipment.status !== mapped) {
@@ -79,8 +94,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return ok();
   } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    console.error("shippo-webhook error", (e as Error).message);
+    return ok({ error_logged: true });
   }
 });
