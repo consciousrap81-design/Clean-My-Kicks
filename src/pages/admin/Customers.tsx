@@ -1,8 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function Customers() {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["customers"],
     queryFn: async () => {
@@ -14,6 +16,16 @@ export default function Customers() {
       return data;
     },
   });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-customers-list")
+      .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   return (
     <div className="space-y-4">
