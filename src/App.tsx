@@ -22,6 +22,7 @@ import Quotes from "./pages/admin/Quotes";
 import Products from "./pages/admin/Products";
 import ProductEdit from "./pages/admin/ProductEdit";
 import ShopOrders from "./pages/admin/ShopOrders";
+import AbandonedCarts from "./pages/admin/AbandonedCarts";
 import QuoteView from "./pages/QuoteView";
 import ProductDetail from "./pages/ProductDetail";
 import ShopOrderSuccess from "./pages/ShopOrderSuccess";
@@ -72,6 +73,7 @@ const App = () => (
               <Route path="products/new" element={<ProductEdit />} />
               <Route path="products/:id" element={<ProductEdit />} />
               <Route path="shop-orders" element={<ShopOrders />} />
+              <Route path="abandoned-carts" element={<AbandonedCarts />} />
               <Route path="settings" element={<Settings />} />
               <Route path="email-preview" element={<EmailPreview />} />
             </Route>
