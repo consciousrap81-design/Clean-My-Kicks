@@ -15,23 +15,7 @@ import {
 import { Package, Truck, Mail, MapPin, ExternalLink, Send } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-
-function trackingUrlFor(carrier: string | null | undefined, tracking: string): string | undefined {
-  if (!tracking) return undefined;
-  const t = encodeURIComponent(tracking.trim());
-  switch ((carrier || "").toLowerCase()) {
-    case "usps":
-      return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${t}`;
-    case "ups":
-      return `https://www.ups.com/track?tracknum=${t}`;
-    case "fedex":
-      return `https://www.fedex.com/fedextrack/?trknbr=${t}`;
-    case "dhl":
-      return `https://www.dhl.com/en/express/tracking.html?AWB=${t}`;
-    default:
-      return undefined;
-  }
-}
+import { trackingUrlFor, carrierLabel } from "@/lib/tracking";
 
 async function sendShippedEmail(
   order: Order,
@@ -55,7 +39,7 @@ async function sendShippedEmail(
           customerName: order.customer_name || undefined,
           productName,
           productSize: snap.size || null,
-          carrier: carrier.trim() || undefined,
+          carrier: carrierLabel(carrier, tracking.trim()) || undefined,
           trackingNumber: tracking.trim(),
           trackingUrl: trackingUrlFor(carrier, tracking.trim()),
           orderUrl: `${origin}/account`,
