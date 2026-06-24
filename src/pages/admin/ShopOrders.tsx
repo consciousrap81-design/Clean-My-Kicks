@@ -63,6 +63,80 @@ async function sendShippedEmail(
   }
 }
 
+function productNameOf(order: Order) {
+  const snap = order.product_snapshot || {};
+  return [snap.brand, snap.model].filter(Boolean).join(" ") || snap.name || "your sneakers";
+}
+
+async function sendTrackingUpdatedEmail(
+  order: Order,
+  prevCarrier: string | null,
+  prevTracking: string | null,
+  carrier: string,
+  tracking: string,
+  customUrl?: string,
+): Promise<{ ok: boolean; error?: string; messageId?: string }> {
+  try {
+    const snap = order.product_snapshot || {};
+    const origin = window.location.origin;
+    const url = (customUrl?.trim() || trackingUrlFor(carrier, tracking.trim())) || undefined;
+    const idempotencyKey = `shop-tracking-${order.id}-${tracking.trim()}-${carrier || "x"}`;
+    const { data, error } = await supabase.functions.invoke("send-transactional-email", {
+      body: {
+        templateName: "shop-order-tracking-updated",
+        recipientEmail: order.customer_email,
+        idempotencyKey,
+        templateData: {
+          customerName: order.customer_name || undefined,
+          productName: productNameOf(order),
+          productSize: snap.size || null,
+          previousCarrier: prevCarrier || null,
+          previousTrackingNumber: prevTracking || null,
+          carrier: (carrier?.trim() || carrierLabel(carrier, tracking.trim())) || undefined,
+          trackingNumber: tracking.trim(),
+          trackingUrl: url,
+          orderUrl: `${origin}/account`,
+        },
+      },
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, messageId: (data as any)?.message_id };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Unknown error" };
+  }
+}
+
+async function sendStatusChangedEmail(
+  order: Order,
+  fromStatus: string,
+  toStatus: string,
+): Promise<{ ok: boolean; error?: string; messageId?: string }> {
+  try {
+    const snap = order.product_snapshot || {};
+    const origin = window.location.origin;
+    const idempotencyKey = `shop-status-${order.id}-${toStatus}`;
+    const { data, error } = await supabase.functions.invoke("send-transactional-email", {
+      body: {
+        templateName: "shop-order-status-changed",
+        recipientEmail: order.customer_email,
+        idempotencyKey,
+        templateData: {
+          customerName: order.customer_name || undefined,
+          productName: productNameOf(order),
+          productSize: snap.size || null,
+          fromStatus,
+          toStatus,
+          orderUrl: `${origin}/account`,
+        },
+      },
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, messageId: (data as any)?.message_id };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Unknown error" };
+  }
+}
+
 type Order = {
   id: string;
   product_id: string | null;
