@@ -2,3 +2,9 @@ project_id = "xxuyhpszppnjdrmfdylv"
 
 [functions.submit-booking]
 verify_jwt = false
+
+[functions.quote-view]
+verify_jwt = false
+
+[functions.quote-respond]
+verify_jwt = false
