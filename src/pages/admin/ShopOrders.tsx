@@ -508,6 +508,32 @@ function OrderDialog({
         from: order!.status,
         to: status,
       });
+      const notifyStatuses = new Set(["delivered", "cancelled", "refunded"]);
+      if (notifyStatuses.has(status) && order!.customer_email) {
+        const sent = await sendStatusChangedEmail(order!, order!.status, status);
+        if (sent.ok) {
+          toast.success(`Status email sent to ${order!.customer_email}`, {
+            description: sent.messageId ? `Message ID: ${sent.messageId}` : undefined,
+            action: sent.messageId ? { label: "Copy ID", onClick: () => copyId(sent.messageId!) } : undefined,
+            duration: 8000,
+          });
+          await logEvent("email_resent", `Status email sent (${status})`, {
+            recipient: order!.customer_email,
+            message_id: sent.messageId,
+            status_to: status,
+            status_from: order!.status,
+          });
+        } else {
+          toast.warning("Status updated, but email failed to send", {
+            description: sent.error,
+            duration: 10000,
+          });
+          await logEvent("email_failed", `Status email failed (${status})`, {
+            recipient: order!.customer_email,
+            error: sent.error,
+          });
+        }
+      }
     }
     if (carrierChanged || trackingChanged) {
       await logEvent(
@@ -521,6 +547,40 @@ function OrderDialog({
           tracking_url: previewUrl || null,
         },
       );
+      const wasShipped = !!order!.shipped_at || order!.status === "shipped" || order!.status === "delivered";
+      if (wasShipped && tracking.trim() && order!.customer_email) {
+        const sent = await sendTrackingUpdatedEmail(
+          order!,
+          order!.tracking_carrier,
+          order!.tracking_number,
+          effectiveCarrier,
+          tracking,
+          customUrl,
+        );
+        if (sent.ok) {
+          toast.success(`Tracking update email sent to ${order!.customer_email}`, {
+            description: sent.messageId ? `Message ID: ${sent.messageId}` : undefined,
+            action: sent.messageId ? { label: "Copy ID", onClick: () => copyId(sent.messageId!) } : undefined,
+            duration: 8000,
+          });
+          await logEvent("email_resent", "Tracking update email sent", {
+            recipient: order!.customer_email,
+            message_id: sent.messageId,
+            carrier: effectiveCarrier || null,
+            tracking_number: tracking.trim(),
+            tracking_url: previewUrl || null,
+          });
+        } else {
+          toast.warning("Tracking saved, but email failed to send", {
+            description: sent.error,
+            duration: 10000,
+          });
+          await logEvent("email_failed", "Tracking update email failed", {
+            recipient: order!.customer_email,
+            error: sent.error,
+          });
+        }
+      }
     }
 
     toast.success("Order updated");
