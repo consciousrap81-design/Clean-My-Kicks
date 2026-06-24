@@ -6,6 +6,20 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SHIPPO = "https://api.goshippo.com";
 
+async function signShipmentId(shipmentId: string): Promise<string | null> {
+  const secret = Deno.env.get("SHIPMENT_TOKEN_SECRET");
+  if (!secret) return null;
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(shipmentId));
+  const b = new Uint8Array(sig); let s = "";
+  for (const x of b) s += String.fromCharCode(x);
+  const b64 = btoa(s).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+  return `${shipmentId}.${b64}`;
+}
+
 const STATUS_MAP: Record<string, string> = {
   UNKNOWN: "label_created",
   PRE_TRANSIT: "label_created",
@@ -164,6 +178,8 @@ Deno.serve(async (req) => {
           if (to) {
             const origin = Deno.env.get("PUBLIC_SITE_URL") || "https://cleanmykicks.com";
             const trackPageUrl = `${origin}/track?n=${encodeURIComponent(trackingNumber)}`;
+            const signed = await signShipmentId(shipment.id);
+            const manageUrl = signed ? `${origin}/track?u=${encodeURIComponent(signed)}` : trackPageUrl;
             await admin.functions.invoke("send-transactional-email", {
               body: {
                 templateName: "shipment-update",
@@ -180,7 +196,7 @@ Deno.serve(async (req) => {
                   eta,
                   etaChanged,
                   trackPageUrl,
-                  manageUrl: trackPageUrl,
+                  manageUrl,
                 },
               },
             });
