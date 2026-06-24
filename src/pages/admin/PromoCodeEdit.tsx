@@ -34,13 +34,13 @@ export default function PromoCodeEdit() {
       if (data) {
         setForm({
           code: data.code,
-          discount_type: data.discount_type,
+          discount_type: data.discount_type as "percent" | "fixed",
           amount: data.amount,
           min_subtotal_cents: data.min_subtotal_cents,
           max_redemptions: data.max_redemptions !== null ? String(data.max_redemptions) : "",
           expires_at: data.expires_at ? data.expires_at.slice(0, 16) : "",
           active: data.active,
-          applies_to: data.applies_to,
+          applies_to: data.applies_to as "all" | "accessories" | "sneakers",
         });
       }
       setLoading(false);
