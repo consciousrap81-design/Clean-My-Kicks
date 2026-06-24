@@ -212,23 +212,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh]);
 
-  // Realtime: react to accessory stock changes for any variant in this cart.
+  // Realtime: react to accessory stock changes for variants in this cart.
+  const variantIdsKey = items
+    .map((i) => i.accessory_variant_id)
+    .filter(Boolean)
+    .join(",");
   useEffect(() => {
-    const variantIds = items
-      .filter((i) => i.accessory_variant_id)
-      .map((i) => i.accessory_variant_id!) as string[];
-    if (!variantIds.length) return;
+    if (!variantIdsKey) return;
+    const variantIds = new Set(variantIdsKey.split(","));
     const channel = supabase
       .channel(`cart-stock-${cartId}`)
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "shop_accessory_variants", filter: `id=in.(${variantIds.join(",")})` },
-        () => { refresh(); },
+        { event: "UPDATE", schema: "public", table: "shop_accessory_variants" },
+        (payload) => {
+          const id = (payload.new as any)?.id;
+          if (id && variantIds.has(id)) refresh();
+        },
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.map((i) => i.accessory_variant_id).filter(Boolean).join(","), cartId]);
+  }, [variantIdsKey, cartId, refresh]);
 
   // Recompute discount whenever items change while a promo is applied.
   useEffect(() => {
