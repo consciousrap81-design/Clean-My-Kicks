@@ -97,6 +97,7 @@ const App = () => (
               <Route path="reviews" element={<AdminReviews />} />
               <Route path="settings" element={<Settings />} />
               <Route path="email-preview" element={<EmailPreview />} />
+              <Route path="status" element={<AdminStatus />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
