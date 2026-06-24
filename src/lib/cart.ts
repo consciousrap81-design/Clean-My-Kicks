@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, useRef, ReactNode, createElement } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { cartSupabase } from "./cartClient";
 
 const CART_KEY = "cmk_cart_id";
 
@@ -90,10 +91,10 @@ const RESERVE_MINUTES = 15;
 
 async function ensureCart(cartId: string) {
   // Ensure a cart row exists for this id.
-  const { data: existing } = await supabase.from("shop_carts").select("id").eq("id", cartId).maybeSingle();
+  const { data: existing } = await cartSupabase.from("shop_carts").select("id").eq("id", cartId).maybeSingle();
   if (!existing) {
     const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("shop_carts").insert({ id: cartId, user_id: user?.id ?? null }).select().single();
+    await cartSupabase.from("shop_carts").insert({ id: cartId, user_id: user?.id ?? null }).select().single();
   }
 }
 
@@ -116,7 +117,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     if (typeof window === "undefined") return;
     await ensureCart(cartId);
-    const { data: rows } = await supabase
+    const { data: rows } = await cartSupabase
       .from("shop_cart_items")
       .select("*")
       .eq("cart_id", cartId)
@@ -248,7 +249,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (eligible === 0) {
       // No longer applicable
       setPromo(null);
-      supabase.from("shop_carts").update({ applied_promo_code: null }).eq("id", cartId).then(() => {});
+      cartSupabase.from("shop_carts").update({ applied_promo_code: null }).eq("id", cartId).then(() => {});
       return;
     }
     const recomputed = promo.discount_type === "percent"
@@ -264,7 +265,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Load persisted promo on init
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
+      const { data } = await cartSupabase
         .from("shop_carts")
         .select("applied_promo_code")
         .eq("id", cartId)
@@ -301,7 +302,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .eq("id", productId);
     if (reserveErr) return { ok: false, error: reserveErr.message };
 
-    const { error } = await supabase
+    const { error } = await cartSupabase
       .from("shop_cart_items")
       .upsert(
         {
@@ -327,7 +328,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .eq("id", variantId)
       .maybeSingle();
     if (!v || !v.active) return { ok: false, error: "Unavailable" };
-    const { data: existing } = await supabase
+    const { data: existing } = await cartSupabase
       .from("shop_cart_items")
       .select("id, qty")
       .eq("cart_id", cartId)
@@ -336,10 +337,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const desiredQty = (existing?.qty ?? 0) + qty;
     if (desiredQty > v.stock_qty) return { ok: false, error: `Only ${v.stock_qty} in stock` };
     if (existing) {
-      const { error } = await supabase.from("shop_cart_items").update({ qty: desiredQty }).eq("id", existing.id);
+      const { error } = await cartSupabase.from("shop_cart_items").update({ qty: desiredQty }).eq("id", existing.id);
       if (error) return { ok: false, error: error.message };
     } else {
-      const { error } = await supabase.from("shop_cart_items").insert({
+      const { error } = await cartSupabase.from("shop_cart_items").insert({
         cart_id: cartId,
         item_type: "accessory",
         accessory_variant_id: variantId,
@@ -354,19 +355,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const updateQty = useCallback<CartCtx["updateQty"]>(async (itemId, qty) => {
     if (qty < 1) return removeItem(itemId);
-    await supabase.from("shop_cart_items").update({ qty }).eq("id", itemId);
+    await cartSupabase.from("shop_cart_items").update({ qty }).eq("id", itemId);
     await refresh();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
 
   const removeItem = useCallback<CartCtx["removeItem"]>(async (itemId) => {
     // If sneaker, release reservation
-    const { data: row } = await supabase
+    const { data: row } = await cartSupabase
       .from("shop_cart_items")
       .select("item_type, sneaker_product_id")
       .eq("id", itemId)
       .maybeSingle();
-    await supabase.from("shop_cart_items").delete().eq("id", itemId);
+    await cartSupabase.from("shop_cart_items").delete().eq("id", itemId);
     if (row?.item_type === "sneaker" && row.sneaker_product_id) {
       // Only release if reserved by us
       const { data: p } = await supabase
@@ -399,7 +400,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearPromo = useCallback<CartCtx["clearPromo"]>(async () => {
     setPromo(null);
-    await supabase.from("shop_carts").update({ applied_promo_code: null }).eq("id", cartId);
+    await cartSupabase.from("shop_carts").update({ applied_promo_code: null }).eq("id", cartId);
   }, [cartId]);
 
   const value: CartCtx = {
