@@ -9,7 +9,6 @@ import { Star } from "lucide-react";
 import { format } from "date-fns";
 import { trackingUrlFor, carrierLabel } from "@/lib/tracking";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import WriteReviewDialog from "@/components/shop/WriteReviewDialog";
 
 const STATUS_STYLES: Record<string, string> = {
