@@ -15,13 +15,14 @@ import {
 import { Package, Truck, Mail, MapPin, ExternalLink, Send } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { trackingUrlFor, carrierLabel } from "@/lib/tracking";
+import { trackingUrlFor, carrierLabel, detectCarrierFromTracking } from "@/lib/tracking";
 
 async function sendShippedEmail(
   order: Order,
   carrier: string,
   tracking: string,
   forceNew = false,
+  customUrl?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const snap = order.product_snapshot || {};
@@ -30,6 +31,7 @@ async function sendShippedEmail(
     const origin = window.location.origin;
     const base = `shop-shipped-${order.id}-${tracking.trim()}`;
     const idempotencyKey = forceNew ? `${base}-resend-${Date.now()}` : base;
+    const url = (customUrl?.trim() || trackingUrlFor(carrier, tracking.trim())) || undefined;
     const { error } = await supabase.functions.invoke("send-transactional-email", {
       body: {
         templateName: "shop-order-shipped",
@@ -39,9 +41,9 @@ async function sendShippedEmail(
           customerName: order.customer_name || undefined,
           productName,
           productSize: snap.size || null,
-          carrier: carrierLabel(carrier, tracking.trim()) || undefined,
+          carrier: (carrier?.trim() || carrierLabel(carrier, tracking.trim())) || undefined,
           trackingNumber: tracking.trim(),
-          trackingUrl: trackingUrlFor(carrier, tracking.trim()),
+          trackingUrl: url,
           orderUrl: `${origin}/account`,
         },
       },
@@ -206,15 +208,29 @@ function OrderDialog({
   const [tracking, setTracking] = useState("");
   const [status, setStatus] = useState("paid");
   const [saving, setSaving] = useState(false);
+  const [customCarrier, setCustomCarrier] = useState("");
+  const [customUrl, setCustomUrl] = useState("");
+
+  const PRESETS = ["USPS", "UPS", "FedEx", "DHL"];
 
   // Reset form when order changes
   useEffect(() => {
     if (order) {
-      setCarrier(order.tracking_carrier || "USPS");
+      const saved = order.tracking_carrier || "";
+      const isPreset = PRESETS.some((p) => p.toLowerCase() === saved.toLowerCase());
+      setCarrier(saved ? (isPreset ? PRESETS.find((p) => p.toLowerCase() === saved.toLowerCase())! : "Other") : "USPS");
+      setCustomCarrier(saved && !isPreset ? saved : "");
+      setCustomUrl("");
       setTracking(order.tracking_number || "");
       setStatus(order.status);
     }
   }, [order]);
+
+  // What we actually send to backend / email
+  const effectiveCarrier = carrier === "Other" ? customCarrier.trim() : carrier;
+  const autoDetected = tracking.trim() ? detectCarrierFromTracking(tracking.trim()) : null;
+  const autoDetectedLabel = autoDetected ? { usps: "USPS", ups: "UPS", fedex: "FedEx", dhl: "DHL" }[autoDetected] : null;
+  const previewUrl = customUrl.trim() || trackingUrlFor(effectiveCarrier, tracking.trim());
 
   if (!order) return null;
   const snap = order.product_snapshot || {};
@@ -239,7 +255,7 @@ function OrderDialog({
       .from("shop_orders")
       .update({
         status: "shipped",
-        tracking_carrier: carrier.trim() || null,
+        tracking_carrier: effectiveCarrier || null,
         tracking_number: tracking.trim(),
         shipped_at: shippedAt,
       })
@@ -249,7 +265,7 @@ function OrderDialog({
       return toast.error(error.message);
     }
 
-    const sent = await sendShippedEmail(order!, carrier, tracking);
+    const sent = await sendShippedEmail(order!, effectiveCarrier, tracking, false, customUrl);
     if (sent.ok) toast.success("Marked shipped — tracking email sent");
     else toast.warning("Marked shipped, but email failed to send", { description: sent.error });
 
@@ -263,7 +279,7 @@ function OrderDialog({
       return;
     }
     setSaving(true);
-    const sent = await sendShippedEmail(order!, carrier, tracking, true);
+    const sent = await sendShippedEmail(order!, effectiveCarrier, tracking, true, customUrl);
     setSaving(false);
     if (sent.ok) toast.success(`Resent to ${order!.customer_email}`);
     else toast.error("Failed to resend email", { description: sent.error });
@@ -277,7 +293,7 @@ function OrderDialog({
     }
     if (tracking.trim()) {
       patch.tracking_number = tracking.trim();
-      patch.tracking_carrier = carrier.trim() || null;
+      patch.tracking_carrier = effectiveCarrier || null;
     }
     const { error } = await supabase.from("shop_orders").update(patch).eq("id", order!.id);
     setSaving(false);
@@ -353,6 +369,52 @@ function OrderDialog({
                 <Input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="9400…" />
               </div>
             </div>
+
+            {carrier === "Other" && (
+              <div className="grid grid-cols-1 gap-2 pt-1">
+                <div>
+                  <Label className="text-xs">Custom carrier name</Label>
+                  <Input
+                    value={customCarrier}
+                    onChange={(e) => setCustomCarrier(e.target.value)}
+                    placeholder="e.g. OnTrac, LaserShip, Royal Mail"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Custom tracking URL (optional)</Label>
+                  <Input
+                    value={customUrl}
+                    onChange={(e) => setCustomUrl(e.target.value)}
+                    placeholder="https://carrier.com/track?id=..."
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Used as-is in the customer email. Leave blank to skip the tracking button.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {autoDetectedLabel && carrier !== autoDetectedLabel && (
+              <div className="text-[11px] text-muted-foreground flex items-center gap-2">
+                <span>Auto-detected: <span className="font-medium text-foreground">{autoDetectedLabel}</span></span>
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={() => { setCarrier(autoDetectedLabel); setCustomCarrier(""); setCustomUrl(""); }}
+                >
+                  Use this
+                </button>
+              </div>
+            )}
+
+            {previewUrl ? (
+              <div className="text-[11px] text-muted-foreground truncate">
+                Email link → <a href={previewUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">{previewUrl}</a>
+              </div>
+            ) : tracking.trim() ? (
+              <div className="text-[11px] text-amber-600">No tracking URL — email will omit the track button.</div>
+            ) : null}
+
             {order.shipped_at && (
               <div className="text-xs text-muted-foreground">
                 Shipped {format(new Date(order.shipped_at), "PPp")}
