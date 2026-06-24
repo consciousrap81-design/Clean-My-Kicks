@@ -612,6 +612,198 @@ export type Database = {
         }
         Relationships: []
       }
+      shop_orders: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          customer_email: string
+          customer_name: string | null
+          id: string
+          paid_at: string | null
+          product_id: string | null
+          product_snapshot: Json
+          shipped_at: string | null
+          shipping_address: Json | null
+          status: string
+          stripe_payment_intent: string | null
+          stripe_session_id: string | null
+          tracking_carrier: string | null
+          tracking_number: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          customer_email: string
+          customer_name?: string | null
+          id?: string
+          paid_at?: string | null
+          product_id?: string | null
+          product_snapshot: Json
+          shipped_at?: string | null
+          shipping_address?: Json | null
+          status?: string
+          stripe_payment_intent?: string | null
+          stripe_session_id?: string | null
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          customer_email?: string
+          customer_name?: string | null
+          id?: string
+          paid_at?: string | null
+          product_id?: string | null
+          product_snapshot?: Json
+          shipped_at?: string | null
+          shipping_address?: Json | null
+          status?: string
+          stripe_payment_intent?: string | null
+          stripe_session_id?: string | null
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_product_photos: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          product_id: string
+          sort_order: number
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          product_id: string
+          sort_order?: number
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          product_id?: string
+          sort_order?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_product_photos_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_product_views: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_product_views_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_products: {
+        Row: {
+          brand: string | null
+          condition: string | null
+          created_at: string
+          description: string | null
+          id: string
+          model: string | null
+          name: string
+          price: number
+          reserved_session_id: string | null
+          reserved_until: string | null
+          size: string | null
+          sold_at: string | null
+          sold_order_id: string | null
+          status: string
+          updated_at: string
+          view_count: number
+        }
+        Insert: {
+          brand?: string | null
+          condition?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          model?: string | null
+          name: string
+          price: number
+          reserved_session_id?: string | null
+          reserved_until?: string | null
+          size?: string | null
+          sold_at?: string | null
+          sold_order_id?: string | null
+          status?: string
+          updated_at?: string
+          view_count?: number
+        }
+        Update: {
+          brand?: string | null
+          condition?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          model?: string | null
+          name?: string
+          price?: number
+          reserved_session_id?: string | null
+          reserved_until?: string | null
+          size?: string | null
+          sold_at?: string | null
+          sold_order_id?: string | null
+          status?: string
+          updated_at?: string
+          view_count?: number
+        }
+        Relationships: []
+      }
       suppressed_emails: {
         Row: {
           created_at: string

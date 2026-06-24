@@ -29,3 +29,7 @@ project_id = "xxuyhpszppnjdrmfdylv"
     verify_jwt = false
   [functions.submit-booking]
     verify_jwt = false
+  [functions.create-shop-checkout]
+    verify_jwt = false
+  [functions.track-product-view]
+    verify_jwt = false
