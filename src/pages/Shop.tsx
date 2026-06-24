@@ -145,7 +145,7 @@ export default function ShopPage() {
     if (condition !== "All" && p.condition !== condition) return false;
     const q = query.trim().toLowerCase();
     if (q) {
-      const hay = [p.name, p.brand, p.model, p.colorway, p.description]
+      const hay = [p.name, p.brand, p.model, (p as any).colorway, p.description]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
