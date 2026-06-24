@@ -582,6 +582,58 @@ export default function Requests() {
                     </a>
                   </div>
                 )}
+
+                {/* Quote section */}
+                <div className="rounded-lg border p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <FileText className="h-4 w-4" />
+                      Quote
+                      {quote && (
+                        <Badge variant="outline" className="text-[10px] uppercase">
+                          {quote.status}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button size="sm" variant="outline" onClick={openQuoteDialog} disabled={busy}>
+                      <FileText className="h-4 w-4" />
+                      {quote ? "Edit Quote" : "Create Quote"}
+                    </Button>
+                  </div>
+                  {quote ? (
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <div>
+                        Amount: <span className="text-foreground font-medium">${Number(quote.quote_amount).toFixed(2)}</span>
+                        {quote.expires_at && <> · Expires {new Date(quote.expires_at).toLocaleDateString()}</>}
+                      </div>
+                      {quote.sent_at && <div>Sent {new Date(quote.sent_at).toLocaleString()}</div>}
+                      {quote.first_viewed_at && <div>First viewed {new Date(quote.first_viewed_at).toLocaleString()} ({quote.view_count} view{quote.view_count === 1 ? "" : "s"})</div>}
+                      {quote.responded_at && <div>Responded {new Date(quote.responded_at).toLocaleString()}</div>}
+                      {quote.customer_response && (
+                        <div className="bg-muted/40 rounded p-2 whitespace-pre-wrap text-foreground">
+                          {quote.customer_response}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 pt-1">
+                        <Button size="sm" variant="ghost" onClick={copyQuoteLink}>
+                          <Copy className="h-3.5 w-3.5" /> Copy link
+                        </Button>
+                        <a
+                          href={`/quote/${quote.public_token}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary text-xs underline"
+                        >
+                          Open customer view
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">
+                      Create a quote and send it to the customer. The job can only be created after they accept it.
+                    </div>
+                  )}
+                </div>
               </div>
 
               <DialogFooter className="flex-wrap gap-2 sm:gap-2">
@@ -597,7 +649,11 @@ export default function Requests() {
                     <Button variant="outline" onClick={decline} disabled={busy}>
                       <XCircle className="h-4 w-4" /> Decline / Archive
                     </Button>
-                    <Button onClick={approveAndConvert} disabled={busy}>
+                    <Button
+                      onClick={approveAndConvert}
+                      disabled={busy || !quote || quote.status !== "accepted"}
+                      title={!quote || quote.status !== "accepted" ? "Customer must accept a quote first" : ""}
+                    >
                       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                       Approve & Create Job
                     </Button>
