@@ -4,9 +4,14 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, ExternalLink, Copy, Mail, MailCheck, MailX, MailWarning } from "lucide-react";
+import { FileText, ExternalLink, Copy, Mail, MailCheck, MailX, MailWarning, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 const STATUS_CLS: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -19,6 +24,10 @@ const STATUS_CLS: Record<string, string> = {
 
 export default function Quotes() {
   const qc = useQueryClient();
+  const [editing, setEditing] = useState<any | null>(null);
+  const [depAmt, setDepAmt] = useState("");
+  const [allowDep, setAllowDep] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["quotes"],
     queryFn: async () => {
@@ -74,6 +83,30 @@ export default function Quotes() {
     toast.success("Quote link copied");
   }
 
+  function openPayment(q: any) {
+    setEditing(q);
+    setDepAmt(q.deposit_amount != null ? String(q.deposit_amount) : "");
+    setAllowDep(!!q.allow_deposit);
+  }
+
+  async function savePayment() {
+    if (!editing) return;
+    setSaving(true);
+    const amt = depAmt.trim() === "" ? null : Number(depAmt);
+    const { error } = await supabase
+      .from("quotes")
+      .update({
+        allow_deposit: allowDep,
+        deposit_amount: amt,
+      })
+      .eq("id", editing.id);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Payment options saved");
+    setEditing(null);
+    qc.invalidateQueries({ queryKey: ["quotes"] });
+  }
+
   const list = data ?? [];
 
   return (
@@ -109,6 +142,14 @@ export default function Quotes() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <DeliveryBadge entry={deliveryByEmail.get((q.customer_email ?? "").toLowerCase())} quoteStatus={q.status} />
                   <Badge variant="outline" className={STATUS_CLS[q.status]}>{q.status}</Badge>
+                  {q.payment_status && q.payment_status !== "unpaid" && (
+                    <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30">
+                      {q.payment_status}
+                    </Badge>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => openPayment(q)} title="Payment options">
+                    <DollarSign className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="sm" onClick={() => copyLink(q.public_token)}>
                     <Copy className="h-4 w-4" />
                   </Button>
@@ -123,6 +164,32 @@ export default function Quotes() {
           ))}
         </div>
       )}
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Payment Options</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="font-medium">Allow deposit payment</Label>
+                <p className="text-xs text-muted-foreground">Customer can pay a deposit first, then the balance later.</p>
+              </div>
+              <Switch checked={allowDep} onCheckedChange={setAllowDep} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Deposit amount (USD)</Label>
+              <Input type="number" step="0.01" min="0" placeholder="e.g. 25.00" value={depAmt} onChange={(e) => setDepAmt(e.target.value)} disabled={!allowDep} />
+              <p className="text-xs text-muted-foreground">
+                Leave blank to require full payment only.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button onClick={savePayment} disabled={saving}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
