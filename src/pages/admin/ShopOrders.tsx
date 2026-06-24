@@ -33,6 +33,42 @@ function trackingUrlFor(carrier: string | null | undefined, tracking: string): s
   }
 }
 
+async function sendShippedEmail(
+  order: Order,
+  carrier: string,
+  tracking: string,
+  forceNew = false,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const snap = order.product_snapshot || {};
+    const productName =
+      [snap.brand, snap.model].filter(Boolean).join(" ") || snap.name || "your sneakers";
+    const origin = window.location.origin;
+    const base = `shop-shipped-${order.id}-${tracking.trim()}`;
+    const idempotencyKey = forceNew ? `${base}-resend-${Date.now()}` : base;
+    const { error } = await supabase.functions.invoke("send-transactional-email", {
+      body: {
+        templateName: "shop-order-shipped",
+        recipientEmail: order.customer_email,
+        idempotencyKey,
+        templateData: {
+          customerName: order.customer_name || undefined,
+          productName,
+          productSize: snap.size || null,
+          carrier: carrier.trim() || undefined,
+          trackingNumber: tracking.trim(),
+          trackingUrl: trackingUrlFor(carrier, tracking.trim()),
+          orderUrl: `${origin}/account`,
+        },
+      },
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Unknown error" };
+  }
+}
+
 type Order = {
   id: string;
   product_id: string | null;
