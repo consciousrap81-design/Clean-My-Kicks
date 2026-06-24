@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
 
     const { data: quote, error } = await supabase
       .from("quotes")
-      .select("id, customer_name, shoe_brand, shoe_model, service_recommended, quote_amount, addons, notes, expires_at, status, photos, sent_at, first_viewed_at, view_count")
+      .select("id, customer_name, shoe_brand, shoe_model, service_recommended, quote_amount, addons, notes, expires_at, status, photos, sent_at, first_viewed_at, view_count, deposit_amount, allow_deposit, payment_status")
       .eq("public_token", token)
       .maybeSingle();
 
@@ -72,6 +72,9 @@ Deno.serve(async (req) => {
         expires_at: quote.expires_at,
         status,
         photos,
+        deposit_amount: quote.deposit_amount != null ? Number(quote.deposit_amount) : null,
+        allow_deposit: !!quote.allow_deposit,
+        payment_status: quote.payment_status,
       },
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
