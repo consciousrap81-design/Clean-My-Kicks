@@ -83,6 +83,15 @@ Deno.serve(async (req) => {
       },
     });
 
+    // Track this as a potential abandoned cart. We don't have the email yet —
+    // the queue processor will pull it from Stripe later if abandonment occurs.
+    await supabase.from("shop_abandoned_carts").insert({
+      product_id: productId,
+      stripe_session_id: stripeSession.id,
+      reserved_session_id: sessionId,
+      status: "pending",
+    });
+
     return json({ url: stripeSession.url });
   } catch (e) {
     console.error("create-shop-checkout error", e);
