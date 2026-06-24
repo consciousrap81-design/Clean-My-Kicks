@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       booking_requests: {
         Row: {
+          accepted_quote_id: string | null
           admin_notes: string | null
           converted_job_id: string | null
           created_at: string
@@ -37,6 +38,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accepted_quote_id?: string | null
           admin_notes?: string | null
           converted_job_id?: string | null
           created_at?: string
@@ -58,6 +60,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accepted_quote_id?: string | null
           admin_notes?: string | null
           converted_job_id?: string | null
           created_at?: string
@@ -79,6 +82,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "booking_requests_accepted_quote_id_fkey"
+            columns: ["accepted_quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "booking_requests_converted_job_id_fkey"
             columns: ["converted_job_id"]
@@ -299,6 +309,92 @@ export type Database = {
           },
         ]
       }
+      quotes: {
+        Row: {
+          addons: Json
+          created_at: string
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          customer_response: string | null
+          expires_at: string | null
+          first_viewed_at: string | null
+          id: string
+          last_viewed_at: string | null
+          notes: string | null
+          photos: string[]
+          public_token: string
+          quote_amount: number
+          request_id: string | null
+          responded_at: string | null
+          sent_at: string | null
+          service_recommended: string | null
+          shoe_brand: string | null
+          shoe_model: string | null
+          status: Database["public"]["Enums"]["quote_status"]
+          updated_at: string
+          view_count: number
+        }
+        Insert: {
+          addons?: Json
+          created_at?: string
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          customer_response?: string | null
+          expires_at?: string | null
+          first_viewed_at?: string | null
+          id?: string
+          last_viewed_at?: string | null
+          notes?: string | null
+          photos?: string[]
+          public_token?: string
+          quote_amount?: number
+          request_id?: string | null
+          responded_at?: string | null
+          sent_at?: string | null
+          service_recommended?: string | null
+          shoe_brand?: string | null
+          shoe_model?: string | null
+          status?: Database["public"]["Enums"]["quote_status"]
+          updated_at?: string
+          view_count?: number
+        }
+        Update: {
+          addons?: Json
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          customer_response?: string | null
+          expires_at?: string | null
+          first_viewed_at?: string | null
+          id?: string
+          last_viewed_at?: string | null
+          notes?: string | null
+          photos?: string[]
+          public_token?: string
+          quote_amount?: number
+          request_id?: string | null
+          responded_at?: string | null
+          sent_at?: string | null
+          service_recommended?: string | null
+          shoe_brand?: string | null
+          shoe_model?: string | null
+          status?: Database["public"]["Enums"]["quote_status"]
+          updated_at?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "booking_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       services: {
         Row: {
           active: boolean
@@ -373,6 +469,13 @@ export type Database = {
         | "picked_up"
         | "cancelled"
       payment_status: "unpaid" | "partial" | "paid" | "refunded"
+      quote_status:
+        | "draft"
+        | "sent"
+        | "viewed"
+        | "accepted"
+        | "declined"
+        | "expired"
       request_status: "pending" | "approved" | "declined" | "awaiting_photos"
     }
     CompositeTypes: {
@@ -514,6 +617,14 @@ export const Constants = {
         "cancelled",
       ],
       payment_status: ["unpaid", "partial", "paid", "refunded"],
+      quote_status: [
+        "draft",
+        "sent",
+        "viewed",
+        "accepted",
+        "declined",
+        "expired",
+      ],
       request_status: ["pending", "approved", "declined", "awaiting_photos"],
     },
   },
