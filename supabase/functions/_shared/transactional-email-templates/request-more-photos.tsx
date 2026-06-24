@@ -2,6 +2,7 @@
 import * as React from 'npm:react@18.3.1'
 import {
   Body,
+  Button,
   Container,
   Head,
   Heading,
@@ -18,9 +19,10 @@ interface Props {
   shoeBrand?: string
   shoeModel?: string
   adminNotes?: string
+  uploadUrl?: string
 }
 
-const Email = ({ customerName, shoeBrand, shoeModel, adminNotes }: Props) => {
+const Email = ({ customerName, shoeBrand, shoeModel, adminNotes, uploadUrl }: Props) => {
   const shoe = [shoeBrand, shoeModel].filter(Boolean).join(' ')
   return (
     <Html lang="en" dir="ltr">
@@ -46,10 +48,19 @@ const Email = ({ customerName, shoeBrand, shoeModel, adminNotes }: Props) => {
             </Section>
           )}
 
+          {uploadUrl && (
+            <Section style={{ textAlign: 'center', margin: '28px 0' }}>
+              <Button href={uploadUrl} style={button}>
+                Upload More Photos
+              </Button>
+            </Section>
+          )}
+
           <Text style={text}>
-            Just reply to this email with the additional photos attached and
-            we&rsquo;ll have your quote ready shortly. Good lighting and a few
-            different angles (top, sides, soles, and any problem areas) help a lot.
+            Tap the button above to add the photos straight from your phone. Good
+            lighting and a few different angles (top, sides, soles, and any
+            problem areas) help a lot. Once we have what we need, we&rsquo;ll get
+            your quote out right away.
           </Text>
 
           <Hr style={hr} />
@@ -74,6 +85,7 @@ export const template = {
     shoeBrand: 'Nike',
     shoeModel: 'Air Force 1',
     adminNotes: 'Please send a clear photo of the soles and the inside heel area.',
+    uploadUrl: 'https://cleanmykicks.com/request/example/photos',
   },
 } satisfies TemplateEntry
 
@@ -110,3 +122,13 @@ const cardLabel = {
 const cardBody = { fontSize: '15px', lineHeight: '22px', color: '#0b1220', margin: 0, whiteSpace: 'pre-wrap' as const }
 const hr = { borderColor: '#e5e7eb', margin: '16px 0' }
 const footer = { fontSize: '12px', color: '#94a3b8', textAlign: 'center' as const, margin: '8px 0 0' }
+const button = {
+  backgroundColor: 'hsl(24, 100%, 50%)',
+  color: '#ffffff',
+  padding: '14px 28px',
+  borderRadius: '8px',
+  fontSize: '15px',
+  fontWeight: 600,
+  textDecoration: 'none',
+  display: 'inline-block',
+}
