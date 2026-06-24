@@ -33,3 +33,7 @@ project_id = "xxuyhpszppnjdrmfdylv"
     verify_jwt = false
   [functions.track-product-view]
     verify_jwt = false
+  [functions.shippo-quote]
+    verify_jwt = false
+  [functions.shippo-webhook]
+    verify_jwt = false
