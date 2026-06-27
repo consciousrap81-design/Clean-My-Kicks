@@ -60,6 +60,19 @@ export function useKicksVoice(opts: {
   const sensitivityRef = useRef(sensitivity);
   sensitivityRef.current = sensitivity;
   const pushBufferRef = useRef<string>("");
+  const wakeTriggeredRef = useRef(false);
+  const commandBufferRef = useRef("");
+  const commandTimerRef = useRef<any>(null);
+
+  const flushCommand = useCallback(() => {
+    const text = commandBufferRef.current.trim();
+    commandBufferRef.current = "";
+    if (commandTimerRef.current) { clearTimeout(commandTimerRef.current); commandTimerRef.current = null; }
+    awaitingCommandRef.current = false;
+    wakeTriggeredRef.current = false;
+    setHeardWake(false);
+    if (text) onCommandRef.current(text);
+  }, []);
 
   const start = useCallback(() => {
     if (!SRClass) return;
@@ -99,30 +112,37 @@ export function useKicksVoice(opts: {
         return;
       }
 
-      if (!finalText) return;
-      const text = finalText.trim();
-
-      if (awaitingCommandRef.current) {
-        awaitingCommandRef.current = false;
-        setHeardWake(false);
-        if (text) onCommandRef.current(text);
-        return;
-      }
-
-      const after = stripWakeWord(text, sensitivityRef.current);
-      if (after !== null) {
-        setHeardWake(true);
-        if (after.length > 0) {
-          setHeardWake(false);
-          onCommandRef.current(after);
-        } else {
+      // Wake-word detection uses BOTH interim + final so it triggers fast,
+      // without waiting for the recognizer's slow final cut.
+      if (!wakeTriggeredRef.current) {
+        const after = stripWakeWord(live, sensitivityRef.current);
+        if (after !== null) {
+          wakeTriggeredRef.current = true;
+          setHeardWake(true);
           awaitingCommandRef.current = true;
           try {
             const u = new SpeechSynthesisUtterance("Yes?");
             u.rate = 1.1;
             window.speechSynthesis.speak(u);
           } catch {}
+          // If the wake word arrived with a trailing command in the same utterance,
+          // seed the command buffer with it.
+          if (after.length > 0) commandBufferRef.current = after;
         }
+      } else if (awaitingCommandRef.current) {
+        // After wake: accumulate command text. Prefer final segments; fall back
+        // to interim so a 1-2s pause flushes even without a final result.
+        if (finalText) {
+          commandBufferRef.current = (commandBufferRef.current + " " + finalText).trim();
+        } else if (interim) {
+          // Replace the trailing interim portion so we always reflect latest.
+          // Keep any already-finalized prefix intact by storing finals separately
+          // via finalText path above; interim alone seeds buffer if empty.
+          if (!commandBufferRef.current) commandBufferRef.current = interim.trim();
+          else commandBufferRef.current = (commandBufferRef.current + " " + interim).trim();
+        }
+        if (commandTimerRef.current) clearTimeout(commandTimerRef.current);
+        commandTimerRef.current = setTimeout(flushCommand, 1400);
       }
     };
     recRef.current = rec;
@@ -137,6 +157,9 @@ export function useKicksVoice(opts: {
     setListening(false);
     setPushActive(false);
     pushBufferRef.current = "";
+    wakeTriggeredRef.current = false;
+    commandBufferRef.current = "";
+    if (commandTimerRef.current) { clearTimeout(commandTimerRef.current); commandTimerRef.current = null; }
     try { recRef.current?.stop(); } catch {}
     recRef.current = null;
     try { window.speechSynthesis.cancel(); } catch {}

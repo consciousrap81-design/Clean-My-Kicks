@@ -103,7 +103,15 @@ Deno.serve(async (req) => {
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const body = await req.json();
-    const { messages, threadId } = body as { messages: UIMessage[]; threadId?: string };
+    const { messages: rawMessages, threadId } = body as { messages: UIMessage[]; threadId?: string };
+    const messages: UIMessage[] = Array.isArray(rawMessages) ? rawMessages : [];
+    if (!Array.isArray(rawMessages)) {
+      console.warn("admin-ai-chat: messages was not an array", { keys: Object.keys(body ?? {}), type: typeof rawMessages });
+    }
+    if (messages.length === 0) {
+      return new Response(JSON.stringify({ error: "No messages provided" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const modelMessages = convertToModelMessages(messages);
 
     const gateway = createLovableAiGatewayProvider(LOVABLE_KEY);
     const model = gateway("google/gemini-3-flash-preview");
@@ -120,7 +128,7 @@ Be concise and concrete. Use light markdown for longer answers. When suggesting 
 You can also discuss your own research findings and patterns you've noticed about the shop, customers, products, and competitors — be a curious collaborator, not just a tool runner.
 
 ${prefs}`,
-      messages: convertToModelMessages(messages),
+      messages: modelMessages,
       tools: buildTools(user.id),
       stopWhen: stepCountIs(50),
       onFinish: async ({ response }) => {
