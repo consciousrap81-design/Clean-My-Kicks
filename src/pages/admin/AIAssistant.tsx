@@ -6,9 +6,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Send, Sparkles, Trash2, Wrench } from "lucide-react";
+import { Plus, Send, Sparkles, Trash2, Wrench, Mic, MicOff } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import { useKicksVoice, voiceSupported } from "@/hooks/useKicksVoice";
 
 type Thread = { id: string; title: string; updated_at: string };
 
@@ -19,6 +21,8 @@ export default function AIAssistant() {
   const [initialMessages, setInitialMessages] = useState<UIMessage[] | null>(null);
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [voiceOn, setVoiceOn] = useState(false);
+  const lastSpokenRef = useRef<string | null>(null);
 
   // Load threads
   useEffect(() => {
@@ -73,6 +77,32 @@ export default function AIAssistant() {
     onError: (e) => toast.error(e.message),
   });
 
+  const voice = useKicksVoice({
+    enabled: voiceOn,
+    onCommand: async (text) => {
+      if (status === "submitted" || status === "streaming") return;
+      toast(`Kicks heard: "${text}"`);
+      await sendMessage({ text });
+    },
+  });
+
+  // Speak the latest assistant message when streaming finishes
+  useEffect(() => {
+    if (!voiceOn) return;
+    if (status !== "ready") return;
+    const last = [...messages].reverse().find((m) => m.role === "assistant");
+    if (!last) return;
+    if (lastSpokenRef.current === last.id) return;
+    const text = (last.parts ?? [])
+      .map((p: any) => (p.type === "text" ? p.text : ""))
+      .join(" ")
+      .trim();
+    if (text) {
+      lastSpokenRef.current = last.id;
+      voice.speak(text);
+    }
+  }, [messages, status, voiceOn, voice]);
+
   useEffect(() => { inputRef.current?.focus(); }, [threadId, status]);
 
   const busy = status === "submitted" || status === "streaming";
@@ -125,13 +155,37 @@ export default function AIAssistant() {
       </aside>
 
       <main className="flex-1 flex flex-col border rounded-lg bg-card min-w-0">
+        <div className="border-b px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="font-display">Kicks</span>
+            <span className="text-xs text-muted-foreground hidden sm:inline">— your shop AI</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {voiceOn && voice.heardWake && <Badge variant="secondary" className="animate-pulse">Listening for command…</Badge>}
+            {voiceOn && voice.listening && !voice.heardWake && <Badge variant="outline" className="text-[10px]">Say "Hey Kicks"</Badge>}
+            <Button
+              size="sm"
+              variant={voiceOn ? "default" : "outline"}
+              onClick={() => {
+                if (!voiceSupported) { toast.error("Voice mode requires Chrome, Edge, or Safari."); return; }
+                setVoiceOn((v) => !v);
+              }}
+              title={voiceOn ? "Voice mode on" : "Enable voice mode"}
+            >
+              {voiceOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+              <span className="ml-1.5 hidden sm:inline">{voiceOn ? "Voice on" : "Voice"}</span>
+            </Button>
+          </div>
+        </div>
         <ScrollArea className="flex-1 p-4">
           <div className="max-w-3xl mx-auto space-y-4">
             {messages.length === 0 && (
               <div className="text-center text-muted-foreground py-12">
                 <Sparkles className="h-8 w-8 mx-auto mb-2 text-primary" />
-                <p className="font-medium">Admin AI</p>
+                <p className="font-medium">Hey, I'm Kicks 👟</p>
                 <p className="text-sm">Ask me to draft product copy, review orders, suggest pricing, or scan competitors. Writes go to your approval inbox.</p>
+                <p className="text-xs mt-2">Tip: turn on Voice and say <strong>"Hey Kicks"</strong> to talk hands-free.</p>
               </div>
             )}
             {messages.map((m) => (
@@ -147,7 +201,7 @@ export default function AIAssistant() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder="Ask the admin AI…"
+              placeholder={voiceOn ? `Type or say "Hey Kicks…"` : "Ask Kicks…"}
               rows={2}
               className="resize-none"
               disabled={busy}
