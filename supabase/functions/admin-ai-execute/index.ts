@@ -79,6 +79,7 @@ async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
     }
     await a.from("ai_suggestions").update({ status: "applied", resolved_at: new Date().toISOString() }).eq("id", sug.id);
     await a.from("ai_audit_log").insert({ actor: userId, tool: `apply:${sug.kind}`, input: payload, output: { ...result, history_id: historyId }, approved: true });
+      await a.from("ai_feedback").insert({ suggestion_id: sug.id, actor: userId, action: "applied", kind: sug.kind, suggestion_snapshot: { title: sug.title, summary: sug.summary, payload: sug.payload } });
     return { ok: true, history_id: historyId };
   } catch (e) {
     await a.from("ai_suggestions").update({ status: "failed" }).eq("id", sug.id);
@@ -108,6 +109,7 @@ Deno.serve(async (req) => {
         await a.from("ai_suggestions").update({ status: "pending", resolved_at: null }).eq("id", h.suggestion_id);
       }
       await a.from("ai_audit_log").insert({ actor: user.id, tool: `undo:${h.kind}`, input: { history_id }, output: { reverted: h.before_state }, approved: true });
+      await a.from("ai_feedback").insert({ suggestion_id: h.suggestion_id, actor: user.id, action: "undone", kind: h.kind, reason: body.reason ?? null, suggestion_snapshot: { before: h.before_state, after: h.after_state } });
       return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -118,7 +120,15 @@ Deno.serve(async (req) => {
     if (!ids.length) return new Response(JSON.stringify({ error: "Missing suggestion_id(s)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     if (action === "dismiss") {
+      const { data: dsugs } = await a.from("ai_suggestions").select("id,kind,title,summary,payload").in("id", ids);
       await a.from("ai_suggestions").update({ status: "dismissed", resolved_at: new Date().toISOString() }).in("id", ids);
+      if (dsugs?.length) {
+        await a.from("ai_feedback").insert(dsugs.map((d: any) => ({
+          suggestion_id: d.id, actor: user.id, action: "dismissed", kind: d.kind,
+          reason: body.reason ?? null,
+          suggestion_snapshot: { title: d.title, summary: d.summary, payload: d.payload },
+        })));
+      }
       return new Response(JSON.stringify({ ok: true, dismissed: ids.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

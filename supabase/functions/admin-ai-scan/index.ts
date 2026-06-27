@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { generateText } from "npm:ai@7";
 import { createLovableAiGatewayProvider } from "../_shared/ai-gateway.ts";
+import { loadAiPreferenceBlock } from "../_shared/ai-preferences.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*" };
 
@@ -20,9 +21,13 @@ Deno.serve(async (req) => {
 
     const context = { drafts, lowStock, recentOrders, staleRequests, scannedAt: new Date().toISOString() };
 
+    const prefs = await loadAiPreferenceBlock();
+
     const { text } = await generateText({
       model: gateway("google/gemini-3-flash-preview"),
-      system: "You are an SMB growth advisor for a sneaker restoration shop in Denton, TX (Clean My Kicks). Look at the JSON and produce 3-6 concrete, prioritized suggestions. Each suggestion MUST be a JSON object with: title (<=60 chars), summary (1-2 sentences), kind (one of: publish_product, follow_up_request, restock_alert, marketing_idea, pricing_idea, content_idea), reasoning (1-2 sentences explaining why), sources (array of 1-3 objects: {title, url, snippet} citing the internal data row OR a credible external reference such as a competitor URL, industry report, or pricing guide). Reply as JSON array only.",
+      system: `You are an SMB growth advisor for a sneaker restoration shop in Denton, TX (Clean My Kicks). Look at the JSON and produce 3-6 concrete, prioritized suggestions. Each suggestion MUST be a JSON object with: title (<=60 chars), summary (1-2 sentences), kind (one of: publish_product, follow_up_request, restock_alert, marketing_idea, pricing_idea, content_idea), reasoning (1-2 sentences explaining why), sources (array of 1-3 objects: {title, url, snippet} citing the internal data row OR a credible external reference such as a competitor URL, industry report, or pricing guide). Reply as JSON array only.
+
+${prefs}`,
       prompt: JSON.stringify(context),
     });
 
