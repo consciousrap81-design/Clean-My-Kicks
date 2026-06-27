@@ -34,6 +34,7 @@ import AISuggestions from "./pages/admin/AISuggestions";
 import AISettings from "./pages/admin/AISettings";
 import AIInsights from "./pages/admin/AIInsights";
 import AITranscripts from "./pages/admin/AITranscripts";
+import CleaningGuides from "./pages/admin/CleaningGuides";
 import QuoteView from "./pages/QuoteView";
 import ProductDetail from "./pages/ProductDetail";
 import ShopOrderSuccess from "./pages/ShopOrderSuccess";
@@ -109,6 +110,7 @@ const App = () => (
               <Route path="ai/insights" element={<AIInsights />} />
               <Route path="ai/transcripts" element={<AITranscripts />} />
               <Route path="ai/:threadId" element={<AIAssistant />} />
+              <Route path="cleaning-guides" element={<CleaningGuides />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

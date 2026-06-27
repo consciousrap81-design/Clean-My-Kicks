@@ -401,6 +401,74 @@ export type Database = {
           },
         ]
       }
+      cleaning_guide_versions: {
+        Row: {
+          brush_stiffness: string | null
+          cautions: string | null
+          change_note: string | null
+          change_type: string
+          changed_by: string | null
+          changed_fields: string[]
+          created_at: string
+          estimated_minutes: number | null
+          guide_id: string
+          id: string
+          material: string | null
+          recommended_chemicals: Json | null
+          steps: Json | null
+          summary: string | null
+          title: string | null
+          tools: Json | null
+          version: number
+        }
+        Insert: {
+          brush_stiffness?: string | null
+          cautions?: string | null
+          change_note?: string | null
+          change_type: string
+          changed_by?: string | null
+          changed_fields?: string[]
+          created_at?: string
+          estimated_minutes?: number | null
+          guide_id: string
+          id?: string
+          material?: string | null
+          recommended_chemicals?: Json | null
+          steps?: Json | null
+          summary?: string | null
+          title?: string | null
+          tools?: Json | null
+          version: number
+        }
+        Update: {
+          brush_stiffness?: string | null
+          cautions?: string | null
+          change_note?: string | null
+          change_type?: string
+          changed_by?: string | null
+          changed_fields?: string[]
+          created_at?: string
+          estimated_minutes?: number | null
+          guide_id?: string
+          id?: string
+          material?: string | null
+          recommended_chemicals?: Json | null
+          steps?: Json | null
+          summary?: string | null
+          title?: string | null
+          tools?: Json | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaning_guide_versions_guide_id_fkey"
+            columns: ["guide_id"]
+            isOneToOne: false
+            referencedRelation: "cleaning_guides"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cleaning_guides: {
         Row: {
           brush_stiffness: string | null

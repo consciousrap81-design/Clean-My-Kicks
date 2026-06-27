@@ -14,6 +14,9 @@ import { Loader2, Trash2, Upload } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ShippingPanel } from "@/components/admin/ShippingPanel";
+import { SuggestedProtocol } from "@/components/admin/SuggestedProtocol";
+
+const MATERIALS = ["Suede", "Leather", "Mesh", "Canvas", "Knit", "Patent", "Nubuck"];
 
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>();
@@ -77,6 +80,8 @@ export default function JobDetail() {
       intake_date: form.intake_date || null, due_date: form.due_date || null,
       completion_date: form.completion_date || null, admin_notes: form.admin_notes,
       lead_source_id: form.lead_source_id,
+      shoe_material: form.shoe_material || null,
+      cleaning_guide_id: form.cleaning_guide_id || null,
     };
     const { error } = await supabase.from("jobs").update(payload).eq("id", id!);
     setSaving(false);
@@ -197,6 +202,18 @@ export default function JobDetail() {
               </Select>
             </div>
             <div><Label>Condition Notes</Label><Textarea value={form.condition_notes || ""} onChange={(e) => set("condition_notes", e.target.value)} /></div>
+            <div>
+              <Label>Shoe Material</Label>
+              <Select
+                value={form.shoe_material || ""}
+                onValueChange={(v) => { set("shoe_material", v); set("cleaning_guide_id", null); }}
+              >
+                <SelectTrigger><SelectValue placeholder="Pick material" /></SelectTrigger>
+                <SelectContent>
+                  {MATERIALS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
 
@@ -227,6 +244,12 @@ export default function JobDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <SuggestedProtocol
+        material={form.shoe_material}
+        guideId={form.cleaning_guide_id}
+        onApplyGuide={(gid) => set("cleaning_guide_id", gid)}
+      />
 
       <Card>
         <CardHeader><CardTitle className="text-base">Payments — Paid ${totalPaid.toFixed(2)} / Balance ${balance.toFixed(2)}</CardTitle></CardHeader>

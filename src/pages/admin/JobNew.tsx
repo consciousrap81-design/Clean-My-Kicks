@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { SuggestedProtocol } from "@/components/admin/SuggestedProtocol";
+
+const MATERIALS = ["Suede", "Leather", "Mesh", "Canvas", "Knit", "Patent", "Nubuck"];
 
 export default function JobNew() {
   const navigate = useNavigate();
@@ -20,6 +23,7 @@ export default function JobNew() {
     service_id: "", lead_source_id: "",
     quoted_price: "", intake_date: new Date().toISOString().slice(0, 10),
     due_date: "", admin_notes: "",
+    shoe_material: "", cleaning_guide_id: "",
   });
 
   const { data: services } = useQuery({
@@ -56,6 +60,8 @@ export default function JobNew() {
       due_date: form.due_date || null,
       admin_notes: form.admin_notes || null,
       lead_source_id: form.lead_source_id || null,
+      shoe_material: form.shoe_material || null,
+      cleaning_guide_id: form.cleaning_guide_id || null,
     }).select().single();
 
     setSaving(false);
@@ -104,6 +110,27 @@ export default function JobNew() {
               </Select>
             </div>
             <div className="md:col-span-2"><Label>Condition Notes</Label><Textarea value={form.condition_notes} onChange={(e) => set("condition_notes", e.target.value)} /></div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">Material & Protocol</CardTitle></CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            <div>
+              <Label>Shoe Material</Label>
+              <Select value={form.shoe_material} onValueChange={(v) => { set("shoe_material", v); set("cleaning_guide_id", ""); }}>
+                <SelectTrigger><SelectValue placeholder="Pick material to see suggested protocol" /></SelectTrigger>
+                <SelectContent>
+                  {MATERIALS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="md:col-span-2">
+              <SuggestedProtocol
+                material={form.shoe_material}
+                guideId={form.cleaning_guide_id || null}
+                onApplyGuide={(gid) => set("cleaning_guide_id", gid)}
+              />
+            </div>
           </CardContent>
         </Card>
         <Card>

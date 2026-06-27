@@ -15,6 +15,7 @@ const nav = [
   { to: "/admin/jobs", label: "Jobs", icon: ListChecks },
   { to: "/admin/customers", label: "Customers", icon: Users },
   { to: "/admin/services", label: "Services", icon: Wrench },
+  { to: "/admin/cleaning-guides", label: "Cleaning Guides", icon: BookOpen },
   { to: "/admin/products", label: "Shop Products", icon: ShoppingBag },
   { to: "/admin/accessories", label: "Accessories", icon: Boxes },
   { to: "/admin/promo-codes", label: "Promo Codes", icon: Tag },
