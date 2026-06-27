@@ -36,7 +36,7 @@ function buildTools(actorId: string) {
       description: "Search shop products by name/brand/model. Returns up to 20 results.",
       inputSchema: z.object({ q: z.string().optional(), status: z.enum(["draft", "available", "sold"]).optional() }),
       execute: async ({ q, status }) => {
-        let query = a.from("shop_products").select("id,name,brand,model,price_cents,status,size,created_at").limit(20).order("created_at", { ascending: false });
+        let query = a.from("shop_products").select("id,name,brand,model,price,status,size,condition,view_count,created_at").limit(20).order("created_at", { ascending: false });
         if (q) query = query.or(`name.ilike.%${q}%,brand.ilike.%${q}%,model.ilike.%${q}%`);
         if (status) query = query.eq("status", status);
         const { data, error } = await query;
@@ -57,7 +57,7 @@ function buildTools(actorId: string) {
       description: "List recent shop orders.",
       inputSchema: z.object({ limit: z.number().min(1).max(50).default(20) }),
       execute: async ({ limit }) => {
-        const { data, error } = await a.from("shop_orders").select("id,status,total_cents,customer_email,created_at,shipping_method,expected_delivery").order("created_at", { ascending: false }).limit(limit);
+        const { data, error } = await a.from("shop_orders").select("id,status,amount,currency,customer_email,customer_name,created_at,shipping_method,tracking_number,tracking_carrier,promo_code,discount_cents").order("created_at", { ascending: false }).limit(limit);
         if (error) return { error: error.message };
         return { orders: data };
       },
@@ -66,7 +66,7 @@ function buildTools(actorId: string) {
       description: "List recent restoration jobs.",
       inputSchema: z.object({ limit: z.number().min(1).max(50).default(20), status: z.string().optional() }),
       execute: async ({ limit, status }) => {
-        let q = a.from("jobs").select("id,status,created_at,customer_id,notes").order("created_at", { ascending: false }).limit(limit);
+        let q = a.from("jobs").select("id,status,payment_status,shoe_brand,shoe_model,quoted_price,intake_date,due_date,completion_date,admin_notes,condition_notes,customer_id,created_at").order("created_at", { ascending: false }).limit(limit);
         if (status) q = q.eq("status", status);
         const { data, error } = await q;
         if (error) return { error: error.message };
