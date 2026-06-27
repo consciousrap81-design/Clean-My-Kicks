@@ -167,6 +167,11 @@ export default function ProductDetail() {
           {/* Details */}
           <div>
             <h1 className="font-display text-3xl md:text-5xl text-foreground leading-tight">{display}</h1>
+            {product.name && product.name !== display && (
+              <div className="mt-1 text-base md:text-lg text-muted-foreground font-medium">
+                {product.name}
+              </div>
+            )}
             <div className="font-display text-2xl md:text-3xl text-primary mt-2">${Number(product.price).toFixed(2)}</div>
 
             <div className="flex flex-wrap gap-4 mt-4 text-sm text-muted-foreground">
