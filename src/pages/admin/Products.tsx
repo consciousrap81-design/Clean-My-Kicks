@@ -72,17 +72,49 @@ export default function Products() {
     const ids = pubConfirm.ids;
     setBulkBusy(true);
     try {
-      const { error } = await supabase.from("shop_products").update({ status: "available" }).in("id", ids);
+      const { data: updated, error } = await supabase
+        .from("shop_products")
+        .update({ status: "available" })
+        .in("id", ids)
+        .select("id");
       if (error) throw error;
-      toast.success(`Published ${ids.length} product${ids.length === 1 ? "" : "s"} — now live on /shop`);
+      const okIds = (updated || []).map((r: any) => r.id as string);
+      const failed = ids.filter((i) => !okIds.includes(i));
       setSelected((s) => {
         const n = new Set(s);
-        ids.forEach((i) => n.delete(i));
+        okIds.forEach((i) => n.delete(i));
         return n;
       });
-      await qc.invalidateQueries({ queryKey: ["admin-shop-products"] });
+      await qc.refetchQueries({ queryKey: ["admin-shop-products"] });
+      if (failed.length) {
+        toast.error(
+          `${failed.length} of ${ids.length} failed to publish. ${okIds.length} updated.`,
+        );
+      }
+      if (okIds.length) {
+        toast.success(
+          `Published ${okIds.length} product${okIds.length === 1 ? "" : "s"} — now live on /shop`,
+          {
+            action: {
+              label: "Undo",
+              onClick: async () => {
+                const { error: undoErr } = await supabase
+                  .from("shop_products")
+                  .update({ status: "draft" })
+                  .in("id", okIds);
+                if (undoErr) return toast.error(`Undo failed: ${undoErr.message}`);
+                await qc.refetchQueries({ queryKey: ["admin-shop-products"] });
+                toast.success(
+                  `Reverted ${okIds.length} product${okIds.length === 1 ? "" : "s"} to Draft`,
+                );
+              },
+            },
+            duration: 8000,
+          },
+        );
+      }
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(`Publish failed: ${e.message}`);
     } finally {
       setBulkBusy(false);
       setConfirm(null);
@@ -226,7 +258,14 @@ export default function Products() {
       </div>
 
       <AlertDialog open={!!pubConfirm} onOpenChange={(o) => !o && !bulkBusy && setConfirm(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !bulkBusy) {
+              e.preventDefault();
+              runPublish();
+            }
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Publish to the live shop?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -234,14 +273,22 @@ export default function Products() {
                 <>
                   This will set <strong>{pubConfirm.label}</strong> to <strong>Available</strong> and make
                   {pubConfirm.ids.length === 1 ? " it" : " them"} immediately visible and purchasable on /shop.
+                  <span className="block mt-2 text-xs">
+                    You can undo this from the toast that appears after publishing.
+                  </span>
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={bulkBusy}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={(e) => { e.preventDefault(); runPublish(); }} disabled={bulkBusy}>
-              <Rocket className="w-4 h-4 mr-1" /> Yes, publish
+            <AlertDialogCancel disabled={bulkBusy}>Keep as Draft</AlertDialogCancel>
+            <AlertDialogAction
+              autoFocus
+              onClick={(e) => { e.preventDefault(); runPublish(); }}
+              disabled={bulkBusy}
+            >
+              <Rocket className="w-4 h-4 mr-1" />
+              {bulkBusy ? "Publishing…" : "Publish now"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
