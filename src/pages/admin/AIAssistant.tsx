@@ -6,11 +6,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Send, Sparkles, Trash2, Wrench, Mic, MicOff } from "lucide-react";
+import { Plus, Send, Sparkles, Trash2, Wrench, Mic, MicOff, Settings2, Search, Radio } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
-import { useKicksVoice, voiceSupported } from "@/hooks/useKicksVoice";
+import { useKicksVoice, voiceSupported, type VoiceMode, type WakeSensitivity } from "@/hooks/useKicksVoice";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Link } from "react-router-dom";
+
+const VOICE_PREFS_KEY = "kicks.voice.prefs.v1";
+function loadVoicePrefs(): { mode: VoiceMode; sensitivity: WakeSensitivity } {
+  if (typeof window === "undefined") return { mode: "wake", sensitivity: "medium" };
+  try {
+    const raw = window.localStorage.getItem(VOICE_PREFS_KEY);
+    if (raw) {
+      const v = JSON.parse(raw);
+      if (v && (v.mode === "wake" || v.mode === "push") && ["strict","medium","loose"].includes(v.sensitivity)) return v;
+    }
+  } catch {}
+  return { mode: "wake", sensitivity: "medium" };
+}
 
 type Thread = { id: string; title: string; updated_at: string };
 
@@ -22,7 +39,13 @@ export default function AIAssistant() {
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [voiceOn, setVoiceOn] = useState(false);
+  const [voiceMode, setVoiceMode] = useState<VoiceMode>(() => loadVoicePrefs().mode);
+  const [sensitivity, setSensitivity] = useState<WakeSensitivity>(() => loadVoicePrefs().sensitivity);
   const lastSpokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(VOICE_PREFS_KEY, JSON.stringify({ mode: voiceMode, sensitivity })); } catch {}
+  }, [voiceMode, sensitivity]);
 
   // Load threads
   useEffect(() => {
@@ -79,6 +102,8 @@ export default function AIAssistant() {
 
   const voice = useKicksVoice({
     enabled: voiceOn,
+    mode: voiceMode,
+    sensitivity,
     onCommand: async (text) => {
       if (status === "submitted" || status === "streaming") return;
       toast(`Kicks heard: "${text}"`);
@@ -162,8 +187,61 @@ export default function AIAssistant() {
             <span className="text-xs text-muted-foreground hidden sm:inline">— your shop AI</span>
           </div>
           <div className="flex items-center gap-2">
-            {voiceOn && voice.heardWake && <Badge variant="secondary" className="animate-pulse">Listening for command…</Badge>}
-            {voiceOn && voice.listening && !voice.heardWake && <Badge variant="outline" className="text-[10px]">Say "Hey Kicks"</Badge>}
+            {voiceOn && voiceMode === "wake" && voice.heardWake && <Badge variant="secondary" className="animate-pulse">Listening for command…</Badge>}
+            {voiceOn && voiceMode === "wake" && voice.listening && !voice.heardWake && <Badge variant="outline" className="text-[10px]">Say "Hey Kicks"</Badge>}
+            {voiceOn && voiceMode === "push" && voice.pushActive && <Badge variant="secondary" className="animate-pulse">Recording…</Badge>}
+            {voiceOn && voiceMode === "push" && !voice.pushActive && <Badge variant="outline" className="text-[10px]">Hold to talk</Badge>}
+            <Button asChild size="sm" variant="ghost" title="Search transcripts">
+              <Link to="/admin/ai/transcripts"><Search className="h-4 w-4" /></Link>
+            </Button>
+            {voiceOn && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button size="icon" variant="ghost" title="Voice settings"><Settings2 className="h-4 w-4" /></Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-72 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Mode</Label>
+                    <RadioGroup value={voiceMode} onValueChange={(v) => setVoiceMode(v as VoiceMode)} className="space-y-1.5">
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem value="wake" id="vm-wake" className="mt-0.5" />
+                        <Label htmlFor="vm-wake" className="font-normal cursor-pointer">
+                          <div className="text-sm flex items-center gap-1.5"><Radio className="h-3 w-3" /> Continuous (wake word)</div>
+                          <div className="text-xs text-muted-foreground">Always listening for "Hey Kicks".</div>
+                        </Label>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem value="push" id="vm-push" className="mt-0.5" />
+                        <Label htmlFor="vm-push" className="font-normal cursor-pointer">
+                          <div className="text-sm flex items-center gap-1.5"><Mic className="h-3 w-3" /> Push-to-talk</div>
+                          <div className="text-xs text-muted-foreground">Mic only opens while you hold the button.</div>
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Wake-word sensitivity</Label>
+                    <RadioGroup value={sensitivity} onValueChange={(v) => setSensitivity(v as WakeSensitivity)} className="space-y-1.5">
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem value="strict" id="ws-strict" className="mt-0.5" />
+                        <Label htmlFor="ws-strict" className="font-normal cursor-pointer text-sm">Strict <span className="text-xs text-muted-foreground">— must say "Hey Kicks"</span></Label>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem value="medium" id="ws-medium" className="mt-0.5" />
+                        <Label htmlFor="ws-medium" className="font-normal cursor-pointer text-sm">Medium <span className="text-xs text-muted-foreground">— common variants</span></Label>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem value="loose" id="ws-loose" className="mt-0.5" />
+                        <Label htmlFor="ws-loose" className="font-normal cursor-pointer text-sm">Loose <span className="text-xs text-muted-foreground">— may trigger on similar words</span></Label>
+                      </div>
+                    </RadioGroup>
+                    {voiceMode === "push" && (
+                      <p className="text-[11px] text-muted-foreground">Sensitivity only applies in continuous mode.</p>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
             <Button
               size="sm"
               variant={voiceOn ? "default" : "outline"}
@@ -201,11 +279,27 @@ export default function AIAssistant() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder={voiceOn ? `Type or say "Hey Kicks…"` : "Ask Kicks…"}
+              placeholder={voiceOn ? (voiceMode === "wake" ? `Type or say "Hey Kicks…"` : "Type, or hold the mic to talk") : "Ask Kicks…"}
               rows={2}
               className="resize-none"
               disabled={busy}
             />
+            {voiceOn && voiceMode === "push" && (
+              <Button
+                type="button"
+                variant={voice.pushActive ? "default" : "outline"}
+                onMouseDown={voice.pushStart}
+                onMouseUp={voice.pushEnd}
+                onMouseLeave={() => { if (voice.pushActive) voice.pushEnd(); }}
+                onTouchStart={(e) => { e.preventDefault(); voice.pushStart(); }}
+                onTouchEnd={(e) => { e.preventDefault(); voice.pushEnd(); }}
+                title="Hold to talk"
+                className={voice.pushActive ? "animate-pulse" : ""}
+                disabled={busy}
+              >
+                <Mic className="h-4 w-4" />
+              </Button>
+            )}
             {busy
               ? <Button onClick={stop} variant="outline">Stop</Button>
               : <Button onClick={handleSend} disabled={!input.trim()}><Send className="h-4 w-4" /></Button>}
