@@ -1,73 +1,84 @@
-# Mail-In Order Service
 
-Adds a "Mail in" fulfillment option alongside existing drop-off, powered by Shippo for live carrier rates and prepaid round-trip labels. US-only at launch.
+# Admin AI Assistant
 
-## Customer flow
+A conversational AI in `/admin` that can read your site, draft changes, run research, and execute approved actions through a small set of safe tools. Inline "AI improve" buttons appear on product/order/job pages and feed the same agent.
 
-1. On the booking form, customer picks **Drop off** or **Mail in**. Mail-in path asks for pickup address (used for return label + inbound rate).
-2. After submit, customer lands on a **shipping kit page** (`/requests/:token/ship`) showing:
-   - Prepaid inbound USPS/UPS label (PDF) generated via Shippo
-   - Packing instructions + printable order slip with QR code
-   - Tracking timeline: Label created → In transit → Received → Cleaning → Shipped back → Delivered
-3. Same `/requests/:token` view gains a "Shipping" section so the customer can re-download labels and watch status.
-4. Once we mark the job done, admin clicks "Generate return label" → customer gets email with tracking; return label uses the address captured at booking.
+## What it can do
 
-## Admin flow
+**Always allowed (no approval):**
+- Read products, orders, jobs, shipments, customers, reviews.
+- Web research (competitors, pricing, trends) via Semrush + web search.
+- Generate suggestions, drafts, SEO rewrites, image concepts.
+- Run a scheduled scan every 4 hours that stores findings + suggestions.
 
-- `booking_requests` gains `fulfillment_method` ('drop_off' | 'mail_in'), `ship_from_address` (jsonb).
-- New `shipments` table: `id`, `request_id`, `direction` ('inbound' | 'outbound'), `carrier`, `service`, `tracking_number`, `tracking_url`, `label_url`, `rate_cents`, `status`, `last_event_at`, timestamps.
-- Admin Requests + Jobs detail pages get a **Shipping panel**: shows both shipments, status, tracking link, "Mark received", "Generate return label" (re-quotes Shippo for outbound from shop address → customer address), "Void label" while unused.
-- Pricing on the quote auto-includes round-trip shipping cost (inbound rate + estimated outbound rate, both pulled from Shippo at booking time, stored on the request as `shipping_quote_cents`). Customer sees one shipping line item.
+**Requires your approval (one-tap Apply/Reject):**
+- Create/update/publish shop products (copy, price, attrs, photos).
+- Generate product/marketing images.
+- Update SEO meta/JSON-LD on pages.
+- Update job/order/shipment status, draft & send customer emails.
+- Apply suggested business actions (e.g. add a promo, change a price).
 
-## Cost handling
+## Interface
 
-- Inbound rate fetched at booking using customer address → shop address, cheapest USPS Ground Advantage / UPS Ground.
-- Outbound rate estimated at the same time (reverse direction) and added to the round-trip total.
-- Round-trip cost is rolled into the quote total — customer pays it via existing Stripe checkout. No separate shipping charge.
-- If actual outbound rate at ship time exceeds the estimate by >$3, admin sees a warning before purchasing the label (can absorb or contact customer).
+- **Chat panel** at `/admin/ai` — full transcript, threaded, persisted in DB. Uses AI Elements (Conversation, Message, Tool, PromptInput).
+- **Inline "✨ AI" buttons** on ProductEdit, ShopOrders, Job detail, and admin Shop pages. Each opens a small drawer that pre-fills context ("rewrite this description", "suggest price for this Jordan 4", "draft reply to this customer") and routes through the same agent.
+- **Suggestions inbox** at `/admin/ai/suggestions` — review/approve/dismiss findings from the scheduled scan.
 
-## Tracking
+## Tools the agent exposes
 
-- Shippo webhook → new edge function `shippo-webhook` updates `shipments.status` and `last_event_at`, appends to `job_updates`, and fires existing transactional emails (`shop-order-tracking-updated` template — reuse, or add `mail-in-status-changed`).
+Each tool is a typed AI SDK `tool()` with `needsApproval` set per your autonomy rules.
 
-## International (deferred)
+| Tool | Approval | Purpose |
+|---|---|---|
+| `search_products` / `get_product` | no | Read shop catalog |
+| `update_product` / `publish_product` | yes | Edit/publish products |
+| `generate_product_image` | yes | Create cover/marketing images |
+| `rewrite_seo` | yes | Update title/meta/JSON-LD |
+| `list_orders` / `list_jobs` / `get_shipment` | no | Read fulfillment |
+| `update_job_status` / `send_customer_email` | yes | Customer ops |
+| `web_search` / `competitor_scan` | no | Research |
+| `propose_promo` / `propose_price_change` | yes | Business actions |
 
-- Reminder task in `.lovable/plan.md` and a recurring admin Settings banner "International mail-in: revisit on <date>" that updates every 2 weeks until dismissed. Implemented as a simple `admin_reminders` table with `key`, `due_at`, `dismissed`. AdminLayout checks for due reminders.
+Agent loop uses `stopWhen: stepCountIs(50)` and Lovable AI Gateway with `google/gemini-3-flash-preview`.
 
-## Technical details
+## Scheduled research (every 4 hours)
 
-**New migration:**
-- `booking_requests`: add `fulfillment_method`, `ship_from_address`, `shipping_quote_cents`
-- `shipments` table (RLS: admin-only writes; public read via request public_token through edge function)
-- `admin_reminders` table (RLS: admin only)
-- Seed one row: `key='international_mail_in'`, `due_at = now() + 14 days`
+`pg_cron` → `admin-ai-scan` edge function:
+1. Pull top competitors (Semrush) for sneaker restoration in Denton/DFW.
+2. Check own domain trend, broken meta, low-stock items, stale drafts.
+3. Ask the model to summarize findings + concrete suggestions.
+4. Insert into `ai_suggestions` (status=`pending`). Notify badge in admin sidebar.
 
-**New secrets:** `SHIPPO_API_KEY` only. `SHOP_ADDRESS_*` values are stored as non-secret config. Shippo's dashboard does not issue a webhook signing secret, so `shippo-webhook` authenticates events by re-fetching the referenced object (track / transaction) from Shippo using `SHIPPO_API_KEY` and trusting only that re-fetched payload — no HMAC verification.
+You approve from the Suggestions inbox; approved items become tool calls with the same approval gate.
 
-**New edge functions:**
-- `shippo-quote` — called from booking form; returns inbound + estimated outbound rate
-- `shippo-purchase-label` — admin-triggered; buys label, persists to `shipments`
-- `shippo-webhook` — receives status events, verifies signature
-- `shipping-kit-view` — public, looks up by request token, returns label URLs + status
+## Schema (new tables)
 
-**Edited:**
-- `src/components/BookingForm` (or current booking flow): add fulfillment_method radio, address fields when mail-in
-- `src/pages/RequestView` (public): shipping kit section
-- `src/pages/admin/Requests.tsx` + `JobDetail.tsx`: shipping panel
-- `src/components/admin/AdminLayout.tsx`: reminder banner
-- `supabase/functions/submit-booking/index.ts`: call `shippo-quote`, store quote + address
+- `ai_threads(id, user_id, title, created_at)` — chat threads.
+- `ai_messages(id, thread_id, role, parts jsonb, created_at)` — UIMessage parts.
+- `ai_suggestions(id, kind, title, summary, payload jsonb, status, created_at)` — scan/agent proposals.
+- `ai_audit_log(id, actor, tool, input jsonb, output jsonb, approved, created_at)` — every tool execution.
 
-**New pages:**
-- `src/pages/admin/Reminders.tsx` (simple list to view/dismiss/snooze)
+All admin-only RLS (`has_role(auth.uid(),'admin')`), full GRANTs to authenticated + service_role.
 
-## Out of scope
+## Edge functions
 
-- International shipping (reminder set instead)
-- Insurance upsell
-- Customer-supplied labels
-- Multi-package shipments
+- `admin-ai-chat` — streaming chat endpoint (`useChat` transport). Validates admin, runs the tool loop, persists messages, writes audit log.
+- `admin-ai-scan` — scheduled research job; writes `ai_suggestions`.
+- `admin-ai-execute` — runs a previously approved suggestion/tool call as the admin user.
 
-## What I need from you before building
+## UI files
 
-1. Confirm shop **origin address** (street, city, state, ZIP) to use for label generation.
-2. You'll need to create a Shippo account and grab your API key + webhook secret — I'll request them via add_secret when we're ready to build.
+- `src/pages/admin/AIAssistant.tsx` — full chat surface (threads sidebar + AI Elements transcript + composer).
+- `src/pages/admin/AISuggestions.tsx` — inbox with approve/dismiss.
+- `src/components/admin/InlineAIButton.tsx` — reusable "✨ AI" trigger embedded in ProductEdit, ShopOrders, Job pages.
+- Sidebar link in admin layout + unread suggestion badge.
+
+## Approval UX
+
+Tool calls render inline in chat with input params collapsed. Destructive tools show **Apply / Reject** buttons; nothing mutates DB until you click Apply. Inline buttons follow the same flow — the drawer shows the proposed change diff before applying.
+
+## Out of scope (for this pass)
+
+- Direct edits to source code/components (the agent can't redeploy your app).
+- Refunds (Stripe refund stays manual until you ask for it).
+- Autonomous mode — every write is approval-gated as you requested.
