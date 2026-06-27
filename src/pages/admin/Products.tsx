@@ -27,7 +27,7 @@ export default function Products() {
   const [restoring, setRestoring] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [confirm, setConfirm] = useState<{ ids: string[]; label: string } | null>(null);
+  const [pubConfirm, setConfirm] = useState<{ ids: string[]; label: string } | null>(null);
 
   const { data: products } = useQuery({
     queryKey: ["admin-shop-products"],
@@ -68,8 +68,8 @@ export default function Products() {
   }
 
   async function runPublish() {
-    if (!confirm) return;
-    const ids = confirm.ids;
+    if (!pubConfirm) return;
+    const ids = pubConfirm.ids;
     setBulkBusy(true);
     try {
       const { error } = await supabase.from("shop_products").update({ status: "available" }).in("id", ids);
@@ -225,15 +225,15 @@ export default function Products() {
         })}
       </div>
 
-      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && !bulkBusy && setConfirm(null)}>
+      <AlertDialog open={!!pubConfirm} onOpenChange={(o) => !o && !bulkBusy && setConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Publish to the live shop?</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirm && (
+              {pubConfirm && (
                 <>
-                  This will set <strong>{confirm.label}</strong> to <strong>Available</strong> and make
-                  {confirm.ids.length === 1 ? " it" : " them"} immediately visible and purchasable on /shop.
+                  This will set <strong>{pubConfirm.label}</strong> to <strong>Available</strong> and make
+                  {pubConfirm.ids.length === 1 ? " it" : " them"} immediately visible and purchasable on /shop.
                 </>
               )}
             </AlertDialogDescription>
