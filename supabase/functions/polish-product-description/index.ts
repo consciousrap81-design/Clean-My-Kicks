@@ -38,7 +38,12 @@ Deno.serve(async (req) => {
     const user = await verifyAdmin(req);
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const { raw, product } = await req.json() as { raw: string; product?: { name?: string; brand?: string; model?: string; size?: string; condition?: string; price?: string } };
+    const { raw, product, tone, density } = await req.json() as {
+      raw: string;
+      product?: { name?: string; brand?: string; model?: string; size?: string; condition?: string; price?: string };
+      tone?: "luxury" | "casual" | "technical";
+      density?: "light" | "standard" | "bold";
+    };
     if (!raw || !raw.trim()) {
       return new Response(JSON.stringify({ error: "Empty description" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -48,10 +53,25 @@ Deno.serve(async (req) => {
 
     const ctx = product ? `Product context:\n${JSON.stringify(product)}\n\n` : "";
 
+    const toneGuide: Record<string, string> = {
+      luxury: "Tone: LUXURY — refined, aspirational, restrained. Favor evocative nouns and short declarative lines. Avoid hype words like 'fire' or 'heat'.",
+      casual: "Tone: CASUAL — conversational sneakerhead voice, friendly and confident, light slang OK (no profanity).",
+      technical: "Tone: TECHNICAL — precise, spec-forward, neutral. Lead with materials, measurements, restoration steps, and condition grading.",
+    };
+    const densityGuide: Record<string, string> = {
+      light: "Formatting density: LIGHT — 1-2 short paragraphs, at most one bullet list of ≤4 items, sparse **bold** (only the headline spec).",
+      standard: "Formatting density: STANDARD — 2-3 sections with bold mini-headers (e.g. **Restoration**, **Includes**, **Condition**), bullets where natural, moderate **bold** on key specs.",
+      bold: "Formatting density: BOLD — fully sectioned with bold mini-headers, multiple bullet lists, generous **bold** on every spec/callout, and a closing one-line tagline.",
+    };
+    const styleBlock = `${toneGuide[tone ?? "casual"]}\n${densityGuide[density ?? "standard"]}`;
+
     const { text } = await generateText({
       model: gateway("google/gemini-3-flash-preview"),
       system: `You are "Kicks", a copywriter for Clean My Kicks (sneaker restoration shop, Denton TX).
 You rewrite messy pasted product descriptions into clean, scannable, customer-ready markdown that fits a 1-of-1 restored sneaker listing.
+
+Style controls (follow strictly):
+${styleBlock}
 
 Rules:
 - Output VALID JSON only: {"formatted":"<markdown>","summary":"<one short paragraph for SEO meta, <=160 chars>","highlights":["bullet 1","bullet 2"],"font_suggestion":"<short note about typographic emphasis e.g. bold sizing line>","notes":"<1-2 sentences explaining your changes>"}
