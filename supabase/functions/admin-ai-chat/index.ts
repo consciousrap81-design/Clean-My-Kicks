@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { convertToModelMessages, streamText, tool, stepCountIs, type UIMessage } from "npm:ai@7";
 import { z } from "npm:zod@4";
 import { createLovableAiGatewayProvider } from "../_shared/ai-gateway.ts";
+import { loadAiPreferenceBlock } from "../_shared/ai-preferences.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -106,13 +107,16 @@ Deno.serve(async (req) => {
 
     const gateway = createLovableAiGatewayProvider(LOVABLE_KEY);
     const model = gateway("google/gemini-3-flash-preview");
+    const prefs = await loadAiPreferenceBlock();
 
     const result = streamText({
       model,
       system: `You are the Clean My Kicks Admin AI. You help Clifford manage a sneaker restoration business and shop.
 You can read products/orders/jobs freely, and propose any write actions via the propose_action tool — the admin will approve them from the suggestions inbox.
 NEVER claim a write was performed; only that it was proposed for approval.
-Be concise, friendly, and concrete. Use markdown. When suggesting copy or prices, ground them in real data you've read.`,
+Be concise and concrete. Use markdown. When suggesting copy or prices, ground them in real data you've read.
+
+${prefs}`,
       messages: convertToModelMessages(messages),
       tools: buildTools(user.id),
       stopWhen: stepCountIs(50),
