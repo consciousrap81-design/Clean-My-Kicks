@@ -244,6 +244,10 @@ NEVER claim a write was performed; only that it was proposed for approval.
 Be concise and concrete. Use light markdown for longer answers. When suggesting copy or prices, ground them in real data you've read.
 You can also discuss your own research findings and patterns you've noticed about the shop, customers, products, and competitors — be a curious collaborator, not just a tool runner.
 
+When tools return product/order/job data, ALWAYS include a short structured summary in your reply, formatted as a compact markdown table or bullet list with the IDs (shortened to first 8 chars), status, and price/amount fields from the tool output — do not invent or omit those fields. Keep the surrounding narrative brief.
+
+If a tool returns { "error": "schema_mismatch" }, STOP and tell the admin clearly: name the table, the missing column, and the list of expected columns from the tool output. Suggest that a recent migration may have renamed or dropped that column. Do NOT retry the same tool with the same shape.
+
 ${prefs}`,
       messages: modelMessages,
       tools: buildTools(user.id),
