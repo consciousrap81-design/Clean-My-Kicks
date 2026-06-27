@@ -10,6 +10,16 @@ import { toast } from "sonner";
 import { signedPhotoUrls } from "@/lib/shop";
 import { useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function Products() {
   const qc = useQueryClient();
@@ -17,6 +27,7 @@ export default function Products() {
   const [restoring, setRestoring] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [confirm, setConfirm] = useState<{ ids: string[]; label: string } | null>(null);
 
   const { data: products } = useQuery({
     queryKey: ["admin-shop-products"],
@@ -56,28 +67,37 @@ export default function Products() {
     qc.invalidateQueries({ queryKey: ["admin-shop-products"] });
   }
 
-  async function publishOne(pid: string) {
-    const { error } = await supabase.from("shop_products").update({ status: "available" }).eq("id", pid);
-    if (error) return toast.error(error.message);
-    toast.success("Published — now live on /shop");
-    qc.invalidateQueries({ queryKey: ["admin-shop-products"] });
-  }
-
-  async function publishSelected() {
-    const ids = Array.from(selected);
-    if (!ids.length) return;
+  async function runPublish() {
+    if (!confirm) return;
+    const ids = confirm.ids;
     setBulkBusy(true);
     try {
       const { error } = await supabase.from("shop_products").update({ status: "available" }).in("id", ids);
       if (error) throw error;
-      toast.success(`Published ${ids.length} product${ids.length === 1 ? "" : "s"}`);
-      setSelected(new Set());
-      qc.invalidateQueries({ queryKey: ["admin-shop-products"] });
+      toast.success(`Published ${ids.length} product${ids.length === 1 ? "" : "s"} — now live on /shop`);
+      setSelected((s) => {
+        const n = new Set(s);
+        ids.forEach((i) => n.delete(i));
+        return n;
+      });
+      await qc.invalidateQueries({ queryKey: ["admin-shop-products"] });
     } catch (e: any) {
       toast.error(e.message);
     } finally {
       setBulkBusy(false);
+      setConfirm(null);
     }
+  }
+
+  function askPublishOne(p: any) {
+    const label = [p.brand, p.model].filter(Boolean).join(" ") || p.name;
+    setConfirm({ ids: [p.id], label });
+  }
+
+  function askPublishSelected() {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    setConfirm({ ids, label: `${ids.length} selected draft${ids.length === 1 ? "" : "s"}` });
   }
 
   function toggleSel(pid: string) {
@@ -140,7 +160,7 @@ export default function Products() {
                 <span className="text-muted-foreground">· {selected.size} selected</span>
               )}
             </div>
-            <Button size="sm" onClick={publishSelected} disabled={bulkBusy || selected.size === 0}>
+            <Button size="sm" onClick={askPublishSelected} disabled={bulkBusy || selected.size === 0}>
               <Rocket className="w-4 h-4 mr-1" /> Publish Selected
             </Button>
           </CardContent>
@@ -183,7 +203,7 @@ export default function Products() {
                 </div>
                 <div className="flex gap-1">
                   {p.status === "draft" && (
-                    <Button size="sm" onClick={() => publishOne(p.id)} className="hidden sm:inline-flex">
+                    <Button size="sm" onClick={() => askPublishOne(p)} className="hidden sm:inline-flex">
                       <Rocket className="w-4 h-4 mr-1" /> Publish Now
                     </Button>
                   )}
@@ -204,17 +224,40 @@ export default function Products() {
           );
         })}
       </div>
+
+      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && !bulkBusy && setConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Publish to the live shop?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirm && (
+                <>
+                  This will set <strong>{confirm.label}</strong> to <strong>Available</strong> and make
+                  {confirm.ids.length === 1 ? " it" : " them"} immediately visible and purchasable on /shop.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); runPublish(); }} disabled={bulkBusy}>
+              <Rocket className="w-4 h-4 mr-1" /> Yes, publish
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    draft: "bg-slate-200 text-slate-800",
-    available: "bg-emerald-100 text-emerald-800",
-    reserved: "bg-amber-100 text-amber-800",
-    sold: "bg-blue-100 text-blue-800",
-    archived: "bg-slate-100 text-slate-500",
+  const map: Record<string, { cls: string; label: string }> = {
+    draft: { cls: "bg-slate-200 text-slate-800", label: "Draft" },
+    available: { cls: "bg-emerald-100 text-emerald-800", label: "Published" },
+    reserved: { cls: "bg-amber-100 text-amber-800", label: "Reserved" },
+    sold: { cls: "bg-blue-100 text-blue-800", label: "Sold" },
+    archived: { cls: "bg-slate-100 text-slate-500", label: "Archived" },
   };
-  return <Badge className={map[status] || ""} variant="secondary">{status}</Badge>;
+  const m = map[status] || { cls: "", label: status };
+  return <Badge className={m.cls} variant="secondary">{m.label}</Badge>;
 }
