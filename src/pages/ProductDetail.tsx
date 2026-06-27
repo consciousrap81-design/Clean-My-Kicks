@@ -9,6 +9,7 @@ import Footer from "@/components/Footer";
 import Seo from "@/components/Seo";
 import { getShopSessionId, signedPhotoUrls, type ShopProduct } from "@/lib/shop";
 import ReviewsSection from "@/components/shop/ReviewsSection";
+import ReactMarkdown from "react-markdown";
 
 type Photo = { id: string; storage_path: string; is_primary: boolean; sort_order: number };
 
@@ -222,9 +223,9 @@ export default function ProductDetail() {
             </div>
 
             {product.description && (
-              <p className="mt-6 text-sm md:text-base text-foreground/80 whitespace-pre-line leading-relaxed">
-                {product.description}
-              </p>
+              <div className="mt-6 text-sm md:text-base text-foreground/80 leading-relaxed prose prose-sm md:prose-base dark:prose-invert max-w-none prose-headings:font-display prose-strong:text-foreground">
+                <ReactMarkdown>{product.description}</ReactMarkdown>
+              </div>
             )}
 
             <div className="mt-8">
