@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Send, Sparkles, Trash2, Wrench, Mic, MicOff, Settings2, Search, Radio, Lock, Unlock } from "lucide-react";
+import { Plus, Send, Sparkles, Trash2, Wrench, Mic, MicOff, Settings2, Search, Radio, Lock, Unlock, AlertTriangle, Package, ShoppingBag, Hammer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
@@ -350,6 +350,19 @@ function MessageView({ message }: { message: UIMessage }) {
           }
           if (part.type?.startsWith?.("tool-") || part.toolName) {
             const name = part.toolName ?? part.type?.replace("tool-", "");
+            const output = part.output;
+            const card = renderToolOutput(name, output);
+            if (card) {
+              return (
+                <div key={i} className="my-2 space-y-2">
+                  {card}
+                  <details className="rounded border bg-muted/40 text-xs">
+                    <summary className="cursor-pointer px-2 py-1 flex items-center gap-1.5 text-muted-foreground"><Wrench className="h-3 w-3" /> {name} — raw</summary>
+                    <pre className="px-2 pb-2 overflow-x-auto"><code>{JSON.stringify(part.input ?? part.output ?? part, null, 2)}</code></pre>
+                  </details>
+                </div>
+              );
+            }
             return (
               <details key={i} className="my-2 rounded border bg-muted/40 text-xs">
                 <summary className="cursor-pointer px-2 py-1 flex items-center gap-1.5"><Wrench className="h-3 w-3" /> {name} <span className="text-muted-foreground">— {part.state ?? "done"}</span></summary>
@@ -362,4 +375,92 @@ function MessageView({ message }: { message: UIMessage }) {
       </div>
     </div>
   );
+}
+
+function short(id?: string) { return id ? String(id).slice(0, 8) : ""; }
+
+function renderToolOutput(name: string, output: any): JSX.Element | null {
+  if (!output || typeof output !== "object") return null;
+
+  if (output.error === "schema_mismatch") {
+    return (
+      <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+        <div className="flex items-center gap-2 font-medium text-destructive">
+          <AlertTriangle className="h-4 w-4" /> Schema mismatch on <code className="text-xs">{output.table}</code>
+        </div>
+        <div className="mt-1.5 text-xs">
+          Missing column: <code className="bg-background px-1 rounded">{output.missing_column ?? "unknown"}</code>
+        </div>
+        {Array.isArray(output.expected_columns) && output.expected_columns.length > 0 && (
+          <div className="mt-1.5 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Expected columns:</span> {output.expected_columns.join(", ")}
+          </div>
+        )}
+        {output.detail && <div className="mt-1.5 text-[11px] text-muted-foreground font-mono break-all">{output.detail}</div>}
+        <div className="mt-2 text-[11px] text-muted-foreground">A recent migration may have renamed or dropped that column. Update the AI tool's <code>select(...)</code> to match the live schema.</div>
+      </div>
+    );
+  }
+
+  if (output.kind === "products" && Array.isArray(output.products)) {
+    return (
+      <div className="rounded-lg border bg-card p-2 text-sm">
+        <div className="flex items-center gap-1.5 px-1 py-1 text-xs text-muted-foreground"><Package className="h-3 w-3" /> {output.count} product{output.count === 1 ? "" : "s"}</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="text-muted-foreground">
+              <tr className="text-left"><th className="px-2 py-1">ID</th><th className="px-2 py-1">Name</th><th className="px-2 py-1">Size</th><th className="px-2 py-1">Status</th><th className="px-2 py-1 text-right">Price</th></tr>
+            </thead>
+            <tbody>
+              {output.products.map((p: any) => (
+                <tr key={p.id} className="border-t"><td className="px-2 py-1 font-mono">{short(p.id)}</td><td className="px-2 py-1">{[p.brand, p.model || p.name].filter(Boolean).join(" ")}</td><td className="px-2 py-1">{p.size ?? "—"}</td><td className="px-2 py-1"><Badge variant="secondary" className="text-[10px]">{p.status}</Badge></td><td className="px-2 py-1 text-right font-medium">{p.price_formatted ?? "—"}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  if (output.kind === "orders" && Array.isArray(output.orders)) {
+    return (
+      <div className="rounded-lg border bg-card p-2 text-sm">
+        <div className="flex items-center gap-1.5 px-1 py-1 text-xs text-muted-foreground"><ShoppingBag className="h-3 w-3" /> {output.count} order{output.count === 1 ? "" : "s"}</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="text-muted-foreground">
+              <tr className="text-left"><th className="px-2 py-1">ID</th><th className="px-2 py-1">Customer</th><th className="px-2 py-1">Status</th><th className="px-2 py-1">Promo</th><th className="px-2 py-1 text-right">Amount</th></tr>
+            </thead>
+            <tbody>
+              {output.orders.map((o: any) => (
+                <tr key={o.id} className="border-t"><td className="px-2 py-1 font-mono">{short(o.id)}</td><td className="px-2 py-1">{o.customer ?? "—"}</td><td className="px-2 py-1"><Badge variant="secondary" className="text-[10px]">{o.status}</Badge></td><td className="px-2 py-1">{o.promo_code ?? "—"}</td><td className="px-2 py-1 text-right font-medium">{o.amount_formatted ?? "—"}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  if (output.kind === "jobs" && Array.isArray(output.jobs)) {
+    return (
+      <div className="rounded-lg border bg-card p-2 text-sm">
+        <div className="flex items-center gap-1.5 px-1 py-1 text-xs text-muted-foreground"><Hammer className="h-3 w-3" /> {output.count} job{output.count === 1 ? "" : "s"}</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="text-muted-foreground">
+              <tr className="text-left"><th className="px-2 py-1">ID</th><th className="px-2 py-1">Shoe</th><th className="px-2 py-1">Status</th><th className="px-2 py-1">Payment</th><th className="px-2 py-1 text-right">Quoted</th></tr>
+            </thead>
+            <tbody>
+              {output.jobs.map((j: any) => (
+                <tr key={j.id} className="border-t"><td className="px-2 py-1 font-mono">{short(j.id)}</td><td className="px-2 py-1">{j.shoe ?? "—"}</td><td className="px-2 py-1"><Badge variant="secondary" className="text-[10px]">{j.status}</Badge></td><td className="px-2 py-1">{j.payment_status ?? "—"}</td><td className="px-2 py-1 text-right font-medium">{j.quoted_price_formatted ?? "—"}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
