@@ -274,6 +274,37 @@ export default function ProductEdit() {
             </Select>
           </div>
           <div className="md:col-span-2"><Label>Description</Label><Textarea rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Restoration notes, what was done, any flaws to disclose…" /></div>
+
+          {/* Public-page preview — mirrors ProductDetail.tsx heading/subtitle exactly */}
+          {(form.name || form.brand || form.model) && (
+            <div className="md:col-span-2 rounded-lg border border-dashed bg-secondary/40 p-4">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                Public page preview
+              </div>
+              {(() => {
+                const display = [form.brand, form.model].filter(Boolean).join(" ") || form.name;
+                const showSub = form.name && form.name !== display;
+                return (
+                  <>
+                    <div className="font-display text-2xl md:text-3xl text-foreground leading-tight">
+                      {display || "—"}
+                    </div>
+                    {showSub && (
+                      <div className="mt-1 text-sm md:text-base text-muted-foreground font-medium">
+                        {form.name}
+                      </div>
+                    )}
+                    {form.price && (
+                      <div className="font-display text-xl text-primary mt-1">
+                        ${Number(form.price).toFixed(2)}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
           <div className="md:col-span-2 flex flex-wrap gap-2">
             <Button onClick={save} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -303,7 +334,8 @@ export default function ProductEdit() {
           <CardContent>
             {photos.length > 0 && (
               <p className="text-xs text-muted-foreground mb-2">
-                Drag photos to reorder. The primary photo always appears first on the shop.
+                Drag to reorder. Click the <Star className="inline w-3 h-3 mx-0.5" /> to set the <strong>cover photo</strong> —
+                this is the image shown in shop listings and at the top of the product page.
               </p>
             )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
@@ -323,11 +355,13 @@ export default function ProductEdit() {
                     <img src={urls[p.storage_path]} alt="" className="w-full h-full object-contain p-1" />
                   )}
                   {p.is_primary && (
-                    <span className="absolute top-1 left-1 bg-primary text-primary-foreground text-[10px] uppercase px-1.5 py-0.5 rounded">Primary</span>
+                    <span className="absolute top-1 left-1 bg-primary text-primary-foreground text-[10px] uppercase px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                      <Star className="w-2.5 h-2.5 fill-current" /> Cover
+                    </span>
                   )}
                   <div className="absolute bottom-1 right-1 flex gap-1">
                     {!p.is_primary && (
-                      <Button size="icon" variant="secondary" className="h-7 w-7" onClick={() => setPrimary(p.id)}>
+                      <Button size="icon" variant="secondary" className="h-7 w-7" title="Set as cover photo" onClick={() => setPrimary(p.id)}>
                         <Star className="w-3 h-3" />
                       </Button>
                     )}
