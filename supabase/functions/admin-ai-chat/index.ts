@@ -36,7 +36,8 @@ function buildTools(actorId: string) {
   const KNOWN_COLUMNS: Record<string, string[]> = {
     shop_products: ["id","name","brand","model","size","condition","description","price","status","view_count","reserved_until","reserved_session_id","sold_at","sold_order_id","created_at","updated_at"],
     shop_orders: ["id","product_id","product_snapshot","user_id","customer_email","customer_name","shipping_address","amount","currency","status","stripe_session_id","stripe_payment_intent","tracking_number","tracking_carrier","paid_at","shipped_at","created_at","updated_at","review_request_sent_at","discount_cents","promo_code","shipping_method"],
-    jobs: ["id","customer_id","service_id","shoe_brand","shoe_model","condition_notes","quoted_price","payment_status","status","intake_date","due_date","completion_date","admin_notes","lead_source_id","created_at","updated_at","user_id"],
+    jobs: ["id","customer_id","service_id","shoe_brand","shoe_model","shoe_material","cleaning_guide_id","condition_notes","quoted_price","payment_status","status","intake_date","due_date","completion_date","admin_notes","lead_source_id","created_at","updated_at","user_id"],
+    cleaning_guides: ["id","material","title","summary","recommended_chemicals","brush_stiffness","tools","steps","cautions","estimated_minutes","source","created_by","created_at","updated_at"],
   };
   function schemaError(table: string, message: string) {
     // Parse `column <table>.<col> does not exist` from PostgREST/Postgres
@@ -165,6 +166,78 @@ function buildTools(actorId: string) {
       inputSchema: z.object({ topic: z.string(), findings: z.string() }),
       execute: async ({ topic, findings }) => ({ topic, findings, recorded: true }),
     }),
+    list_cleaning_guides: tool({
+      description: "List restoration cleaning guides. Optionally filter by shoe material (Suede, Leather, Mesh, Canvas, Knit, etc.).",
+      inputSchema: z.object({ material: z.string().optional(), limit: z.number().min(1).max(50).default(20) }),
+      execute: async ({ material, limit }) => {
+        let q = a.from("cleaning_guides").select("id,material,title,summary,brush_stiffness,estimated_minutes,source,updated_at").order("updated_at", { ascending: false }).limit(limit);
+        if (material) q = q.ilike("material", material);
+        const { data, error } = await q;
+        if (error) return schemaError("cleaning_guides", error.message);
+        return { kind: "cleaning_guides", count: data?.length ?? 0, guides: data ?? [] };
+      },
+    }),
+    get_cleaning_guide: tool({
+      description: "Get the full restoration protocol for a cleaning guide by id, including chemicals, tools, steps, and cautions.",
+      inputSchema: z.object({ id: z.string().uuid() }),
+      execute: async ({ id }) => {
+        const { data, error } = await a.from("cleaning_guides").select("*").eq("id", id).maybeSingle();
+        if (error) return schemaError("cleaning_guides", error.message);
+        return { kind: "cleaning_guide", guide: data };
+      },
+    }),
+    suggest_cleaning_protocol_for_job: tool({
+      description: "Given a job id, look up the job's shoe material (or infer from shoe_brand/model/condition_notes) and return the best matching cleaning guide(s). Read-only — does not modify the job.",
+      inputSchema: z.object({ job_id: z.string().uuid() }),
+      execute: async ({ job_id }) => {
+        const { data: job, error: je } = await a.from("jobs").select("id,shoe_brand,shoe_model,shoe_material,cleaning_guide_id,condition_notes").eq("id", job_id).maybeSingle();
+        if (je) return schemaError("jobs", je.message);
+        if (!job) return { error: "job_not_found", job_id };
+        const material = job.shoe_material;
+        let matches: any[] = [];
+        if (material) {
+          const { data } = await a.from("cleaning_guides").select("id,material,title,summary,brush_stiffness,recommended_chemicals,tools,steps,cautions,estimated_minutes").ilike("material", material);
+          matches = data ?? [];
+        }
+        if (matches.length === 0) {
+          const { data } = await a.from("cleaning_guides").select("id,material,title,summary,brush_stiffness,estimated_minutes").limit(20);
+          matches = data ?? [];
+        }
+        return { kind: "protocol_suggestion", job: { id: job.id, shoe: [job.shoe_brand, job.shoe_model].filter(Boolean).join(" "), material, current_guide_id: job.cleaning_guide_id, condition_notes: job.condition_notes }, guides: matches };
+      },
+    }),
+    add_cleaning_guide: tool({
+      description: "Create a new cleaning guide when Kicks has learned a new restoration protocol (e.g. for a material or technique not yet covered). Use sparingly — only when the protocol is concrete and actionable. Tagged with source='kicks_ai'.",
+      inputSchema: z.object({
+        material: z.string(),
+        title: z.string(),
+        summary: z.string().optional(),
+        recommended_chemicals: z.array(z.object({ name: z.string(), purpose: z.string().optional(), dilution: z.string().optional() })).default([]),
+        brush_stiffness: z.string().optional(),
+        tools: z.array(z.string()).default([]),
+        steps: z.array(z.object({ order: z.number(), title: z.string(), instruction: z.string(), caution: z.string().nullable().optional() })).min(1),
+        cautions: z.string().optional(),
+        estimated_minutes: z.number().optional(),
+      }),
+      execute: async (input) => {
+        const { data, error } = await a.from("cleaning_guides").insert({
+          material: input.material,
+          title: input.title,
+          summary: input.summary ?? null,
+          recommended_chemicals: input.recommended_chemicals,
+          brush_stiffness: input.brush_stiffness ?? null,
+          tools: input.tools,
+          steps: input.steps,
+          cautions: input.cautions ?? null,
+          estimated_minutes: input.estimated_minutes ?? null,
+          source: "kicks_ai",
+          created_by: actorId,
+        }).select("id,material,title").single();
+        if (error) return schemaError("cleaning_guides", error.message);
+        await a.from("ai_audit_log").insert({ actor: actorId, tool: "add_cleaning_guide", input, output: data, approved: true });
+        return { kind: "cleaning_guide_created", guide: data };
+      },
+    }),
   };
 }
 
@@ -243,6 +316,8 @@ You can read products/orders/jobs freely, and propose any write actions via the 
 NEVER claim a write was performed; only that it was proposed for approval.
 Be concise and concrete. Use light markdown for longer answers. When suggesting copy or prices, ground them in real data you've read.
 You can also discuss your own research findings and patterns you've noticed about the shop, customers, products, and competitors — be a curious collaborator, not just a tool runner.
+
+You have a Cleaning Guides knowledge base (table: cleaning_guides) indexed by shoe material (Suede, Leather, Mesh, Canvas, Knit, etc.). When a new or selected job involves restoration, use suggest_cleaning_protocol_for_job or list_cleaning_guides/get_cleaning_guide to recommend the right chemicals, brush stiffness, tools, and step-by-step instructions. If you discover a genuinely new, concrete protocol (e.g. for a material/technique not yet in the guides), you may use add_cleaning_guide to save it — tag your learnings clearly in the summary, and don't duplicate guides that already exist.
 
 When tools return product/order/job data, ALWAYS include a short structured summary in your reply, formatted as a compact markdown table or bullet list with the IDs (shortened to first 8 chars), status, and price/amount fields from the tool output — do not invent or omit those fields. Keep the surrounding narrative brief.
 
