@@ -222,9 +222,9 @@ export default function ProductDetail() {
             </div>
 
             {product.description && (
-              <p className="mt-6 text-sm md:text-base text-foreground/80 whitespace-pre-line leading-relaxed">
-                {product.description}
-              </p>
+              <div className="mt-6 text-sm md:text-base text-foreground/80 leading-relaxed prose prose-sm md:prose-base dark:prose-invert max-w-none prose-headings:font-display prose-strong:text-foreground">
+                <ReactMarkdown>{product.description}</ReactMarkdown>
+              </div>
             )}
 
             <div className="mt-8">
