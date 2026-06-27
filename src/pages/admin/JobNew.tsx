@@ -113,6 +113,27 @@ export default function JobNew() {
           </CardContent>
         </Card>
         <Card>
+          <CardHeader><CardTitle className="text-base">Material & Protocol</CardTitle></CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            <div>
+              <Label>Shoe Material</Label>
+              <Select value={form.shoe_material} onValueChange={(v) => { set("shoe_material", v); set("cleaning_guide_id", ""); }}>
+                <SelectTrigger><SelectValue placeholder="Pick material to see suggested protocol" /></SelectTrigger>
+                <SelectContent>
+                  {MATERIALS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="md:col-span-2">
+              <SuggestedProtocol
+                material={form.shoe_material}
+                guideId={form.cleaning_guide_id || null}
+                onApplyGuide={(gid) => set("cleaning_guide_id", gid)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
           <CardHeader><CardTitle className="text-base">Pricing & Dates</CardTitle></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
             <div><Label>Quoted Price</Label><Input type="number" step="0.01" value={form.quoted_price} onChange={(e) => set("quoted_price", e.target.value)} /></div>
