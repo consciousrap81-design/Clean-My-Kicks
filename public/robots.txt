@@ -12,3 +12,13 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /account
+Disallow: /auth
+Disallow: /quote/
+Disallow: /request/
+Disallow: /recover-cart
+Disallow: /unsubscribe
+Disallow: /shop/order/success
+
+Sitemap: https://cleanmykicks.com/sitemap.xml

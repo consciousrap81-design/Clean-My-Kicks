@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Loader2, PackageSearch, Sparkles, ExternalLink, Truck, Download, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import Seo from "@/components/Seo";
 
 type Shipment = {
   id: string;
@@ -180,6 +181,11 @@ export default function Track() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo
+        title="Track Your Order | Clean My Kicks"
+        description="Track your Clean My Kicks shipment by order or tracking number. View status, ETA, and full delivery history."
+        path="/track"
+      />
       <header className="border-b">
         <div className="max-w-3xl mx-auto px-6 py-5 flex items-center gap-3">
           <div className="h-9 w-9 rounded-md bg-primary flex items-center justify-center">
