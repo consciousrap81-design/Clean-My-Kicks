@@ -202,6 +202,18 @@ export default function JobDetail() {
               </Select>
             </div>
             <div><Label>Condition Notes</Label><Textarea value={form.condition_notes || ""} onChange={(e) => set("condition_notes", e.target.value)} /></div>
+            <div>
+              <Label>Shoe Material</Label>
+              <Select
+                value={form.shoe_material || ""}
+                onValueChange={(v) => { set("shoe_material", v); set("cleaning_guide_id", null); }}
+              >
+                <SelectTrigger><SelectValue placeholder="Pick material" /></SelectTrigger>
+                <SelectContent>
+                  {MATERIALS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
 
@@ -232,6 +244,12 @@ export default function JobDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <SuggestedProtocol
+        material={form.shoe_material}
+        guideId={form.cleaning_guide_id}
+        onApplyGuide={(gid) => set("cleaning_guide_id", gid)}
+      />
 
       <Card>
         <CardHeader><CardTitle className="text-base">Payments — Paid ${totalPaid.toFixed(2)} / Balance ${balance.toFixed(2)}</CardTitle></CardHeader>
