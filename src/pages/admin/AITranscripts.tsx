@@ -46,10 +46,12 @@ export default function AITranscripts() {
       setLoading(true);
       const [{ data: t }, { data: m }] = await Promise.all([
         supabase.from("ai_threads").select("id,title,updated_at,is_private").eq("is_private", false).order("updated_at", { ascending: false }),
-        supabase.from("ai_messages").select("id,thread_id,role,parts,created_at,ai_threads!inner(is_private)").eq("ai_threads.is_private", false).order("created_at", { ascending: false }).limit(2000),
+        supabase.from("ai_messages").select("id,thread_id,role,parts,created_at").order("created_at", { ascending: false }).limit(2000),
       ]);
-      setThreads((t ?? []) as ThreadRow[]);
-      setMessages((m ?? []) as MsgRow[]);
+      const tt = (t ?? []) as ThreadRow[];
+      const allowed = new Set(tt.map((x) => x.id));
+      setThreads(tt);
+      setMessages(((m ?? []) as MsgRow[]).filter((x) => allowed.has(x.thread_id)));
       setLoading(false);
     })();
   }, []);
