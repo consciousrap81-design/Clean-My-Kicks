@@ -6,6 +6,7 @@ import { Eye, Users, Clock, ArrowLeft, ShoppingBag, Loader2 } from "lucide-react
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import Seo from "@/components/Seo";
 import { getShopSessionId, signedPhotoUrls, type ShopProduct } from "@/lib/shop";
 import ReviewsSection from "@/components/shop/ReviewsSection";
 
@@ -122,9 +123,41 @@ export default function ProductDetail() {
   const canBuy = !isSold && (!isReserved || reservedByMe);
   const activePhoto = photos[activeIdx];
   const activeUrl = activePhoto ? urls[activePhoto.storage_path] : null;
+  const ogImage = photos[0] ? urls[photos[0].storage_path] : undefined;
+  const priceUsd = ((product as any).price_cents ?? 0) / 100;
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: display,
+    description: (product as any).description || `${display} restored by Clean My Kicks.`,
+    image: ogImage ? [ogImage] : undefined,
+    brand: { "@type": "Brand", name: product.brand || "Clean My Kicks" },
+    sku: product.id,
+    offers: {
+      "@type": "Offer",
+      url: `https://cleanmykicks.com/shop/${product.id}`,
+      priceCurrency: "USD",
+      price: priceUsd.toFixed(2),
+      availability: isSold
+        ? "https://schema.org/SoldOut"
+        : isReserved
+        ? "https://schema.org/LimitedAvailability"
+        : "https://schema.org/InStock",
+      itemCondition: "https://schema.org/RefurbishedCondition",
+    },
+  };
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-12">
+      <Seo
+        title={`${display} — Restored Sneakers | Clean My Kicks`}
+        description={((product as any).description || `${display} restored, cleaned, and ready to ship from Denton, TX. Shop one-of-one pairs at Clean My Kicks.`).slice(0, 160)}
+        path={`/shop/${product.id}`}
+        image={ogImage}
+        type="product"
+        jsonLd={productJsonLd}
+        noindex={isSold}
+      />
       <Navbar />
       <div className="container px-4 pt-24 md:pt-32">
         <Link to="/#shop" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary mb-6">
