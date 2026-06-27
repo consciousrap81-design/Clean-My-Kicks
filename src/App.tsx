@@ -110,6 +110,7 @@ const App = () => (
               <Route path="ai/insights" element={<AIInsights />} />
               <Route path="ai/transcripts" element={<AITranscripts />} />
               <Route path="ai/:threadId" element={<AIAssistant />} />
+              <Route path="cleaning-guides" element={<CleaningGuides />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
