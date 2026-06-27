@@ -9,6 +9,7 @@ import Footer from "@/components/Footer";
 import Seo from "@/components/Seo";
 import { getShopSessionId, signedPhotoUrls, type ShopProduct } from "@/lib/shop";
 import ReviewsSection from "@/components/shop/ReviewsSection";
+import ReactMarkdown from "react-markdown";
 
 type Photo = { id: string; storage_path: string; is_primary: boolean; sort_order: number };
 
