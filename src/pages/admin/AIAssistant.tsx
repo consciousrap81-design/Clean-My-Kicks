@@ -179,7 +179,10 @@ export default function AIAssistant() {
             {threads.map((t) => (
               <div key={t.id} className={`group flex items-center gap-1 rounded px-2 py-1.5 text-sm cursor-pointer hover:bg-accent ${t.id === threadId ? "bg-accent" : ""}`}
                 onClick={() => navigate(`/admin/ai/${t.id}`)}>
-                <span className="flex-1 truncate">{t.title}</span>
+                <span className="flex-1 truncate flex items-center gap-1.5">
+                  {t.is_private && <Lock className="h-3 w-3 text-muted-foreground shrink-0" />}
+                  <span className="truncate">{t.title}</span>
+                </span>
                 <button onClick={(e) => { e.stopPropagation(); deleteThread(t.id); }} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
