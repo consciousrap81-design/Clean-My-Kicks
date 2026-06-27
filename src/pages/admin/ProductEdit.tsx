@@ -80,7 +80,18 @@ export default function ProductEdit() {
       .eq("product_id", id!)
       .order("is_primary", { ascending: false })
       .order("sort_order", { ascending: true });
-    const ph = (data ?? []) as Photo[];
+    let ph = (data ?? []) as Photo[];
+    // Fallback: if photos exist but none is marked as Cover, promote the first one
+    if (ph.length > 0 && !ph.some((p) => p.is_primary)) {
+      const first = ph[0];
+      const { error } = await supabase
+        .from("shop_product_photos")
+        .update({ is_primary: true })
+        .eq("id", first.id);
+      if (!error) {
+        ph = ph.map((p, i) => ({ ...p, is_primary: i === 0 }));
+      }
+    }
     setPhotos(ph);
     const u = await signedPhotoUrls(ph.map((p) => p.storage_path));
     setUrls(u);
