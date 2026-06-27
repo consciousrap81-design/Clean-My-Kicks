@@ -29,6 +29,8 @@ import ShopOrders from "./pages/admin/ShopOrders";
 import AbandonedCarts from "./pages/admin/AbandonedCarts";
 import AdminReviews from "./pages/admin/Reviews";
 import AdminStatus from "./pages/admin/Status";
+import AIAssistant from "./pages/admin/AIAssistant";
+import AISuggestions from "./pages/admin/AISuggestions";
 import QuoteView from "./pages/QuoteView";
 import ProductDetail from "./pages/ProductDetail";
 import ShopOrderSuccess from "./pages/ShopOrderSuccess";
@@ -98,6 +100,9 @@ const App = () => (
               <Route path="settings" element={<Settings />} />
               <Route path="email-preview" element={<EmailPreview />} />
               <Route path="status" element={<AdminStatus />} />
+              <Route path="ai" element={<AIAssistant />} />
+              <Route path="ai/:threadId" element={<AIAssistant />} />
+              <Route path="ai/suggestions" element={<AISuggestions />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
