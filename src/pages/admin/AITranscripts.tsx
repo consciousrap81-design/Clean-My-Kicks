@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Search, MessageSquare, Sparkles, ExternalLink } from "lucide-react";
+import { Search, MessageSquare, Sparkles, ExternalLink, Lock } from "lucide-react";
 
-type ThreadRow = { id: string; title: string; updated_at: string };
+type ThreadRow = { id: string; title: string; updated_at: string; is_private: boolean };
 type MsgRow = { id: string; thread_id: string; role: string; parts: any; created_at: string };
 
 function partsToText(parts: any): string {
@@ -45,11 +45,13 @@ export default function AITranscripts() {
     (async () => {
       setLoading(true);
       const [{ data: t }, { data: m }] = await Promise.all([
-        supabase.from("ai_threads").select("id,title,updated_at").order("updated_at", { ascending: false }),
+        supabase.from("ai_threads").select("id,title,updated_at,is_private").eq("is_private", false).order("updated_at", { ascending: false }),
         supabase.from("ai_messages").select("id,thread_id,role,parts,created_at").order("created_at", { ascending: false }).limit(2000),
       ]);
-      setThreads((t ?? []) as ThreadRow[]);
-      setMessages((m ?? []) as MsgRow[]);
+      const tt = (t ?? []) as ThreadRow[];
+      const allowed = new Set(tt.map((x) => x.id));
+      setThreads(tt);
+      setMessages(((m ?? []) as MsgRow[]).filter((x) => allowed.has(x.thread_id)));
       setLoading(false);
     })();
   }, []);
@@ -79,6 +81,7 @@ export default function AITranscripts() {
           <p className="text-sm text-muted-foreground">Every Kicks conversation is auto-saved. Search past research, decisions, and site notes.</p>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Private chats excluded</Badge>
           <Badge variant="outline">{totalThreads} threads</Badge>
           <Badge variant="outline">{totalMsgs.toLocaleString()} messages indexed</Badge>
         </div>
