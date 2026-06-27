@@ -31,6 +31,28 @@ async function verifyAdmin(req: Request) {
 
 function buildTools(actorId: string) {
   const a = admin();
+  // Known columns per table (kept in sync with migrations). Used to detect
+  // schema drift and surface a clear admin warning when a query fails.
+  const KNOWN_COLUMNS: Record<string, string[]> = {
+    shop_products: ["id","name","brand","model","size","condition","description","price","status","view_count","reserved_until","reserved_session_id","sold_at","sold_order_id","created_at","updated_at"],
+    shop_orders: ["id","product_id","product_snapshot","user_id","customer_email","customer_name","shipping_address","amount","currency","status","stripe_session_id","stripe_payment_intent","tracking_number","tracking_carrier","paid_at","shipped_at","created_at","updated_at","review_request_sent_at","discount_cents","promo_code","shipping_method"],
+    jobs: ["id","customer_id","service_id","shoe_brand","shoe_model","condition_notes","quoted_price","payment_status","status","intake_date","due_date","completion_date","admin_notes","lead_source_id","created_at","updated_at","user_id"],
+  };
+  function schemaError(table: string, message: string) {
+    // Parse `column <table>.<col> does not exist` from PostgREST/Postgres
+    const m = message.match(/column\s+(?:"?([\w.]+)"?\.)?"?([\w]+)"?\s+does not exist/i);
+    const missing = m?.[2];
+    return {
+      error: "schema_mismatch",
+      table,
+      missing_column: missing ?? null,
+      detail: message,
+      expected_columns: KNOWN_COLUMNS[table] ?? [],
+      admin_warning: missing
+        ? `Schema drift detected on ${table}: column "${missing}" was requested but does not exist. Expected one of: ${(KNOWN_COLUMNS[table] ?? []).join(", ")}.`
+        : `Schema error on ${table}: ${message}`,
+    };
+  }
   return {
     search_products: tool({
       description: "Search shop products by name/brand/model. Returns up to 20 results.",
@@ -40,8 +62,24 @@ function buildTools(actorId: string) {
         if (q) query = query.or(`name.ilike.%${q}%,brand.ilike.%${q}%,model.ilike.%${q}%`);
         if (status) query = query.eq("status", status);
         const { data, error } = await query;
-        if (error) return { error: error.message };
-        return { products: data };
+        if (error) return schemaError("shop_products", error.message);
+        return {
+          kind: "products",
+          count: data?.length ?? 0,
+          products: (data ?? []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            brand: p.brand,
+            model: p.model,
+            size: p.size,
+            condition: p.condition,
+            status: p.status,
+            price: p.price != null ? Number(p.price) : null,
+            price_formatted: p.price != null ? `$${Number(p.price).toFixed(2)}` : null,
+            views: p.view_count ?? 0,
+            created_at: p.created_at,
+          })),
+        };
       },
     }),
     get_product: tool({
@@ -49,8 +87,8 @@ function buildTools(actorId: string) {
       inputSchema: z.object({ id: z.string().uuid() }),
       execute: async ({ id }) => {
         const { data, error } = await a.from("shop_products").select("*").eq("id", id).maybeSingle();
-        if (error) return { error: error.message };
-        return { product: data };
+        if (error) return schemaError("shop_products", error.message);
+        return { kind: "product", product: data };
       },
     }),
     list_orders: tool({
@@ -58,8 +96,24 @@ function buildTools(actorId: string) {
       inputSchema: z.object({ limit: z.number().min(1).max(50).default(20) }),
       execute: async ({ limit }) => {
         const { data, error } = await a.from("shop_orders").select("id,status,amount,currency,customer_email,customer_name,created_at,shipping_method,tracking_number,tracking_carrier,promo_code,discount_cents").order("created_at", { ascending: false }).limit(limit);
-        if (error) return { error: error.message };
-        return { orders: data };
+        if (error) return schemaError("shop_orders", error.message);
+        return {
+          kind: "orders",
+          count: data?.length ?? 0,
+          orders: (data ?? []).map((o: any) => ({
+            id: o.id,
+            status: o.status,
+            customer: o.customer_name || o.customer_email,
+            customer_email: o.customer_email,
+            amount: o.amount != null ? Number(o.amount) : null,
+            amount_formatted: o.amount != null ? `$${Number(o.amount).toFixed(2)} ${String(o.currency || "usd").toUpperCase()}` : null,
+            discount_cents: o.discount_cents ?? 0,
+            promo_code: o.promo_code,
+            shipping_method: o.shipping_method,
+            tracking: o.tracking_number ? `${o.tracking_carrier ?? ""} ${o.tracking_number}`.trim() : null,
+            created_at: o.created_at,
+          })),
+        };
       },
     }),
     list_jobs: tool({
@@ -69,8 +123,26 @@ function buildTools(actorId: string) {
         let q = a.from("jobs").select("id,status,payment_status,shoe_brand,shoe_model,quoted_price,intake_date,due_date,completion_date,admin_notes,condition_notes,customer_id,created_at").order("created_at", { ascending: false }).limit(limit);
         if (status) q = q.eq("status", status);
         const { data, error } = await q;
-        if (error) return { error: error.message };
-        return { jobs: data };
+        if (error) return schemaError("jobs", error.message);
+        return {
+          kind: "jobs",
+          count: data?.length ?? 0,
+          jobs: (data ?? []).map((j: any) => ({
+            id: j.id,
+            status: j.status,
+            payment_status: j.payment_status,
+            shoe: [j.shoe_brand, j.shoe_model].filter(Boolean).join(" ") || null,
+            quoted_price: j.quoted_price != null ? Number(j.quoted_price) : null,
+            quoted_price_formatted: j.quoted_price != null ? `$${Number(j.quoted_price).toFixed(2)}` : null,
+            intake_date: j.intake_date,
+            due_date: j.due_date,
+            completion_date: j.completion_date,
+            condition_notes: j.condition_notes,
+            admin_notes: j.admin_notes,
+            customer_id: j.customer_id,
+            created_at: j.created_at,
+          })),
+        };
       },
     }),
     propose_action: tool({
@@ -171,6 +243,10 @@ You can read products/orders/jobs freely, and propose any write actions via the 
 NEVER claim a write was performed; only that it was proposed for approval.
 Be concise and concrete. Use light markdown for longer answers. When suggesting copy or prices, ground them in real data you've read.
 You can also discuss your own research findings and patterns you've noticed about the shop, customers, products, and competitors — be a curious collaborator, not just a tool runner.
+
+When tools return product/order/job data, ALWAYS include a short structured summary in your reply, formatted as a compact markdown table or bullet list with the IDs (shortened to first 8 chars), status, and price/amount fields from the tool output — do not invent or omit those fields. Keep the surrounding narrative brief.
+
+If a tool returns { "error": "schema_mismatch" }, STOP and tell the admin clearly: name the table, the missing column, and the list of expected columns from the tool output. Suggest that a recent migration may have renamed or dropped that column. Do NOT retry the same tool with the same shape.
 
 ${prefs}`,
       messages: modelMessages,
