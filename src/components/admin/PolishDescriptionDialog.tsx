@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, Loader2, Check, RotateCw, Type, History, X, Undo2 } from "lucide-react";
+import { Sparkles, Loader2, Check, RotateCw, Type, History, X, Undo2, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
@@ -41,9 +41,16 @@ export default function PolishDescriptionDialog({ open, onOpenChange, original, 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [edited, setEdited] = useState("");
   const [accepted, setAccepted] = useState<Record<number, boolean>>({});
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const active = versions.find((v) => v.id === activeId) || null;
   const blocks = useMemo(() => splitBlocks(edited), [edited]);
+  const previewMarkdown = useMemo(
+    () => blocks.filter((_, i) => accepted[i] !== false).join("\n\n"),
+    [blocks, accepted],
+  );
+  const displayTitle = [product?.brand, product?.model].filter(Boolean).join(" ") || product?.name || "Product";
+  const showSub = !!product?.name && product.name !== displayTitle;
 
   // Load persisted versions when product context changes
   useEffect(() => {
@@ -280,6 +287,9 @@ export default function PolishDescriptionDialog({ open, onOpenChange, original, 
               <Button variant="ghost" onClick={reset}>
                 Back
               </Button>
+              <Button variant="outline" onClick={() => setPreviewOpen(true)} disabled={!previewMarkdown.trim()}>
+                <Eye className="h-4 w-4 mr-2" /> Customer preview
+              </Button>
               <Button variant="outline" onClick={run} disabled={busy}>
                 {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCw className="h-4 w-4 mr-2" />}
                 Regenerate
@@ -291,6 +301,31 @@ export default function PolishDescriptionDialog({ open, onOpenChange, original, 
           </div>
         )}
       </DialogContent>
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Customer preview</DialogTitle>
+            <DialogDescription>How this description will render on the public product page.</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border bg-background p-5">
+            <div className="font-display text-2xl md:text-3xl text-foreground leading-tight">{displayTitle}</div>
+            {showSub && <div className="mt-1 text-sm md:text-base text-muted-foreground font-medium">{product?.name}</div>}
+            {product?.price && (
+              <div className="font-display text-xl text-primary mt-1">${Number(product.price).toFixed(2)}</div>
+            )}
+            {previewMarkdown ? (
+              <div className="mt-6 text-sm md:text-base text-foreground/80 leading-relaxed prose prose-sm md:prose-base dark:prose-invert max-w-none prose-headings:font-display prose-strong:text-foreground">
+                <ReactMarkdown>{previewMarkdown}</ReactMarkdown>
+              </div>
+            ) : (
+              <div className="mt-6 text-sm text-muted-foreground italic">(no blocks selected)</div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPreviewOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
