@@ -274,6 +274,37 @@ export default function ProductEdit() {
             </Select>
           </div>
           <div className="md:col-span-2"><Label>Description</Label><Textarea rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Restoration notes, what was done, any flaws to disclose…" /></div>
+
+          {/* Public-page preview — mirrors ProductDetail.tsx heading/subtitle exactly */}
+          {(form.name || form.brand || form.model) && (
+            <div className="md:col-span-2 rounded-lg border border-dashed bg-secondary/40 p-4">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                Public page preview
+              </div>
+              {(() => {
+                const display = [form.brand, form.model].filter(Boolean).join(" ") || form.name;
+                const showSub = form.name && form.name !== display;
+                return (
+                  <>
+                    <div className="font-display text-2xl md:text-3xl text-foreground leading-tight">
+                      {display || "—"}
+                    </div>
+                    {showSub && (
+                      <div className="mt-1 text-sm md:text-base text-muted-foreground font-medium">
+                        {form.name}
+                      </div>
+                    )}
+                    {form.price && (
+                      <div className="font-display text-xl text-primary mt-1">
+                        ${Number(form.price).toFixed(2)}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
           <div className="md:col-span-2 flex flex-wrap gap-2">
             <Button onClick={save} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
