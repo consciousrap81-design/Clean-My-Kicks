@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Send, Sparkles, Trash2, Wrench, Mic, MicOff, Settings2, Search, Radio } from "lucide-react";
+import { Plus, Send, Sparkles, Trash2, Wrench, Mic, MicOff, Settings2, Search, Radio, Lock, Unlock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
@@ -29,7 +29,7 @@ function loadVoicePrefs(): { mode: VoiceMode; sensitivity: WakeSensitivity } {
   return { mode: "wake", sensitivity: "medium" };
 }
 
-type Thread = { id: string; title: string; updated_at: string };
+type Thread = { id: string; title: string; updated_at: string; is_private: boolean };
 
 export default function AIAssistant() {
   const { threadId } = useParams<{ threadId?: string }>();
@@ -49,7 +49,7 @@ export default function AIAssistant() {
 
   // Load threads
   useEffect(() => {
-    supabase.from("ai_threads").select("id,title,updated_at").order("updated_at", { ascending: false })
+    supabase.from("ai_threads").select("id,title,updated_at,is_private").order("updated_at", { ascending: false })
       .then(({ data }) => setThreads((data ?? []) as Thread[]));
   }, []);
 
@@ -142,7 +142,7 @@ export default function AIAssistant() {
   async function newThread() {
     const { data: user } = await supabase.auth.getUser();
     if (!user.user) return;
-    const { data } = await supabase.from("ai_threads").insert({ user_id: user.user.id, title: "New conversation" }).select("id,title,updated_at").single();
+    const { data } = await supabase.from("ai_threads").insert({ user_id: user.user.id, title: "New conversation" }).select("id,title,updated_at,is_private").single();
     if (data) { setThreads((t) => [data as Thread, ...t]); navigate(`/admin/ai/${data.id}`); }
   }
 
@@ -151,6 +151,16 @@ export default function AIAssistant() {
     await supabase.from("ai_threads").delete().eq("id", id);
     setThreads((t) => t.filter((x) => x.id !== id));
     if (id === threadId) navigate("/admin/ai");
+  }
+
+  const activeThread = threads.find((t) => t.id === threadId);
+  async function togglePrivacy() {
+    if (!activeThread) return;
+    const next = !activeThread.is_private;
+    const { error } = await supabase.from("ai_threads").update({ is_private: next }).eq("id", activeThread.id);
+    if (error) { toast.error(error.message); return; }
+    setThreads((ts) => ts.map((t) => t.id === activeThread.id ? { ...t, is_private: next } : t));
+    toast.success(next ? "Conversation marked private — excluded from transcripts." : "Conversation is no longer private.");
   }
 
   if (initialMessages === null && threadId) {
@@ -185,6 +195,9 @@ export default function AIAssistant() {
             <Sparkles className="h-4 w-4 text-primary" />
             <span className="font-display">Kicks</span>
             <span className="text-xs text-muted-foreground hidden sm:inline">— your shop AI</span>
+            {activeThread?.is_private && (
+              <Badge variant="secondary" className="gap-1"><Lock className="h-3 w-3" /> Private</Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {voiceOn && voiceMode === "wake" && voice.heardWake && <Badge variant="secondary" className="animate-pulse">Listening for command…</Badge>}
@@ -194,6 +207,17 @@ export default function AIAssistant() {
             <Button asChild size="sm" variant="ghost" title="Search transcripts">
               <Link to="/admin/ai/transcripts"><Search className="h-4 w-4" /></Link>
             </Button>
+            {activeThread && (
+              <Button
+                size="sm"
+                variant={activeThread.is_private ? "default" : "outline"}
+                onClick={togglePrivacy}
+                title={activeThread.is_private ? "Private — excluded from transcripts" : "Mark conversation private"}
+              >
+                {activeThread.is_private ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                <span className="ml-1.5 hidden sm:inline">{activeThread.is_private ? "Private" : "Private off"}</span>
+              </Button>
+            )}
             {voiceOn && (
               <Popover>
                 <PopoverTrigger asChild>
