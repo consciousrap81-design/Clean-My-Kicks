@@ -8,6 +8,7 @@ import { Eye, Clock, ArrowRight, Sparkles, Wrench, Paintbrush, Search, X } from 
 import { formatDistanceToNow } from "date-fns";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import Seo from "@/components/Seo";
 import { signedPhotoUrls, type ShopProduct } from "@/lib/shop";
 import BuyNowButton from "@/components/shop/BuyNowButton";
 import AddSneakerToCartButton from "@/components/shop/AddSneakerToCartButton";
@@ -199,6 +200,11 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-0">
+      <Seo
+        title="Restored Kicks for Sale | Clean My Kicks Shop"
+        description="Shop one-of-one restored sneakers, cleaning kits, and laces from Clean My Kicks. Authentic, hand-restored Jordans, Nikes, and more — shipped from Denton, TX."
+        path="/shop"
+      />
       <Navbar />
 
       {/* Hero */}
