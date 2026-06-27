@@ -98,20 +98,65 @@ function buildTools(actorId: string) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const reqId = crypto.randomUUID().slice(0, 8);
+  const t0 = Date.now();
+  const log = (label: string, data?: unknown) => {
+    try {
+      console.log(`[admin-ai-chat ${reqId}] ${label}`, data !== undefined ? JSON.stringify(data) : "");
+    } catch {
+      console.log(`[admin-ai-chat ${reqId}] ${label} <unserializable>`);
+    }
+  };
+  log("incoming", { method: req.method, url: req.url, ua: req.headers.get("user-agent") });
   try {
     const user = await verifyAdmin(req);
-    if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!user) {
+      log("unauthorized");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    log("admin verified", { user_id: user.id });
 
-    const body = await req.json();
+    const rawBodyText = await req.text();
+    log("raw body", { length: rawBodyText.length, preview: rawBodyText.slice(0, 4000) });
+    let body: any;
+    try {
+      body = JSON.parse(rawBodyText);
+    } catch (parseErr) {
+      log("JSON parse error", { error: String(parseErr) });
+      return new Response(JSON.stringify({ error: "Invalid JSON body", detail: String(parseErr) }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const { messages: rawMessages, threadId } = body as { messages: UIMessage[]; threadId?: string };
+    log("parsed body", {
+      threadId,
+      bodyKeys: Object.keys(body ?? {}),
+      rawMessagesType: Array.isArray(rawMessages) ? "array" : typeof rawMessages,
+      rawMessagesLen: Array.isArray(rawMessages) ? rawMessages.length : undefined,
+    });
     const messages: UIMessage[] = Array.isArray(rawMessages) ? rawMessages : [];
     if (!Array.isArray(rawMessages)) {
       console.warn("admin-ai-chat: messages was not an array", { keys: Object.keys(body ?? {}), type: typeof rawMessages });
     }
     if (messages.length === 0) {
+      log("empty messages, rejecting", { rawMessages });
       return new Response(JSON.stringify({ error: "No messages provided" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const modelMessages = await convertToModelMessages(messages);
+    log("messages summary", messages.map((m: any, i) => ({
+      i,
+      role: m?.role,
+      hasParts: Array.isArray(m?.parts),
+      partsLen: Array.isArray(m?.parts) ? m.parts.length : undefined,
+      partTypes: Array.isArray(m?.parts) ? m.parts.map((p: any) => p?.type) : undefined,
+      hasContent: m?.content !== undefined,
+      contentType: typeof m?.content,
+    })));
+    let modelMessages;
+    try {
+      modelMessages = await convertToModelMessages(messages);
+      log("convertToModelMessages ok", { count: modelMessages.length });
+    } catch (convErr) {
+      log("convertToModelMessages FAILED", { error: String(convErr), stack: (convErr as Error)?.stack, messages });
+      return new Response(JSON.stringify({ error: "Failed to convert messages", detail: String(convErr) }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const gateway = createLovableAiGatewayProvider(LOVABLE_KEY);
     const model = gateway("google/gemini-3-flash-preview");
@@ -132,6 +177,7 @@ ${prefs}`,
       tools: buildTools(user.id),
       stopWhen: stepCountIs(50),
       onFinish: async ({ response }) => {
+        log("onFinish", { ms: Date.now() - t0, responseMsgs: response.messages.length });
         if (!threadId) return;
         try {
           const a = admin();
@@ -145,14 +191,15 @@ ${prefs}`,
           }
           await a.from("ai_threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
         } catch (e) {
-          console.error("persist error", e);
+          log("persist error", { error: String(e), stack: (e as Error)?.stack });
         }
       },
     });
 
+    log("streaming response start", { ms: Date.now() - t0 });
     return result.toUIMessageStreamResponse({ headers: corsHeaders });
   } catch (e) {
-    console.error(e);
+    log("FATAL handler error", { error: String(e), stack: (e as Error)?.stack, ms: Date.now() - t0 });
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
