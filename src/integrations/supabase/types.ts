@@ -130,6 +130,47 @@ export type Database = {
           },
         ]
       }
+      ai_feedback: {
+        Row: {
+          action: string
+          actor: string | null
+          created_at: string
+          id: string
+          kind: string | null
+          reason: string | null
+          suggestion_id: string | null
+          suggestion_snapshot: Json
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          created_at?: string
+          id?: string
+          kind?: string | null
+          reason?: string | null
+          suggestion_id?: string | null
+          suggestion_snapshot?: Json
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          created_at?: string
+          id?: string
+          kind?: string | null
+          reason?: string | null
+          suggestion_id?: string | null
+          suggestion_snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_feedback_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "ai_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_messages: {
         Row: {
           created_at: string
@@ -161,6 +202,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_settings: {
+        Row: {
+          auto_apply_safe: boolean
+          created_at: string
+          custom_instructions: string
+          forbidden_phrases: string[]
+          id: string
+          preferred_phrases: string[]
+          singleton: boolean
+          tone: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auto_apply_safe?: boolean
+          created_at?: string
+          custom_instructions?: string
+          forbidden_phrases?: string[]
+          id?: string
+          preferred_phrases?: string[]
+          singleton?: boolean
+          tone?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auto_apply_safe?: boolean
+          created_at?: string
+          custom_instructions?: string
+          forbidden_phrases?: string[]
+          id?: string
+          preferred_phrases?: string[]
+          singleton?: boolean
+          tone?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       ai_suggestions: {
         Row: {
