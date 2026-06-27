@@ -287,7 +287,23 @@ export default function ProductEdit() {
               </SelectContent>
             </Select>
           </div>
-          <div className="md:col-span-2"><Label>Description</Label><Textarea rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Restoration notes, what was done, any flaws to disclose…" /></div>
+          <div className="md:col-span-2">
+            <div className="flex items-center justify-between mb-1">
+              <Label>Description</Label>
+              <Button type="button" size="sm" variant="outline" onClick={() => setPolishOpen(true)} disabled={!form.description.trim()}>
+                <Sparkles className="h-3.5 w-3.5 mr-1" /> Polish with Kicks
+              </Button>
+            </div>
+            <Textarea rows={6} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Paste raw notes — Kicks can reformat with bullets, sections, and bold highlights." />
+            <p className="text-[11px] text-muted-foreground mt-1">Markdown supported on the public page: <code>**bold**</code>, <code>- bullets</code>, and headings.</p>
+          </div>
+          <PolishDescriptionDialog
+            open={polishOpen}
+            onOpenChange={setPolishOpen}
+            original={form.description}
+            product={{ name: form.name, brand: form.brand, model: form.model, size: form.size, condition: form.condition, price: form.price }}
+            onAccept={(formatted) => setForm((f) => ({ ...f, description: formatted }))}
+          />
 
           {/* Public-page preview — mirrors ProductDetail.tsx heading/subtitle exactly */}
           {(form.name || form.brand || form.model) && (
