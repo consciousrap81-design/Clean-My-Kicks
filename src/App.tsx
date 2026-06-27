@@ -101,8 +101,8 @@ const App = () => (
               <Route path="email-preview" element={<EmailPreview />} />
               <Route path="status" element={<AdminStatus />} />
               <Route path="ai" element={<AIAssistant />} />
-              <Route path="ai/:threadId" element={<AIAssistant />} />
               <Route path="ai/suggestions" element={<AISuggestions />} />
+              <Route path="ai/:threadId" element={<AIAssistant />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
