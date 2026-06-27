@@ -50,6 +50,125 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_audit_log: {
+        Row: {
+          actor: string | null
+          approved: boolean
+          created_at: string
+          id: string
+          input: Json | null
+          output: Json | null
+          tool: string
+        }
+        Insert: {
+          actor?: string | null
+          approved?: boolean
+          created_at?: string
+          id?: string
+          input?: Json | null
+          output?: Json | null
+          tool: string
+        }
+        Update: {
+          actor?: string | null
+          approved?: boolean
+          created_at?: string
+          id?: string
+          input?: Json | null
+          output?: Json | null
+          tool?: string
+        }
+        Relationships: []
+      }
+      ai_messages: {
+        Row: {
+          created_at: string
+          id: string
+          parts: Json
+          role: string
+          thread_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parts?: Json
+          role: string
+          thread_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parts?: Json
+          role?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "ai_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_suggestions: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          payload: Json
+          resolved_at: string | null
+          status: string
+          summary: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          payload?: Json
+          resolved_at?: string | null
+          status?: string
+          summary?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          resolved_at?: string | null
+          status?: string
+          summary?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      ai_threads: {
+        Row: {
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       booking_requests: {
         Row: {
           accepted_quote_id: string | null
