@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
 
     const { text } = await generateText({
       model: gateway("google/gemini-3-flash-preview"),
-      system: "You are an SMB growth advisor for a sneaker restoration shop in Denton, TX (Clean My Kicks). Look at the JSON and produce 3-6 concrete, prioritized suggestions. Each suggestion: title (<=60 chars), summary (1-2 sentences), kind (one of: publish_product, follow_up_request, restock_alert, marketing_idea, pricing_idea, content_idea). Reply as JSON array only.",
+      system: "You are an SMB growth advisor for a sneaker restoration shop in Denton, TX (Clean My Kicks). Look at the JSON and produce 3-6 concrete, prioritized suggestions. Each suggestion MUST be a JSON object with: title (<=60 chars), summary (1-2 sentences), kind (one of: publish_product, follow_up_request, restock_alert, marketing_idea, pricing_idea, content_idea), reasoning (1-2 sentences explaining why), sources (array of 1-3 objects: {title, url, snippet} citing the internal data row OR a credible external reference such as a competitor URL, industry report, or pricing guide). Reply as JSON array only.",
       prompt: JSON.stringify(context),
     });
 
@@ -37,7 +37,13 @@ Deno.serve(async (req) => {
         kind: s.kind ?? "marketing_idea",
         title: String(s.title ?? "Suggestion").slice(0, 200),
         summary: String(s.summary ?? "").slice(0, 1000),
-        payload: { source: "scheduled_scan", raw: s, context },
+        payload: {
+          source: "scheduled_scan",
+          reasoning: s.reasoning ?? null,
+          sources: Array.isArray(s.sources) ? s.sources.slice(0, 6) : [],
+          raw: s,
+          context,
+        },
         status: "pending",
       }));
       await a.from("ai_suggestions").insert(rows);
