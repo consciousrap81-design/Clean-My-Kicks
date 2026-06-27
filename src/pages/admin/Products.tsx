@@ -5,15 +5,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
+import { Eye, Plus, Pencil, Trash2, RotateCcw, Rocket, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { signedPhotoUrls } from "@/lib/shop";
 import { useEffect } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function Products() {
   const qc = useQueryClient();
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [restoring, setRestoring] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const { data: products } = useQuery({
     queryKey: ["admin-shop-products"],
@@ -53,6 +56,41 @@ export default function Products() {
     qc.invalidateQueries({ queryKey: ["admin-shop-products"] });
   }
 
+  async function publishOne(pid: string) {
+    const { error } = await supabase.from("shop_products").update({ status: "available" }).eq("id", pid);
+    if (error) return toast.error(error.message);
+    toast.success("Published — now live on /shop");
+    qc.invalidateQueries({ queryKey: ["admin-shop-products"] });
+  }
+
+  async function publishSelected() {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    setBulkBusy(true);
+    try {
+      const { error } = await supabase.from("shop_products").update({ status: "available" }).in("id", ids);
+      if (error) throw error;
+      toast.success(`Published ${ids.length} product${ids.length === 1 ? "" : "s"}`);
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["admin-shop-products"] });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  function toggleSel(pid: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      n.has(pid) ? n.delete(pid) : n.add(pid);
+      return n;
+    });
+  }
+
+  const draftIds = (products || []).filter((p: any) => p.status === "draft").map((p: any) => p.id);
+  const allDraftsSelected = draftIds.length > 0 && draftIds.every((id: string) => selected.has(id));
+
   async function restoreStaged() {
     if (!confirm("Recreate the 3 previously staged draft products?")) return;
     setRestoring(true);
@@ -87,6 +125,28 @@ export default function Products() {
         </div>
       </div>
 
+      {draftIds.length > 0 && (
+        <Card>
+          <CardContent className="p-3 flex flex-wrap items-center gap-3 justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={allDraftsSelected}
+                onCheckedChange={(c) =>
+                  setSelected(c ? new Set(draftIds) : new Set())
+                }
+              />
+              <span>Select all drafts ({draftIds.length})</span>
+              {selected.size > 0 && (
+                <span className="text-muted-foreground">· {selected.size} selected</span>
+              )}
+            </div>
+            <Button size="sm" onClick={publishSelected} disabled={bulkBusy || selected.size === 0}>
+              <Rocket className="w-4 h-4 mr-1" /> Publish Selected
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-3">
         {(products || []).length === 0 && (
           <Card><CardContent className="p-8 text-center text-muted-foreground">
@@ -102,6 +162,12 @@ export default function Products() {
           return (
             <Card key={p.id}>
               <CardContent className="p-3 md:p-4 flex items-center gap-3">
+                {p.status === "draft" && (
+                  <Checkbox
+                    checked={selected.has(p.id)}
+                    onCheckedChange={() => toggleSel(p.id)}
+                  />
+                )}
                 <div className="w-16 h-16 md:w-20 md:h-20 bg-secondary rounded-lg overflow-hidden shrink-0">
                   {img && <img src={img} alt={display} className="w-full h-full object-contain p-1" />}
                 </div>
@@ -116,6 +182,16 @@ export default function Products() {
                   <div className="mt-1.5"><StatusBadge status={p.status} /></div>
                 </div>
                 <div className="flex gap-1">
+                  {p.status === "draft" && (
+                    <Button size="sm" onClick={() => publishOne(p.id)} className="hidden sm:inline-flex">
+                      <Rocket className="w-4 h-4 mr-1" /> Publish Now
+                    </Button>
+                  )}
+                  <Button asChild variant="ghost" size="icon" title="Preview on Shop">
+                    <Link to={`/shop/${p.id}`} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="w-4 h-4" />
+                    </Link>
+                  </Button>
                   <Button asChild variant="ghost" size="icon">
                     <Link to={`/admin/products/${p.id}`}><Pencil className="w-4 h-4" /></Link>
                   </Button>

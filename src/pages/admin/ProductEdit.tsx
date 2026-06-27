@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Star, Trash2, Upload } from "lucide-react";
+import { Loader2, Star, Trash2, Upload, Rocket, ExternalLink } from "lucide-react";
 import { signedPhotoUrls } from "@/lib/shop";
 import { PRODUCT_TEMPLATES } from "@/lib/productTemplates";
 
@@ -117,6 +117,27 @@ export default function ProductEdit() {
     }
   }
 
+  async function publishNow() {
+    if (isNew) {
+      toast.error("Save the product first");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("shop_products")
+        .update({ status: "available" })
+        .eq("id", id!);
+      if (error) throw error;
+      setForm((f) => ({ ...f, status: "available" }));
+      toast.success("Published — now live on /shop");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
     if (isNew) {
       toast.error("Save the product first");
@@ -210,11 +231,25 @@ export default function ProductEdit() {
             </Select>
           </div>
           <div className="md:col-span-2"><Label>Description</Label><Textarea rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Restoration notes, what was done, any flaws to disclose…" /></div>
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 flex flex-wrap gap-2">
             <Button onClick={save} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {isNew ? "Create Product" : "Save Changes"}
             </Button>
+            {!isNew && (
+              <>
+                <Button asChild variant="outline">
+                  <a href={`/shop/${id}`} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="w-4 h-4 mr-2" /> Preview on Shop
+                  </a>
+                </Button>
+                {form.status !== "available" && (
+                  <Button variant="default" onClick={publishNow} disabled={saving}>
+                    <Rocket className="w-4 h-4 mr-2" /> Publish Now
+                  </Button>
+                )}
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
