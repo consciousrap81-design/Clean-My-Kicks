@@ -401,6 +401,57 @@ export type Database = {
           },
         ]
       }
+      cleaning_guides: {
+        Row: {
+          brush_stiffness: string | null
+          cautions: string | null
+          created_at: string
+          created_by: string | null
+          estimated_minutes: number | null
+          id: string
+          material: string
+          recommended_chemicals: Json
+          source: string | null
+          steps: Json
+          summary: string | null
+          title: string
+          tools: Json
+          updated_at: string
+        }
+        Insert: {
+          brush_stiffness?: string | null
+          cautions?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_minutes?: number | null
+          id?: string
+          material: string
+          recommended_chemicals?: Json
+          source?: string | null
+          steps?: Json
+          summary?: string | null
+          title: string
+          tools?: Json
+          updated_at?: string
+        }
+        Update: {
+          brush_stiffness?: string | null
+          cautions?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_minutes?: number | null
+          id?: string
+          material?: string
+          recommended_chemicals?: Json
+          source?: string | null
+          steps?: Json
+          summary?: string | null
+          title?: string
+          tools?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -608,6 +659,7 @@ export type Database = {
       jobs: {
         Row: {
           admin_notes: string | null
+          cleaning_guide_id: string | null
           completion_date: string | null
           condition_notes: string | null
           created_at: string
@@ -620,6 +672,7 @@ export type Database = {
           quoted_price: number
           service_id: string | null
           shoe_brand: string | null
+          shoe_material: string | null
           shoe_model: string | null
           status: Database["public"]["Enums"]["job_status"]
           updated_at: string
@@ -627,6 +680,7 @@ export type Database = {
         }
         Insert: {
           admin_notes?: string | null
+          cleaning_guide_id?: string | null
           completion_date?: string | null
           condition_notes?: string | null
           created_at?: string
@@ -639,6 +693,7 @@ export type Database = {
           quoted_price?: number
           service_id?: string | null
           shoe_brand?: string | null
+          shoe_material?: string | null
           shoe_model?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           updated_at?: string
@@ -646,6 +701,7 @@ export type Database = {
         }
         Update: {
           admin_notes?: string | null
+          cleaning_guide_id?: string | null
           completion_date?: string | null
           condition_notes?: string | null
           created_at?: string
@@ -658,12 +714,20 @@ export type Database = {
           quoted_price?: number
           service_id?: string | null
           shoe_brand?: string | null
+          shoe_material?: string | null
           shoe_model?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           updated_at?: string
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "jobs_cleaning_guide_id_fkey"
+            columns: ["cleaning_guide_id"]
+            isOneToOne: false
+            referencedRelation: "cleaning_guides"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "jobs_customer_id_fkey"
             columns: ["customer_id"]
