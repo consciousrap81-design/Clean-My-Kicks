@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ListChecks, Users, Wrench, Settings, LogOut, Sparkles, Inbox, FileText, Mail, ShoppingBag, Package, ShoppingCart, MessageSquare, Boxes, Tag, Activity, Lightbulb, SlidersHorizontal } from "lucide-react";
+import { LayoutDashboard, ListChecks, Users, Wrench, Settings, LogOut, Sparkles, Inbox, FileText, Mail, ShoppingBag, Package, ShoppingCart, MessageSquare, Boxes, Tag, Activity, Lightbulb, SlidersHorizontal, BarChart3 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
@@ -25,6 +25,7 @@ const nav = [
   { to: "/admin/status", label: "System Status", icon: Activity },
   { to: "/admin/ai", label: "AI Assistant", icon: Sparkles },
   { to: "/admin/ai/suggestions", label: "AI Suggestions", icon: Lightbulb },
+  { to: "/admin/ai/insights", label: "AI Insights", icon: BarChart3 },
   { to: "/admin/ai/settings", label: "AI Settings", icon: SlidersHorizontal },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
