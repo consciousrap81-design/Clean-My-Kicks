@@ -30,6 +30,9 @@ const WAKE_PATTERNS: Record<WakeSensitivity, string[]> = {
   loose: ["hey kicks", "hi kicks", "ok kicks", "okay kicks", "yo kicks", "kicks", "kix", "ticks", "kick"],
 };
 
+const COMMAND_SILENCE_MS = 1300;
+const COMMAND_TIMEOUT_MS = 9000;
+
 function stripWakeWord(text: string, sensitivity: WakeSensitivity): string | null {
   const t = normalize(text);
   for (const p of WAKE_PATTERNS[sensitivity]) {
@@ -61,18 +64,59 @@ export function useKicksVoice(opts: {
   sensitivityRef.current = sensitivity;
   const pushBufferRef = useRef<string>("");
   const wakeTriggeredRef = useRef(false);
-  const commandBufferRef = useRef("");
+  const commandFinalRef = useRef("");
+  const commandInterimRef = useRef("");
   const commandTimerRef = useRef<any>(null);
+  const commandTimeoutRef = useRef<any>(null);
+  const lastFinalChunkRef = useRef("");
 
-  const flushCommand = useCallback(() => {
-    const text = commandBufferRef.current.trim();
-    commandBufferRef.current = "";
+  const clearCommandTimers = useCallback(() => {
     if (commandTimerRef.current) { clearTimeout(commandTimerRef.current); commandTimerRef.current = null; }
+    if (commandTimeoutRef.current) { clearTimeout(commandTimeoutRef.current); commandTimeoutRef.current = null; }
+  }, []);
+
+  const currentCommandText = useCallback(() => {
+    return [commandFinalRef.current, commandInterimRef.current].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  }, []);
+
+  const resetCommandState = useCallback(() => {
+    commandFinalRef.current = "";
+    commandInterimRef.current = "";
+    lastFinalChunkRef.current = "";
     awaitingCommandRef.current = false;
     wakeTriggeredRef.current = false;
     setHeardWake(false);
+    clearCommandTimers();
+  }, [clearCommandTimers]);
+
+  const flushCommand = useCallback(() => {
+    const text = currentCommandText();
+    resetCommandState();
     if (text) onCommandRef.current(text);
+  }, [currentCommandText, resetCommandState]);
+
+  const scheduleCommandFlush = useCallback((delay = COMMAND_SILENCE_MS) => {
+    if (commandTimerRef.current) clearTimeout(commandTimerRef.current);
+    commandTimerRef.current = setTimeout(flushCommand, delay);
+  }, [flushCommand]);
+
+  const scheduleCommandTimeout = useCallback(() => {
+    if (commandTimeoutRef.current) clearTimeout(commandTimeoutRef.current);
+    commandTimeoutRef.current = setTimeout(() => resetCommandState(), COMMAND_TIMEOUT_MS);
+  }, [resetCommandState]);
+
+  const cleanCommandChunk = useCallback((text: string) => {
+    const withoutWake = stripWakeWord(text, sensitivityRef.current);
+    return (withoutWake ?? normalize(text)).trim();
   }, []);
+
+  const appendFinalCommand = useCallback((text: string) => {
+    const chunk = cleanCommandChunk(text);
+    if (!chunk || chunk === lastFinalChunkRef.current) return;
+    lastFinalChunkRef.current = chunk;
+    commandFinalRef.current = [commandFinalRef.current, chunk].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+    commandInterimRef.current = "";
+  }, [cleanCommandChunk]);
 
   const start = useCallback(() => {
     if (!SRClass) return;
@@ -90,6 +134,9 @@ export function useKicksVoice(opts: {
     rec.onend = () => {
       setListening(false);
       recRef.current = null;
+      if (!stopRequestedRef.current && awaitingCommandRef.current && currentCommandText()) {
+        scheduleCommandFlush(250);
+      }
       // In wake mode keep listening; push mode only listens while held.
       if (!stopRequestedRef.current && modeRef.current === "wake") {
         setTimeout(() => start(), 200);
@@ -120,29 +167,27 @@ export function useKicksVoice(opts: {
           wakeTriggeredRef.current = true;
           setHeardWake(true);
           awaitingCommandRef.current = true;
-          try {
-            const u = new SpeechSynthesisUtterance("Yes?");
-            u.rate = 1.1;
-            window.speechSynthesis.speak(u);
-          } catch {}
+          scheduleCommandTimeout();
           // If the wake word arrived with a trailing command in the same utterance,
           // seed the command buffer with it.
-          if (after.length > 0) commandBufferRef.current = after;
+          if (after.length > 0) {
+            if (finalText && !interim) commandFinalRef.current = after;
+            else commandInterimRef.current = after;
+            scheduleCommandFlush();
+          }
         }
       } else if (awaitingCommandRef.current) {
         // After wake: accumulate command text. Prefer final segments; fall back
         // to interim so a 1-2s pause flushes even without a final result.
         if (finalText) {
-          commandBufferRef.current = (commandBufferRef.current + " " + finalText).trim();
+          appendFinalCommand(finalText);
         } else if (interim) {
-          // Replace the trailing interim portion so we always reflect latest.
-          // Keep any already-finalized prefix intact by storing finals separately
-          // via finalText path above; interim alone seeds buffer if empty.
-          if (!commandBufferRef.current) commandBufferRef.current = interim.trim();
-          else commandBufferRef.current = (commandBufferRef.current + " " + interim).trim();
+          // Replace the trailing interim portion instead of appending every
+          // interim update. This prevents duplicated commands in continuous mode.
+          commandInterimRef.current = cleanCommandChunk(interim);
         }
-        if (commandTimerRef.current) clearTimeout(commandTimerRef.current);
-        commandTimerRef.current = setTimeout(flushCommand, 1400);
+        if (currentCommandText()) scheduleCommandFlush();
+        scheduleCommandTimeout();
       }
     };
     recRef.current = rec;
@@ -157,9 +202,7 @@ export function useKicksVoice(opts: {
     setListening(false);
     setPushActive(false);
     pushBufferRef.current = "";
-    wakeTriggeredRef.current = false;
-    commandBufferRef.current = "";
-    if (commandTimerRef.current) { clearTimeout(commandTimerRef.current); commandTimerRef.current = null; }
+    resetCommandState();
     try { recRef.current?.stop(); } catch {}
     recRef.current = null;
     try { window.speechSynthesis.cancel(); } catch {}
