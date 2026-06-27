@@ -80,6 +80,56 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_change_history: {
+        Row: {
+          actor: string | null
+          after_state: Json | null
+          before_state: Json | null
+          created_at: string
+          id: string
+          kind: string
+          record_id: string | null
+          suggestion_id: string | null
+          table_name: string | null
+          undone: boolean
+          undone_at: string | null
+        }
+        Insert: {
+          actor?: string | null
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          id?: string
+          kind: string
+          record_id?: string | null
+          suggestion_id?: string | null
+          table_name?: string | null
+          undone?: boolean
+          undone_at?: string | null
+        }
+        Update: {
+          actor?: string | null
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          id?: string
+          kind?: string
+          record_id?: string | null
+          suggestion_id?: string | null
+          table_name?: string | null
+          undone?: boolean
+          undone_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_change_history_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "ai_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_messages: {
         Row: {
           created_at: string
