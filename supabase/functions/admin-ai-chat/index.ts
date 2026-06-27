@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
     if (messages.length === 0) {
       return new Response(JSON.stringify({ error: "No messages provided" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const modelMessages = convertToModelMessages(messages);
+    const modelMessages = await convertToModelMessages(messages);
 
     const gateway = createLovableAiGatewayProvider(LOVABLE_KEY);
     const model = gateway("google/gemini-3-flash-preview");
