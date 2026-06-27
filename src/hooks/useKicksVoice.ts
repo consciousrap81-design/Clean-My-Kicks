@@ -157,6 +157,9 @@ export function useKicksVoice(opts: {
     setListening(false);
     setPushActive(false);
     pushBufferRef.current = "";
+    wakeTriggeredRef.current = false;
+    commandBufferRef.current = "";
+    if (commandTimerRef.current) { clearTimeout(commandTimerRef.current); commandTimerRef.current = null; }
     try { recRef.current?.stop(); } catch {}
     recRef.current = null;
     try { window.speechSynthesis.cancel(); } catch {}
