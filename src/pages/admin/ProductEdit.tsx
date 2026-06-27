@@ -12,6 +12,8 @@ import { Loader2, Star, Trash2, Upload, Rocket, ExternalLink, GripVertical } fro
 import { signedPhotoUrls } from "@/lib/shop";
 import { PRODUCT_TEMPLATES } from "@/lib/productTemplates";
 import { prepareProductPhoto } from "@/lib/productPhoto";
+import PolishDescriptionDialog from "@/components/admin/PolishDescriptionDialog";
+import { Sparkles } from "lucide-react";
 
 type Photo = { id: string; storage_path: string; is_primary: boolean; sort_order: number };
 
@@ -25,6 +27,7 @@ export default function ProductEdit() {
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [dragId, setDragId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
+  const [polishOpen, setPolishOpen] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
