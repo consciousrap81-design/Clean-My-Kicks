@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Star, Trash2, Upload, Rocket, ExternalLink } from "lucide-react";
+import { Loader2, Star, Trash2, Upload, Rocket, ExternalLink, GripVertical } from "lucide-react";
 import { signedPhotoUrls } from "@/lib/shop";
 import { PRODUCT_TEMPLATES } from "@/lib/productTemplates";
+import { prepareProductPhoto } from "@/lib/productPhoto";
 
 type Photo = { id: string; storage_path: string; is_primary: boolean; sort_order: number };
 
@@ -22,6 +23,8 @@ export default function ProductEdit() {
   const [uploading, setUploading] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -149,9 +152,9 @@ export default function ProductEdit() {
     try {
       const maxSort = photos.reduce((m, p) => Math.max(m, p.sort_order), -1);
       for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        const ext = f.name.split(".").pop()?.toLowerCase() || "jpg";
-        const path = `${id}/${crypto.randomUUID()}.${ext}`;
+        const original = files[i];
+        const f = await prepareProductPhoto(original);
+        const path = `${id}/${crypto.randomUUID()}.jpg`;
         const { error: upErr } = await supabase.storage.from("shop-products").upload(path, f, { upsert: false });
         if (upErr) throw upErr;
         const { error: insErr } = await supabase.from("shop_product_photos").insert({
@@ -183,6 +186,46 @@ export default function ProductEdit() {
     await supabase.storage.from("shop-products").remove([p.storage_path]);
     await supabase.from("shop_product_photos").delete().eq("id", p.id);
     await loadPhotos();
+  }
+
+  async function persistOrder(list: Photo[]) {
+    setReordering(true);
+    try {
+      // Optimistic local update
+      setPhotos(list.map((p, idx) => ({ ...p, sort_order: idx })));
+      await Promise.all(
+        list.map((p, idx) =>
+          supabase.from("shop_product_photos").update({ sort_order: idx }).eq("id", p.id),
+        ),
+      );
+      toast.success("Photo order saved");
+    } catch (e: any) {
+      toast.error(e.message);
+      await loadPhotos();
+    } finally {
+      setReordering(false);
+    }
+  }
+
+  function onDragStart(photoId: string) {
+    setDragId(photoId);
+  }
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+  }
+  async function onDrop(targetId: string) {
+    if (!dragId || dragId === targetId) {
+      setDragId(null);
+      return;
+    }
+    const from = photos.findIndex((p) => p.id === dragId);
+    const to = photos.findIndex((p) => p.id === targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...photos];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setDragId(null);
+    await persistOrder(next);
   }
 
   return (
@@ -258,9 +301,24 @@ export default function ProductEdit() {
         <Card>
           <CardHeader><CardTitle className="text-base">Photos</CardTitle></CardHeader>
           <CardContent>
+            {photos.length > 0 && (
+              <p className="text-xs text-muted-foreground mb-2">
+                Drag photos to reorder. The primary photo always appears first on the shop.
+              </p>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
               {photos.map((p) => (
-                <div key={p.id} className="relative aspect-square bg-secondary rounded-lg overflow-hidden border">
+                <div
+                  key={p.id}
+                  draggable
+                  onDragStart={() => onDragStart(p.id)}
+                  onDragOver={onDragOver}
+                  onDrop={() => onDrop(p.id)}
+                  className={`relative aspect-square bg-secondary rounded-lg overflow-hidden border cursor-move transition ${dragId === p.id ? "opacity-50 ring-2 ring-primary" : ""}`}
+                >
+                  <div className="absolute top-1 right-1 bg-background/80 rounded p-1 pointer-events-none">
+                    <GripVertical className="w-3 h-3 text-muted-foreground" />
+                  </div>
                   {urls[p.storage_path] && (
                     <img src={urls[p.storage_path]} alt="" className="w-full h-full object-contain p-1" />
                   )}
@@ -280,6 +338,11 @@ export default function ProductEdit() {
                 </div>
               ))}
             </div>
+            {reordering && (
+              <p className="text-xs text-muted-foreground mb-2 inline-flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Saving order…
+              </p>
+            )}
             <label className="inline-flex items-center gap-2 cursor-pointer">
               <input type="file" accept="image/*" multiple className="hidden" onChange={onUpload} disabled={uploading} />
               <Button asChild disabled={uploading}>
@@ -289,6 +352,9 @@ export default function ProductEdit() {
                 </span>
               </Button>
             </label>
+            <p className="text-xs text-muted-foreground mt-2">
+              Photos are automatically resized to 1920px and compressed for fast loading.
+            </p>
           </CardContent>
         </Card>
       )}
