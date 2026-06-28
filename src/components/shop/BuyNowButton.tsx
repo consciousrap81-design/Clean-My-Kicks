@@ -9,7 +9,8 @@ type Props = {
   productId: string;
   status?: string | null;
   reservedUntil?: string | null;
-  reservedSessionId?: string | null;
+  /** True when this session is the one holding the reservation. */
+  reservedByMe?: boolean;
   price?: number | null;
   className?: string;
   size?: "sm" | "default" | "lg";
@@ -24,7 +25,7 @@ export default function BuyNowButton({
   productId,
   status,
   reservedUntil,
-  reservedSessionId,
+  reservedByMe,
   price,
   className,
   size = "default",
@@ -36,7 +37,7 @@ export default function BuyNowButton({
   const isSold = status === "sold";
   const stillReserved =
     status === "reserved" && reservedUntil && new Date(reservedUntil) > new Date();
-  const reservedByOther = !!stillReserved && reservedSessionId !== sessionId;
+  const reservedByOther = !!stillReserved && !reservedByMe;
 
   async function handleClick(e: React.MouseEvent) {
     e.preventDefault();
