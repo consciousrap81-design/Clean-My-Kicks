@@ -14,6 +14,7 @@ import ProductGallery from "@/components/shop/ProductGallery";
 import ShareButtons from "@/components/shop/ShareButtons";
 import ReviewSnippet from "@/components/shop/ReviewSnippet";
 import RecentlyViewed, { trackRecentlyViewed } from "@/components/shop/RecentlyViewed";
+import YouMayAlsoLike from "@/components/shop/YouMayAlsoLike";
 
 type Photo = { id: string; storage_path: string; is_primary: boolean; sort_order: number };
 
@@ -244,6 +245,8 @@ export default function ProductDetail() {
         <div id="reviews">
           <ReviewsSection productId={product.id} productName={display} />
         </div>
+
+        <YouMayAlsoLike productId={product.id} brand={product.brand} model={product.model} />
 
         <RecentlyViewed excludeId={product.id} />
       </div>
