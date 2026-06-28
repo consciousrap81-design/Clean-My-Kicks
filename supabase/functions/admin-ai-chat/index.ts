@@ -304,7 +304,9 @@ Deno.serve(async (req) => {
     }
 
     const gateway = createLovableAiGatewayProvider(LOVABLE_KEY);
-    const model = gateway("google/gemini-3-flash-preview");
+    // Use the lite Gemini variant for snappier voice-style replies. Falls back
+    // to the standard flash via the gateway if the lite model is unavailable.
+    const model = gateway("google/gemini-3.1-flash-lite");
     const prefs = await loadAiPreferenceBlock();
 
     const result = streamText({

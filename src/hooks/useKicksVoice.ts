@@ -56,6 +56,9 @@ const WAKE_PATTERNS: Record<WakeSensitivity, string[]> = {
 
 const COMMAND_SILENCE_MS = 1300;
 const COMMAND_TIMEOUT_MS = 9000;
+// How long the conversation stays "open" after a command before requiring
+// the wake word again. Resets on every new utterance.
+const CONVERSATION_IDLE_MS = 60000;
 
 let currentAudio: HTMLAudioElement | null = null;
 function stopCurrentAudio() {
@@ -159,6 +162,7 @@ export function useKicksVoice(opts: {
   const commandInterimRef = useRef("");
   const commandTimerRef = useRef<any>(null);
   const commandTimeoutRef = useRef<any>(null);
+  const conversationIdleRef = useRef<any>(null);
   const lastFinalChunkRef = useRef("");
 
   const clearCommandTimers = useCallback(() => {
@@ -166,19 +170,44 @@ export function useKicksVoice(opts: {
     if (commandTimeoutRef.current) { clearTimeout(commandTimeoutRef.current); commandTimeoutRef.current = null; }
   }, []);
 
+  const endConversation = useCallback(() => {
+    if (conversationIdleRef.current) { clearTimeout(conversationIdleRef.current); conversationIdleRef.current = null; }
+    wakeTriggeredRef.current = false;
+    awaitingCommandRef.current = false;
+    setHeardWake(false);
+  }, []);
+
+  const bumpConversationIdle = useCallback(() => {
+    if (conversationIdleRef.current) clearTimeout(conversationIdleRef.current);
+    conversationIdleRef.current = setTimeout(endConversation, CONVERSATION_IDLE_MS);
+  }, [endConversation]);
+
   const currentCommandText = useCallback(() => {
     return [commandFinalRef.current, commandInterimRef.current].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
   }, []);
 
-  const resetCommandState = useCallback(() => {
+  // Reset only the per-command buffers. In wake mode we KEEP the conversation
+  // open (wakeTriggered + awaiting) so the user can keep talking without
+  // saying "Hey Kicks" again. A separate idle timer ends the conversation
+  // after CONVERSATION_IDLE_MS of silence.
+  const resetCommandState = useCallback((opts?: { endConversation?: boolean }) => {
     commandFinalRef.current = "";
     commandInterimRef.current = "";
     lastFinalChunkRef.current = "";
-    awaitingCommandRef.current = false;
-    wakeTriggeredRef.current = false;
-    setHeardWake(false);
     clearCommandTimers();
-  }, [clearCommandTimers]);
+    const shouldEnd = opts?.endConversation || modeRef.current !== "wake";
+    if (shouldEnd) {
+      awaitingCommandRef.current = false;
+      wakeTriggeredRef.current = false;
+      setHeardWake(false);
+      if (conversationIdleRef.current) { clearTimeout(conversationIdleRef.current); conversationIdleRef.current = null; }
+    } else {
+      // Stay open for follow-up questions.
+      awaitingCommandRef.current = true;
+      wakeTriggeredRef.current = true;
+      bumpConversationIdle();
+    }
+  }, [clearCommandTimers, bumpConversationIdle]);
 
   const flushCommand = useCallback(() => {
     const text = currentCommandText();
@@ -193,6 +222,8 @@ export function useKicksVoice(opts: {
 
   const scheduleCommandTimeout = useCallback(() => {
     if (commandTimeoutRef.current) clearTimeout(commandTimeoutRef.current);
+    // If the user starts speaking but never finishes, give up on this command
+    // buffer but keep the conversation open in wake mode.
     commandTimeoutRef.current = setTimeout(() => resetCommandState(), COMMAND_TIMEOUT_MS);
   }, [resetCommandState]);
 
@@ -259,6 +290,7 @@ export function useKicksVoice(opts: {
           setHeardWake(true);
           awaitingCommandRef.current = true;
           scheduleCommandTimeout();
+          bumpConversationIdle();
           // If the wake word arrived with a trailing command in the same utterance,
           // seed the command buffer with it.
           if (after.length > 0) {
@@ -279,6 +311,7 @@ export function useKicksVoice(opts: {
         }
         if (currentCommandText()) scheduleCommandFlush();
         scheduleCommandTimeout();
+        bumpConversationIdle();
       }
     };
     recRef.current = rec;
