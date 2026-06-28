@@ -8,8 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Save, Brain } from "lucide-react";
+import { Sparkles, Save, Brain, Volume2, Play } from "lucide-react";
 import { toast } from "sonner";
+import { KICKS_VOICE_STORAGE_KEY, type KicksVoicePrefs, type KicksVoiceId, previewKicksVoice } from "@/hooks/useKicksVoice";
+import { Slider } from "@/components/ui/slider";
 
 type Settings = {
   id?: string;
@@ -40,6 +42,24 @@ export default function AISettings() {
   const [saving, setSaving] = useState(false);
   const [forbidInput, setForbidInput] = useState("");
   const [preferInput, setPreferInput] = useState("");
+  const [voicePrefs, setVoicePrefs] = useState<KicksVoicePrefs>(() => {
+    if (typeof window === "undefined") return { voice: "coral", instructions: "", speed: 1.0, useAiVoice: true };
+    try {
+      const raw = window.localStorage.getItem(KICKS_VOICE_STORAGE_KEY);
+      return raw ? { voice: "coral", instructions: "", speed: 1.0, useAiVoice: true, ...JSON.parse(raw) } : { voice: "coral", instructions: "", speed: 1.0, useAiVoice: true };
+    } catch { return { voice: "coral", instructions: "", speed: 1.0, useAiVoice: true }; }
+  });
+  const [previewing, setPreviewing] = useState<string | null>(null);
+
+  function saveVoicePrefs(next: KicksVoicePrefs) {
+    setVoicePrefs(next);
+    try { window.localStorage.setItem(KICKS_VOICE_STORAGE_KEY, JSON.stringify(next)); } catch {}
+  }
+  async function preview(voice: KicksVoiceId) {
+    setPreviewing(voice);
+    try { await previewKicksVoice({ ...voicePrefs, voice, useAiVoice: true }); }
+    finally { setTimeout(() => setPreviewing(null), 600); }
+  }
 
   async function load() {
     const { data } = await supabase.from("ai_settings").select("*").limit(1).maybeSingle();
@@ -183,6 +203,78 @@ export default function AISettings() {
         </div>
         <p className="text-[11px] text-muted-foreground">The assistant reads the latest 50 feedback entries on every scan and chat to bias future proposals toward what you accept and away from what you reject.</p>
       </Card>
+
+      <Card className="p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-medium flex items-center gap-2"><Volume2 className="h-4 w-4 text-primary" /> Kicks voice</h2>
+            <p className="text-[11px] text-muted-foreground">Uses the Lovable AI Gateway (gpt-4o-mini-tts) when on, falls back to your browser voice otherwise.</p>
+          </div>
+          <Switch
+            checked={voicePrefs.useAiVoice}
+            onCheckedChange={(v) => saveVoicePrefs({ ...voicePrefs, useAiVoice: v })}
+          />
+        </div>
+
+        <div className="grid gap-2">
+          <Label>Voice (friendly female options)</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {VOICE_OPTIONS.map((v) => (
+              <div
+                key={v.id}
+                className={`flex items-center justify-between rounded border p-2 ${voicePrefs.voice === v.id ? "border-primary bg-primary/5" : ""}`}
+              >
+                <button
+                  type="button"
+                  className="flex-1 text-left"
+                  onClick={() => saveVoicePrefs({ ...voicePrefs, voice: v.id })}
+                >
+                  <p className="text-sm font-medium">{v.label}{voicePrefs.voice === v.id && <span className="ml-2 text-[10px] text-primary">selected</span>}</p>
+                  <p className="text-[11px] text-muted-foreground">{v.hint}</p>
+                </button>
+                <Button type="button" size="sm" variant="outline" disabled={previewing === v.id} onClick={() => preview(v.id)}>
+                  <Play className="h-3 w-3 mr-1" /> {previewing === v.id ? "…" : "Preview"}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <Label>Speed ({voicePrefs.speed?.toFixed(2)}x)</Label>
+          <Slider
+            min={0.75} max={1.25} step={0.05}
+            value={[voicePrefs.speed ?? 1.0]}
+            onValueChange={(v) => saveVoicePrefs({ ...voicePrefs, speed: v[0] })}
+          />
+        </div>
+
+        <div>
+          <Label>Voice instructions (optional)</Label>
+          <Textarea
+            rows={3}
+            placeholder="Leave blank for the default 'perky, knowledgeable coworker' style. Override here to tune tone, energy, pacing, accent…"
+            value={voicePrefs.instructions ?? ""}
+            onChange={(e) => saveVoicePrefs({ ...voicePrefs, instructions: e.target.value })}
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <Button type="button" variant="secondary" onClick={() => preview(voicePrefs.voice)}>
+            <Play className="h-4 w-4 mr-2" /> Preview current settings
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }
+
+const VOICE_OPTIONS: { id: KicksVoiceId; label: string; hint: string }[] = [
+  { id: "coral",   label: "Coral",   hint: "Warm, perky, conversational — recommended default." },
+  { id: "shimmer", label: "Shimmer", hint: "Bright and upbeat, light energy." },
+  { id: "nova",    label: "Nova",    hint: "Clear and confident, a touch professional." },
+  { id: "sage",    label: "Sage",    hint: "Calm, soft-spoken, measured pacing." },
+  { id: "alloy",   label: "Alloy",   hint: "Neutral and balanced; good clarity." },
+  { id: "ballad",  label: "Ballad",  hint: "Expressive with more melodic inflection." },
+  { id: "fable",   label: "Fable",   hint: "Storyteller cadence — slightly playful." },
+];
