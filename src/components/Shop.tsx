@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Eye, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { signedPhotoUrls, type ShopProduct } from "@/lib/shop";
+import { signedPhotoUrls, SHOP_PRODUCT_PUBLIC_COLS, type ShopProduct } from "@/lib/shop";
 import { formatDistanceToNow } from "date-fns";
 import BuyNowButton from "@/components/shop/BuyNowButton";
 
@@ -21,7 +21,7 @@ const Shop = () => {
       const [{ data: live }, { data: sold }] = await Promise.all([
         supabase
           .from("shop_products")
-          .select("*, shop_product_photos(storage_path, is_primary, sort_order)")
+          .select(`${SHOP_PRODUCT_PUBLIC_COLS}, shop_product_photos(storage_path, is_primary, sort_order)`)
           .in("status", ["available", "reserved"])
           .order("created_at", { ascending: false })
           .limit(12),
@@ -165,7 +165,6 @@ const Shop = () => {
                         productId={p.id}
                         status={p.status}
                         reservedUntil={(p as any).reserved_until}
-                        reservedSessionId={(p as any).reserved_session_id}
                         price={Number(p.price)}
                         className="h-9 md:h-10 text-xs md:text-sm w-full"
                       />
