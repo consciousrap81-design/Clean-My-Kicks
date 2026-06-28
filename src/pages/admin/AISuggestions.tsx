@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { Sparkles, RefreshCw, Check, X, Undo2, ExternalLink, History } from "lucide-react";
+import { Sparkles, RefreshCw, Check, X, Undo2, ExternalLink, History, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 type Suggestion = { id: string; kind: string; title: string; summary: string | null; status: string; payload: any; created_at: string };
@@ -17,6 +17,23 @@ function extractSources(payload: any): SourceLink[] {
   const candidates = [payload.sources, payload.raw?.sources, payload.citations, payload.raw?.citations];
   for (const c of candidates) if (Array.isArray(c) && c.length) return c as SourceLink[];
   return [];
+}
+
+const ADVISORY_KINDS = new Set(["marketing_idea", "content_idea"]);
+const ACTIONABLE_KINDS = new Set(["publish_product", "pricing_idea", "restock_alert", "follow_up_request", "update_product", "price_change", "update_job_status"]);
+
+function hasActionableTarget(kind: string, payload: any): boolean {
+  if (ADVISORY_KINDS.has(kind)) return false;
+  switch (kind) {
+    case "publish_product": return !!payload?.product_id;
+    case "pricing_idea":
+    case "price_change": return !!payload?.product_id && typeof payload?.price_cents === "number";
+    case "restock_alert": return !!payload?.variant_id && typeof payload?.add_stock === "number";
+    case "follow_up_request": return !!payload?.request_id && !!payload?.status;
+    case "update_product": return !!payload?.product_id && !!payload?.updates;
+    case "update_job_status": return !!payload?.job_id && !!payload?.status;
+    default: return false;
+  }
 }
 
 export default function AISuggestions() {
@@ -53,9 +70,16 @@ export default function AISuggestions() {
   }
 
   async function act(id: string, action: "apply" | "dismiss") {
-    const { error } = await supabase.functions.invoke("admin-ai-execute", { body: { suggestion_id: id, action } });
+    const { data, error } = await supabase.functions.invoke("admin-ai-execute", { body: { suggestion_id: id, action } });
     if (error) { toast.error(error.message); return; }
-    toast.success(action === "apply" ? "Applied" : "Dismissed");
+    if (action === "apply") {
+      const r = data?.results?.[0];
+      if (r && r.ok === false) toast.error(r.error || "Failed to apply");
+      else if (r?.advisory) toast.success(r.message || "Advisory acknowledged");
+      else toast.success(r?.message || "Applied");
+    } else {
+      toast.success("Dismissed");
+    }
     await load();
   }
 
@@ -81,6 +105,10 @@ export default function AISuggestions() {
   const pending = useMemo(() => items.filter((i) => i.status === "pending"), [items]);
   const resolved = useMemo(() => items.filter((i) => i.status !== "pending"), [items]);
   const allSelected = pending.length > 0 && pending.every((p) => selected.has(p.id));
+  const staleCount = useMemo(
+    () => pending.filter((p) => ACTIONABLE_KINDS.has(p.kind) && !hasActionableTarget(p.kind, p.payload)).length,
+    [pending]
+  );
 
   function toggleAll() {
     if (allSelected) setSelected(new Set());
@@ -112,6 +140,18 @@ export default function AISuggestions() {
       </div>
 
       <section className="space-y-2">
+        {staleCount > 0 && (
+          <Card className="p-3 border-amber-500/40 bg-amber-500/5 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div className="text-xs flex-1">
+              <p className="font-medium">{staleCount} suggestion{staleCount === 1 ? "" : "s"} from an older scan can't be applied — they're missing target IDs.</p>
+              <p className="text-muted-foreground mt-0.5">Dismiss them and run a fresh scan so Kicks can attach the right product/variant/request IDs.</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={runScan} disabled={scanning}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${scanning ? "animate-spin" : ""}`} /> Re-scan
+            </Button>
+          </Card>
+        )}
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-muted-foreground">Pending ({pending.length})</h2>
           {pending.length > 0 && (
@@ -133,13 +173,19 @@ export default function AISuggestions() {
         {pending.map((s) => {
           const sources = extractSources(s.payload);
           const reasoning = s.payload?.reasoning ?? s.payload?.raw?.reasoning;
+          const advisory = ADVISORY_KINDS.has(s.kind);
+          const actionable = hasActionableTarget(s.kind, s.payload);
+          const stale = ACTIONABLE_KINDS.has(s.kind) && !actionable;
           return (
             <Card key={s.id} className="p-4">
               <div className="flex items-start gap-3">
                 <Checkbox className="mt-1" checked={selected.has(s.id)} onCheckedChange={() => toggleOne(s.id)} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <Badge variant="outline">{s.kind}</Badge>
+                    {advisory && <Badge variant="secondary" className="text-[10px]">Advisory</Badge>}
+                    {actionable && <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">Actionable</Badge>}
+                    {stale && <Badge variant="destructive" className="text-[10px]">Missing target ID</Badge>}
                     <span className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleString()}</span>
                   </div>
                   <p className="font-medium">{s.title}</p>
@@ -171,10 +217,15 @@ export default function AISuggestions() {
                   </details>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <Button size="sm" onClick={() => act(s.id, "apply")}><Check className="h-3.5 w-3.5 mr-1" />Apply</Button>
+                  <Button size="sm" onClick={() => act(s.id, "apply")} disabled={stale} title={stale ? "Missing target ID — re-scan to regenerate" : undefined}>
+                    <Check className="h-3.5 w-3.5 mr-1" />{advisory ? "Acknowledge" : "Apply"}
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => act(s.id, "dismiss")}><X className="h-3.5 w-3.5" /></Button>
                 </div>
               </div>
+              {s.payload?.error && (
+                <p className="mt-2 text-xs text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> {s.payload.error}</p>
+              )}
             </Card>
           );
         })}
