@@ -1,27 +1,67 @@
 import { Menu, X, Phone, MessageCircle, Instagram } from "lucide-react";
 import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import heroK from "@/assets/hero-k.png";
 import CartButton from "@/components/shop/CartButton";
 const navItems = [
-  { label: "Services", href: "#services" },
+  { label: "Services", href: "/#services" },
   { label: "Shop", href: "/shop" },
-  { label: "About", href: "#about" },
-  { label: "Contact", href: "#booking" },
+  { label: "About", href: "/#about" },
+  { label: "Contact", href: "/#booking" },
 ];
-
-const scrollToBooking = () => {
-  document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" });
-};
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    // Plain routes (no hash) — let router handle via navigate
+    if (!href.includes("#")) {
+      e.preventDefault();
+      navigate(href);
+      return;
+    }
+    // Hash links: if already on the target page, just scroll
+    const [path, hash] = href.split("#");
+    const targetPath = path || "/";
+    if (location.pathname === targetPath) {
+      e.preventDefault();
+      document.getElementById(hash)?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      e.preventDefault();
+      navigate(`${targetPath}#${hash}`);
+      // After navigation, scroll to the section
+      setTimeout(() => {
+        document.getElementById(hash)?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
+  };
+
+  const scrollToBooking = () => {
+    if (location.pathname === "/") {
+      document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      navigate("/#booking");
+      setTimeout(() => {
+        document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 nav-dark backdrop-blur-lg border-b border-white/10">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <a href="#" className="flex items-center group">
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate("/");
+            }}
+            className="flex items-center group"
+          >
             <img 
               src={heroK} 
               alt="K" 
@@ -39,6 +79,7 @@ const Navbar = () => {
               <a
                 key={item.label}
                 href={item.href}
+                onClick={(e) => handleNavClick(e, item.href)}
                 className="font-body text-sm uppercase tracking-widest text-white/70 hover:text-primary transition-colors duration-300"
               >
                 {item.label}
@@ -98,7 +139,10 @@ const Navbar = () => {
                 <a
                   key={item.label}
                   href={item.href}
-                  onClick={() => setIsOpen(false)}
+                  onClick={(e) => {
+                    setIsOpen(false);
+                    handleNavClick(e, item.href);
+                  }}
                   className="font-body text-sm uppercase tracking-widest text-white/70 hover:text-primary transition-colors py-2"
                 >
                   {item.label}
