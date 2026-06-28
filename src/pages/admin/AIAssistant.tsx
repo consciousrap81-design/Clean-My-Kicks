@@ -105,9 +105,19 @@ export default function AIAssistant() {
     mode: voiceMode,
     sensitivity,
     onCommand: async (text) => {
-      if (status === "submitted" || status === "streaming") return;
+      // If a response is still in flight, abort it so the new question wins.
+      if (status === "submitted" || status === "streaming") {
+        try { stop(); } catch {}
+      }
       toast(`Kicks heard: "${text}"`);
       await sendMessage({ text });
+    },
+    onInterrupt: () => {
+      // User started speaking while Kicks was talking — abort the current
+      // streaming response so we don't keep replying over them.
+      if (status === "submitted" || status === "streaming") {
+        try { stop(); } catch {}
+      }
     },
   });
 
