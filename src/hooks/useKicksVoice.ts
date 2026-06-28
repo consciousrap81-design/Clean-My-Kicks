@@ -70,6 +70,7 @@ function stopCurrentAudio() {
 async function speakWithAiGateway(text: string, prefs: KicksVoicePrefs): Promise<boolean> {
   try {
     const { data, error } = await supabase.functions.invoke("kicks-tts", {
+      responseType: "arrayBuffer",
       body: {
         text,
         voice: prefs.voice,
@@ -78,8 +79,8 @@ async function speakWithAiGateway(text: string, prefs: KicksVoicePrefs): Promise
       },
     });
     if (error) throw error;
-    const blob = data instanceof Blob ? data : new Blob([data as ArrayBuffer], { type: "audio/mpeg" });
-    if (!blob.size) return false;
+    if (!data || !(data instanceof ArrayBuffer) || data.byteLength === 0) return false;
+    const blob = new Blob([data], { type: "audio/mpeg" });
     const url = URL.createObjectURL(blob);
     stopCurrentAudio();
     const a = new Audio(url);
