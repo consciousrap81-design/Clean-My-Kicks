@@ -289,13 +289,11 @@ export function useKicksVoice(opts: {
       const live = (finalText + interim).trim();
       if (live) setLastHeard(live);
 
-      // Barge-in: if Kicks is currently speaking and the user starts talking,
-      // cut her off immediately and abort any in-flight response so the new
-      // utterance can be handled.
-      if (live && isSpeakingFlag) {
-        stopCurrentAudio();
-        try { onInterruptRef.current?.(); } catch {}
-      }
+      // Mute-while-speaking: ignore anything the recognizer picks up while
+      // Kicks is talking so she doesn't hear herself and interrupt her own
+      // response. Voice barge-in is intentionally disabled in this mode —
+      // use the Stop button or typed input to interrupt.
+      if (isSpeakingFlag) return;
 
       // Push-to-talk: just accumulate; we deliver on pushEnd().
       if (modeRef.current === "push") {
