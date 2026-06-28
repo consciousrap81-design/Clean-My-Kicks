@@ -61,6 +61,7 @@ const COMMAND_TIMEOUT_MS = 9000;
 const CONVERSATION_IDLE_MS = 60000;
 
 let currentAudio: HTMLAudioElement | null = null;
+let isSpeakingFlag = false;
 function stopCurrentAudio() {
   try { currentAudio?.pause(); } catch {}
   if (currentAudio) {
@@ -68,7 +69,9 @@ function stopCurrentAudio() {
     currentAudio = null;
   }
   try { window.speechSynthesis?.cancel(); } catch {}
+  isSpeakingFlag = false;
 }
+export function isKicksSpeaking() { return isSpeakingFlag; }
 
 async function speakWithAiGateway(text: string, prefs: KicksVoicePrefs): Promise<boolean> {
   try {
@@ -101,7 +104,12 @@ async function speakWithAiGateway(text: string, prefs: KicksVoicePrefs): Promise
     stopCurrentAudio();
     const a = new Audio(urlObj);
     currentAudio = a;
-    a.onended = () => { try { URL.revokeObjectURL(urlObj); } catch {} if (currentAudio === a) currentAudio = null; };
+    isSpeakingFlag = true;
+    a.onended = () => {
+      try { URL.revokeObjectURL(urlObj); } catch {}
+      if (currentAudio === a) { currentAudio = null; isSpeakingFlag = false; }
+    };
+    a.onpause = () => { if (a.ended || currentAudio !== a) isSpeakingFlag = false; };
     await a.play();
     return true;
   } catch (e) {
@@ -117,6 +125,9 @@ function speakWithBrowser(text: string) {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.05;
     u.pitch = 1;
+    isSpeakingFlag = true;
+    u.onend = () => { isSpeakingFlag = false; };
+    u.onerror = () => { isSpeakingFlag = false; };
     window.speechSynthesis.speak(u);
   } catch {}
 }
@@ -141,8 +152,9 @@ export function useKicksVoice(opts: {
   mode?: VoiceMode;
   sensitivity?: WakeSensitivity;
   onCommand: (text: string) => void;
+  onInterrupt?: () => void;
 }) {
-  const { enabled, onCommand, mode = "wake", sensitivity = "medium" } = opts;
+  const { enabled, onCommand, onInterrupt, mode = "wake", sensitivity = "medium" } = opts;
   const [listening, setListening] = useState(false);
   const [heardWake, setHeardWake] = useState(false);
   const [lastHeard, setLastHeard] = useState("");
@@ -152,6 +164,8 @@ export function useKicksVoice(opts: {
   const stopRequestedRef = useRef(false);
   const onCommandRef = useRef(onCommand);
   onCommandRef.current = onCommand;
+  const onInterruptRef = useRef(onInterrupt);
+  onInterruptRef.current = onInterrupt;
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const sensitivityRef = useRef(sensitivity);
@@ -274,6 +288,14 @@ export function useKicksVoice(opts: {
       }
       const live = (finalText + interim).trim();
       if (live) setLastHeard(live);
+
+      // Barge-in: if Kicks is currently speaking and the user starts talking,
+      // cut her off immediately and abort any in-flight response so the new
+      // utterance can be handled.
+      if (live && isSpeakingFlag) {
+        stopCurrentAudio();
+        try { onInterruptRef.current?.(); } catch {}
+      }
 
       // Push-to-talk: just accumulate; we deliver on pushEnd().
       if (modeRef.current === "push") {
