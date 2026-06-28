@@ -1,4 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+export const KICKS_VOICE_STORAGE_KEY = "kicks.voice.prefs.v1";
+export type KicksVoiceId = "alloy" | "coral" | "nova" | "sage" | "shimmer" | "ballad" | "fable";
+export type KicksVoicePrefs = {
+  voice: KicksVoiceId;
+  instructions?: string;
+  speed?: number;
+  useAiVoice: boolean;
+};
+const DEFAULT_VOICE_PREFS: KicksVoicePrefs = {
+  voice: "coral",
+  instructions: "",
+  speed: 1.0,
+  useAiVoice: true,
+};
+function readVoicePrefs(): KicksVoicePrefs {
+  if (typeof window === "undefined") return DEFAULT_VOICE_PREFS;
+  try {
+    const raw = window.localStorage.getItem(KICKS_VOICE_STORAGE_KEY);
+    if (!raw) return DEFAULT_VOICE_PREFS;
+    return { ...DEFAULT_VOICE_PREFS, ...JSON.parse(raw) };
+  } catch { return DEFAULT_VOICE_PREFS; }
+}
 
 /**
  * Browser-native voice control for "Kicks".
@@ -32,6 +56,59 @@ const WAKE_PATTERNS: Record<WakeSensitivity, string[]> = {
 
 const COMMAND_SILENCE_MS = 1300;
 const COMMAND_TIMEOUT_MS = 9000;
+
+let currentAudio: HTMLAudioElement | null = null;
+function stopCurrentAudio() {
+  try { currentAudio?.pause(); } catch {}
+  if (currentAudio) {
+    try { URL.revokeObjectURL(currentAudio.src); } catch {}
+    currentAudio = null;
+  }
+  try { window.speechSynthesis?.cancel(); } catch {}
+}
+
+async function speakWithAiGateway(text: string, prefs: KicksVoicePrefs): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke("kicks-tts", {
+      body: {
+        text,
+        voice: prefs.voice,
+        instructions: prefs.instructions || undefined,
+        speed: prefs.speed ?? 1.0,
+      },
+    });
+    if (error) throw error;
+    const blob = data instanceof Blob ? data : new Blob([data as ArrayBuffer], { type: "audio/mpeg" });
+    if (!blob.size) return false;
+    const url = URL.createObjectURL(blob);
+    stopCurrentAudio();
+    const a = new Audio(url);
+    currentAudio = a;
+    a.onended = () => { try { URL.revokeObjectURL(url); } catch {} if (currentAudio === a) currentAudio = null; };
+    await a.play();
+    return true;
+  } catch (e) {
+    console.warn("[kicks-tts] AI voice failed, falling back to browser TTS", e);
+    return false;
+  }
+}
+
+function speakWithBrowser(text: string) {
+  if (!("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.05;
+    u.pitch = 1;
+    window.speechSynthesis.speak(u);
+  } catch {}
+}
+
+export async function previewKicksVoice(prefs: KicksVoicePrefs, sample?: string) {
+  const text = sample || "Hey! I'm Kicks. Ready whenever you need a hand around the shop.";
+  const ok = prefs.useAiVoice ? await speakWithAiGateway(text, prefs) : false;
+  if (!ok) speakWithBrowser(text);
+}
 
 function stripWakeWord(text: string, sensitivity: WakeSensitivity): string | null {
   const t = normalize(text);
@@ -205,7 +282,7 @@ export function useKicksVoice(opts: {
     resetCommandState();
     try { recRef.current?.stop(); } catch {}
     recRef.current = null;
-    try { window.speechSynthesis.cancel(); } catch {}
+    stopCurrentAudio();
   }, []);
 
   const pushStart = useCallback(() => {
@@ -233,18 +310,13 @@ export function useKicksVoice(opts: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, mode]);
 
-  const speak = useCallback((text: string) => {
+  const speak = useCallback(async (text: string) => {
     if (!enabled) return;
-    if (!("speechSynthesis" in window)) return;
-    const clean = text.replace(/```[\s\S]*?```/g, "").replace(/[*_#>`]/g, "").slice(0, 800);
+    const clean = text.replace(/```[\s\S]*?```/g, "").replace(/[*_#>`]/g, "").slice(0, 1500);
     if (!clean.trim()) return;
-    try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(clean);
-      u.rate = 1.05;
-      u.pitch = 1;
-      window.speechSynthesis.speak(u);
-    } catch {}
+    const prefs = readVoicePrefs();
+    const ok = prefs.useAiVoice ? await speakWithAiGateway(clean, prefs) : false;
+    if (!ok) speakWithBrowser(clean);
   }, [enabled]);
 
   return { listening, heardWake, lastHeard, pushActive, speak, pushStart, pushEnd, supported: voiceSupported };
