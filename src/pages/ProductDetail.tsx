@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Seo from "@/components/Seo";
-import { getShopSessionId, signedPhotoUrls, type ShopProduct } from "@/lib/shop";
+import { getShopSessionId, signedPhotoUrls, SHOP_PRODUCT_PUBLIC_COLS, fetchReservationStatus, type ShopProduct } from "@/lib/shop";
 import ReviewsSection from "@/components/shop/ReviewsSection";
 import ReactMarkdown from "react-markdown";
 import ProductGallery from "@/components/shop/ProductGallery";
@@ -30,12 +30,17 @@ export default function ProductDetail() {
   const [buying, setBuying] = useState(false);
   const sessionId = useMemo(() => getShopSessionId(), []);
   const cancelled = search.get("cancelled") === "1";
+  const [reservedByMe, setReservedByMe] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     let mounted = true;
     async function load() {
-      const { data: p } = await supabase.from("shop_products").select("*").eq("id", id).maybeSingle();
+      const { data: p } = await supabase
+        .from("shop_products")
+        .select(SHOP_PRODUCT_PUBLIC_COLS)
+        .eq("id", id)
+        .maybeSingle();
       const { data: ph } = await supabase
         .from("shop_product_photos")
         .select("*")
@@ -51,6 +56,8 @@ export default function ProductDetail() {
         setUrls(u);
         setLoading(false);
       }
+      const resv = await fetchReservationStatus([id!], sessionId);
+      if (mounted) setReservedByMe(!!resv.get(id!)?.reserved_by_me);
     }
     load();
 
@@ -61,8 +68,13 @@ export default function ProductDetail() {
     // Realtime: product status updates
     const pchan = supabase
       .channel(`shop-product-${id}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "shop_products", filter: `id=eq.${id}` }, (payload) => {
-        setProduct((prev) => ({ ...(prev as any), ...(payload.new as any) }));
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "shop_products", filter: `id=eq.${id}` }, async (payload) => {
+        const incoming = payload.new as any;
+        // Strip sensitive bookkeeping cols before merging into client state.
+        const { reserved_session_id: _r, sold_order_id: _s, ...safe } = incoming ?? {};
+        setProduct((prev) => ({ ...(prev as any), ...safe }));
+        const resv = await fetchReservationStatus([id!], sessionId);
+        setReservedByMe(!!resv.get(id!)?.reserved_by_me);
       })
       .subscribe();
 
@@ -126,7 +138,6 @@ export default function ProductDetail() {
   const display = [product.brand, product.model].filter(Boolean).join(" ") || product.name;
   const isSold = product.status === "sold";
   const isReserved = product.status === "reserved" && product.reserved_until && new Date(product.reserved_until) > new Date();
-  const reservedByMe = isReserved && (product as any).reserved_session_id === sessionId;
   const canBuy = !isSold && (!isReserved || reservedByMe);
   const ogImage = photos[0] ? urls[photos[0].storage_path] : undefined;
   const slides = photos.map((p) => ({ id: p.id, url: urls[p.storage_path] }));

@@ -59,7 +59,11 @@ export default function ProductEdit() {
   useEffect(() => {
     if (isNew) return;
     (async () => {
-      const { data: p } = await supabase.from("shop_products").select("*").eq("id", id!).maybeSingle();
+      const { data: p } = await supabase
+        .from("shop_products")
+        .select("id, name, brand, model, size, condition, description, price, status")
+        .eq("id", id!)
+        .maybeSingle();
       if (!p) return;
       setForm({
         name: p.name ?? "",

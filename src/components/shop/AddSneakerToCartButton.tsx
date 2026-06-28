@@ -9,7 +9,8 @@ type Props = {
   priceDollars: number;
   status?: string | null;
   reservedUntil?: string | null;
-  reservedSessionId?: string | null;
+  /** True when the current cart/session is the one holding this sneaker. */
+  reservedByMe?: boolean;
   className?: string;
   variant?: "default" | "outline" | "secondary";
   size?: "sm" | "default" | "lg";
@@ -20,19 +21,19 @@ export default function AddSneakerToCartButton({
   priceDollars,
   status,
   reservedUntil,
-  reservedSessionId,
+  reservedByMe,
   className,
   variant = "outline",
   size = "default",
 }: Props) {
-  const { cartId, addSneaker, setOpen } = useCart();
+  const { addSneaker, setOpen } = useCart();
   const [loading, setLoading] = useState(false);
 
   const isSold = status === "sold";
   const stillReserved =
     status === "reserved" && reservedUntil && new Date(reservedUntil) > new Date();
-  const reservedByOther = !!stillReserved && reservedSessionId !== cartId;
-  const alreadyHeld = !!stillReserved && reservedSessionId === cartId;
+  const reservedByOther = !!stillReserved && !reservedByMe;
+  const alreadyHeld = !!stillReserved && !!reservedByMe;
 
   async function handleClick(e: React.MouseEvent) {
     e.preventDefault();

@@ -1895,6 +1895,15 @@ export type Database = {
           read_ct: number
         }[]
       }
+      shop_products_reservation_for_session: {
+        Args: { p_ids: string[]; p_session: string }
+        Returns: {
+          id: string
+          reserved_by_me: boolean
+          reserved_until: string
+          status: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "customer"

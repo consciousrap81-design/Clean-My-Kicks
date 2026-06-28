@@ -9,7 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Seo from "@/components/Seo";
-import { signedPhotoUrls, type ShopProduct } from "@/lib/shop";
+import { signedPhotoUrls, SHOP_PRODUCT_PUBLIC_COLS, fetchReservationStatus, getShopSessionId, type ShopProduct } from "@/lib/shop";
 import BuyNowButton from "@/components/shop/BuyNowButton";
 import AddSneakerToCartButton from "@/components/shop/AddSneakerToCartButton";
 import AccessoryCard, { type AccessoryRow } from "@/components/shop/AccessoryCard";
@@ -66,6 +66,8 @@ export default function ShopPage() {
   const [condition, setCondition] = useState<string>("All");
   const [query, setQuery] = useState<string>("");
   const [sort, setSort] = useState<"newest" | "price_asc" | "price_desc" | "popular">("newest");
+  const [resvByMe, setResvByMe] = useState<Record<string, boolean>>({});
+  const sessionId = useMemo(() => getShopSessionId(), []);
 
   useEffect(() => {
     let mounted = true;
@@ -73,7 +75,7 @@ export default function ShopPage() {
       const [{ data: live }, { data: sold }] = await Promise.all([
         supabase
           .from("shop_products")
-          .select("*, shop_product_photos(storage_path, is_primary, sort_order)")
+          .select(`${SHOP_PRODUCT_PUBLIC_COLS}, shop_product_photos(storage_path, is_primary, sort_order)`)
           .in("status", ["available", "reserved"])
           .order("created_at", { ascending: false }),
         supabase
@@ -113,6 +115,13 @@ export default function ShopPage() {
       if (mounted) {
         setUrls(u);
         setLoading(false);
+      }
+      const reservedIds = rows.filter((r) => r.status === "reserved").map((r) => r.id);
+      if (reservedIds.length && mounted) {
+        const resv = await fetchReservationStatus(reservedIds, sessionId);
+        const map: Record<string, boolean> = {};
+        resv.forEach((v, k) => { map[k] = !!v.reserved_by_me; });
+        setResvByMe(map);
       }
     }
     load();
@@ -411,7 +420,7 @@ export default function ShopPage() {
                           priceDollars={Number(p.price)}
                           status={p.status}
                           reservedUntil={(p as any).reserved_until}
-                          reservedSessionId={(p as any).reserved_session_id}
+                          reservedByMe={!!resvByMe[p.id]}
                           className="w-full h-9 text-xs"
                           variant="outline"
                           size="sm"
@@ -420,7 +429,7 @@ export default function ShopPage() {
                           productId={p.id}
                           status={p.status}
                           reservedUntil={(p as any).reserved_until}
-                          reservedSessionId={(p as any).reserved_session_id}
+                          reservedByMe={!!resvByMe[p.id]}
                           price={Number(p.price)}
                           className="w-full h-9 text-xs col-span-2 sm:col-span-1"
                           size="sm"
