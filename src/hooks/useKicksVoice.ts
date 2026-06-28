@@ -69,23 +69,36 @@ function stopCurrentAudio() {
 
 async function speakWithAiGateway(text: string, prefs: KicksVoicePrefs): Promise<boolean> {
   try {
-    const { data, error } = await supabase.functions.invoke("kicks-tts", {
-      responseType: "arrayBuffer",
-      body: {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kicks-tts`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
         text,
         voice: prefs.voice,
         instructions: prefs.instructions || undefined,
         speed: prefs.speed ?? 1.0,
-      },
+      }),
     });
-    if (error) throw error;
-    if (!data || !(data instanceof ArrayBuffer) || data.byteLength === 0) return false;
-    const blob = new Blob([data], { type: "audio/mpeg" });
-    const url = URL.createObjectURL(blob);
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.warn("[kicks-tts] function returned non-OK", res.status, detail);
+      throw new Error(`TTS failed: ${res.status}`);
+    }
+    const audio = await res.arrayBuffer();
+    if (!audio || audio.byteLength === 0) return false;
+    const blob = new Blob([audio], { type: "audio/mpeg" });
+    const urlObj = URL.createObjectURL(blob);
     stopCurrentAudio();
-    const a = new Audio(url);
+    const a = new Audio(urlObj);
     currentAudio = a;
-    a.onended = () => { try { URL.revokeObjectURL(url); } catch {} if (currentAudio === a) currentAudio = null; };
+    a.onended = () => { try { URL.revokeObjectURL(urlObj); } catch {} if (currentAudio === a) currentAudio = null; };
     await a.play();
     return true;
   } catch (e) {
