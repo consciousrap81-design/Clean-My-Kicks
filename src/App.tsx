@@ -110,6 +110,7 @@ const App = () => (
               <Route path="ai/settings" element={<AISettings />} />
               <Route path="ai/insights" element={<AIInsights />} />
               <Route path="ai/transcripts" element={<AITranscripts />} />
+              <Route path="ai/health" element={<AIHealth />} />
               <Route path="ai/:threadId" element={<AIAssistant />} />
               <Route path="cleaning-guides" element={<CleaningGuides />} />
             </Route>
