@@ -101,7 +101,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       sneakerIds.length
         ? supabase
             .from("shop_products")
-            .select("id, name, brand, model, size, status, reserved_until, reserved_session_id, shop_product_photos(storage_path, is_primary, sort_order)")
+            .select("id, name, brand, model, size, status, reserved_until, shop_product_photos(storage_path, is_primary, sort_order)")
             .in("id", sneakerIds)
         : Promise.resolve({ data: [] as any[] }),
       variantIds.length
@@ -117,6 +117,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const variantMap = new Map<string, any>();
     (variants ?? []).forEach((v: any) => variantMap.set(v.id, v));
 
+    // Per-session reservation ownership (no longer readable from the table directly).
+    let resvMap = new Map<string, boolean>();
+    if (sneakerIds.length) {
+      const { data: resv } = await supabase.rpc("shop_products_reservation_for_session", {
+        p_ids: sneakerIds,
+        p_session: cartId,
+      });
+      (resv ?? []).forEach((r: any) => resvMap.set(r.id, !!r.reserved_by_me));
+    }
+
     const enriched: EnrichedCartItem[] = raw.map((row) => {
       if (row.item_type === "sneaker" && row.sneaker_product_id) {
         const s = sneakerMap.get(row.sneaker_product_id);
@@ -129,7 +139,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const isSold = s.status === "sold";
         const now = new Date();
         const stillReserved = s.reserved_until && new Date(s.reserved_until) > now;
-        const heldByOther = !!stillReserved && s.reserved_session_id !== cartId;
+        const heldByOther = !!stillReserved && !resvMap.get(s.id);
         const ourReservation = !heldByOther && row.reserved_until ? new Date(row.reserved_until) : null;
         const reservationExpired =
           !isSold && !heldByOther && (!stillReserved || (ourReservation !== null && ourReservation <= now));
@@ -256,15 +266,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Check current state of the sneaker
     const { data: prod } = await supabase
       .from("shop_products")
-      .select("id, status, reserved_until, reserved_session_id")
+      .select("id, status, reserved_until")
       .eq("id", productId)
       .maybeSingle();
     if (!prod) return { ok: false, error: "Not found" };
     const now = new Date();
     const stillReserved = prod.reserved_until && new Date(prod.reserved_until) > now;
     if (prod.status === "sold") return { ok: false, error: "Already sold" };
-    if (stillReserved && prod.reserved_session_id !== cartId) {
-      return { ok: false, error: "Reserved by another buyer" };
+    if (stillReserved) {
+      const { data: resv } = await supabase.rpc("shop_products_reservation_for_session", {
+        p_ids: [productId],
+        p_session: cartId,
+      });
+      const mine = !!(resv ?? [])[0]?.reserved_by_me;
+      if (!mine) return { ok: false, error: "Reserved by another buyer" };
     }
     const reservedUntil = new Date(now.getTime() + RESERVE_MINUTES * 60 * 1000).toISOString();
     const { error: reserveErr } = await supabase
@@ -340,13 +355,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
     await cartSupabase.from("shop_cart_items").delete().eq("id", itemId);
     if (row?.item_type === "sneaker" && row.sneaker_product_id) {
-      // Only release if reserved by us
-      const { data: p } = await supabase
-        .from("shop_products")
-        .select("status, reserved_session_id")
-        .eq("id", row.sneaker_product_id)
-        .maybeSingle();
-      if (p?.reserved_session_id === cartId && p?.status === "reserved") {
+      // Only release if this cart owns the reservation.
+      const { data: resv } = await supabase.rpc("shop_products_reservation_for_session", {
+        p_ids: [row.sneaker_product_id],
+        p_session: cartId,
+      });
+      const r = (resv ?? [])[0];
+      if (r?.reserved_by_me && r?.status === "reserved") {
         await supabase
           .from("shop_products")
           .update({ status: "available", reserved_until: null, reserved_session_id: null })
