@@ -1,44 +1,50 @@
-# Adaptability Pipeline Audit + Health Panel
+# Fix `www.cleanmykicks.com` SSL error (GoDaddy DNS)
 
-## 1. End-to-end audit (read-only)
+The SSL error happens because `www` was never added as its own domain in Lovable, so no certificate was issued for it. We fix it in two places: add `www` in Lovable, then add the matching A record at GoDaddy.
 
-Run targeted SQL via `supabase--read_query` to confirm the learning loop is recording:
+## Step 1 — Add `www` in Lovable
 
-- **Recent activity counts** (last 7/30 days) across `ai_feedback`, `ai_audit_log`, `ai_change_history`, `ai_suggestions`.
-- **Join check**: every `ai_suggestions` row with `status in ('applied','dismissed')` in the last 30 days has a matching `ai_feedback` row with the same `suggestion_id` and matching `action`.
-- **Orphans**: feedback rows whose `suggestion_id` no longer resolves, and applied suggestions missing a feedback record.
-- **Undo coverage**: `ai_change_history` rows where `undone = true` paired with an `ai_feedback` row with `action = 'undone'`.
-- **Error surface**: `ai_suggestions.status = 'failed'` in the last 30 days, plus recent `admin-ai-execute` edge function logs filtered for error lines.
+1. Open **Project Settings → Project → Domains**.
+2. Click **Connect Domain**.
+3. Enter exactly: `www.cleanmykicks.com`
+4. Lovable will show the DNS record it expects (an A record for host `www` → `185.158.133.1`).
+5. Leave this tab open — you'll come back to verify.
 
-Report findings inline (counts, gaps, sample IDs). No data changes.
+Do not remove the existing apex `cleanmykicks.com` entry.
 
-## 2. New admin UI: Adaptability Health panel
+## Step 2 — Add the A record in GoDaddy
 
-Add `src/pages/admin/AIHealth.tsx` mounted at `/admin/ai/health`, linked from the AdminLayout AI section.
+1. Sign in to GoDaddy → **My Products → Domains → cleanmykicks.com → DNS** (or "Manage DNS").
+2. Before adding anything, look in the DNS records list for any existing record where **Type = A or CNAME** and **Name = www**.
+   - If one exists (often a parked GoDaddy CNAME like `www → @`), **delete it**. A conflicting record will block verification and SSL.
+3. Click **Add New Record** and enter:
+   - **Type:** A
+   - **Name / Host:** `www`
+   - **Value / Points to:** `185.158.133.1`
+   - **TTL:** 1 Hour (default is fine)
+4. Save.
 
-Three sections, all read-only, all client-side queries against existing tables:
+## Step 3 — Check CAA (only if present)
 
-1. **Pipeline status cards** — counts for last 24h / 7d / 30d:
-   - Suggestions: pending, applied, dismissed, failed
-   - Feedback events: applied, dismissed, undone
-   - Audit log entries
-   - Change history entries (and how many undone)
+In the same GoDaddy DNS list, look for any **CAA** records.
+- If there are none, skip this step (default is "any CA allowed", which is fine).
+- If there are CAA records, make sure at least one allows Let's Encrypt:
+  - Type: CAA, Name: `@`, Flag: `0`, Tag: `issue`, Value: `letsencrypt.org`
+  - Without this, Lovable cannot issue the SSL cert.
 
-2. **Coverage checks** (computed client-side from the same queries):
-   - "Applied suggestions with feedback recorded" — ratio + list of any gaps
-   - "Dismissed suggestions with feedback recorded" — ratio + gaps
-   - "Undo events linked to change history" — ratio + gaps
-   - Each row shows green / amber / red badge based on a simple threshold (100% green, ≥90% amber, <90% red).
+## Step 4 — Wait and verify
 
-3. **Recent errors & failed actions**:
-   - Latest `ai_suggestions` with `status = 'failed'` (id, kind, title, time).
-   - Latest `ai_audit_log` rows where `output` contains an `error` field.
-   - "Refresh" button to re-run all queries.
+1. DNS usually propagates in 5–30 minutes on GoDaddy (can take up to 72h).
+2. Check propagation at https://dnschecker.org → enter `www.cleanmykicks.com`, type **A**, expect `185.158.133.1` worldwide.
+3. Back in **Lovable → Domains**, the `www` entry should move: Verifying → Setting up → Active.
+4. Once Active, visit `https://www.cleanmykicks.com` — the SSL error should be gone.
 
-No new tables, no new edge functions, no schema changes. Pure read views over what the pipeline already writes.
+## Step 5 — Pick a primary (recommended)
 
-## Technical notes
+In **Lovable → Domains**, set one of the two (apex or www) as **Primary**. The other will redirect to it. This keeps SEO clean and avoids duplicate-content issues. Most stores use the apex `cleanmykicks.com` as primary.
 
-- All queries scoped through Supabase client (admin-only routes already enforce role via `ProtectedRoute`).
-- Reuse existing UI primitives (`Card`, `Badge`, `Button`, `Table`).
-- Add route in `src/App.tsx` and nav entry in `src/components/admin/AdminLayout.tsx` under the existing AI group.
+## Notes
+
+- I am not making any code changes for this — it is purely a DNS + Lovable Domains configuration task you do in the GoDaddy and Lovable dashboards.
+- If after ~1 hour the Lovable status is still **Verifying** or **Failed**, send me a screenshot of your GoDaddy DNS records and the Lovable Domains panel and I'll diagnose further.
+- Once `www` is Active, I can optionally add an in-app `<link rel="canonical">` and a small redirect helper so search engines consistently see your chosen primary domain — say the word and I'll plan that as a follow-up.
