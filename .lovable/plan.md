@@ -1,84 +1,44 @@
+# Adaptability Pipeline Audit + Health Panel
 
-# Admin AI Assistant
+## 1. End-to-end audit (read-only)
 
-A conversational AI in `/admin` that can read your site, draft changes, run research, and execute approved actions through a small set of safe tools. Inline "AI improve" buttons appear on product/order/job pages and feed the same agent.
+Run targeted SQL via `supabase--read_query` to confirm the learning loop is recording:
 
-## What it can do
+- **Recent activity counts** (last 7/30 days) across `ai_feedback`, `ai_audit_log`, `ai_change_history`, `ai_suggestions`.
+- **Join check**: every `ai_suggestions` row with `status in ('applied','dismissed')` in the last 30 days has a matching `ai_feedback` row with the same `suggestion_id` and matching `action`.
+- **Orphans**: feedback rows whose `suggestion_id` no longer resolves, and applied suggestions missing a feedback record.
+- **Undo coverage**: `ai_change_history` rows where `undone = true` paired with an `ai_feedback` row with `action = 'undone'`.
+- **Error surface**: `ai_suggestions.status = 'failed'` in the last 30 days, plus recent `admin-ai-execute` edge function logs filtered for error lines.
 
-**Always allowed (no approval):**
-- Read products, orders, jobs, shipments, customers, reviews.
-- Web research (competitors, pricing, trends) via Semrush + web search.
-- Generate suggestions, drafts, SEO rewrites, image concepts.
-- Run a scheduled scan every 4 hours that stores findings + suggestions.
+Report findings inline (counts, gaps, sample IDs). No data changes.
 
-**Requires your approval (one-tap Apply/Reject):**
-- Create/update/publish shop products (copy, price, attrs, photos).
-- Generate product/marketing images.
-- Update SEO meta/JSON-LD on pages.
-- Update job/order/shipment status, draft & send customer emails.
-- Apply suggested business actions (e.g. add a promo, change a price).
+## 2. New admin UI: Adaptability Health panel
 
-## Interface
+Add `src/pages/admin/AIHealth.tsx` mounted at `/admin/ai/health`, linked from the AdminLayout AI section.
 
-- **Chat panel** at `/admin/ai` — full transcript, threaded, persisted in DB. Uses AI Elements (Conversation, Message, Tool, PromptInput).
-- **Inline "✨ AI" buttons** on ProductEdit, ShopOrders, Job detail, and admin Shop pages. Each opens a small drawer that pre-fills context ("rewrite this description", "suggest price for this Jordan 4", "draft reply to this customer") and routes through the same agent.
-- **Suggestions inbox** at `/admin/ai/suggestions` — review/approve/dismiss findings from the scheduled scan.
+Three sections, all read-only, all client-side queries against existing tables:
 
-## Tools the agent exposes
+1. **Pipeline status cards** — counts for last 24h / 7d / 30d:
+   - Suggestions: pending, applied, dismissed, failed
+   - Feedback events: applied, dismissed, undone
+   - Audit log entries
+   - Change history entries (and how many undone)
 
-Each tool is a typed AI SDK `tool()` with `needsApproval` set per your autonomy rules.
+2. **Coverage checks** (computed client-side from the same queries):
+   - "Applied suggestions with feedback recorded" — ratio + list of any gaps
+   - "Dismissed suggestions with feedback recorded" — ratio + gaps
+   - "Undo events linked to change history" — ratio + gaps
+   - Each row shows green / amber / red badge based on a simple threshold (100% green, ≥90% amber, <90% red).
 
-| Tool | Approval | Purpose |
-|---|---|---|
-| `search_products` / `get_product` | no | Read shop catalog |
-| `update_product` / `publish_product` | yes | Edit/publish products |
-| `generate_product_image` | yes | Create cover/marketing images |
-| `rewrite_seo` | yes | Update title/meta/JSON-LD |
-| `list_orders` / `list_jobs` / `get_shipment` | no | Read fulfillment |
-| `update_job_status` / `send_customer_email` | yes | Customer ops |
-| `web_search` / `competitor_scan` | no | Research |
-| `propose_promo` / `propose_price_change` | yes | Business actions |
+3. **Recent errors & failed actions**:
+   - Latest `ai_suggestions` with `status = 'failed'` (id, kind, title, time).
+   - Latest `ai_audit_log` rows where `output` contains an `error` field.
+   - "Refresh" button to re-run all queries.
 
-Agent loop uses `stopWhen: stepCountIs(50)` and Lovable AI Gateway with `google/gemini-3-flash-preview`.
+No new tables, no new edge functions, no schema changes. Pure read views over what the pipeline already writes.
 
-## Scheduled research (every 4 hours)
+## Technical notes
 
-`pg_cron` → `admin-ai-scan` edge function:
-1. Pull top competitors (Semrush) for sneaker restoration in Denton/DFW.
-2. Check own domain trend, broken meta, low-stock items, stale drafts.
-3. Ask the model to summarize findings + concrete suggestions.
-4. Insert into `ai_suggestions` (status=`pending`). Notify badge in admin sidebar.
-
-You approve from the Suggestions inbox; approved items become tool calls with the same approval gate.
-
-## Schema (new tables)
-
-- `ai_threads(id, user_id, title, created_at)` — chat threads.
-- `ai_messages(id, thread_id, role, parts jsonb, created_at)` — UIMessage parts.
-- `ai_suggestions(id, kind, title, summary, payload jsonb, status, created_at)` — scan/agent proposals.
-- `ai_audit_log(id, actor, tool, input jsonb, output jsonb, approved, created_at)` — every tool execution.
-
-All admin-only RLS (`has_role(auth.uid(),'admin')`), full GRANTs to authenticated + service_role.
-
-## Edge functions
-
-- `admin-ai-chat` — streaming chat endpoint (`useChat` transport). Validates admin, runs the tool loop, persists messages, writes audit log.
-- `admin-ai-scan` — scheduled research job; writes `ai_suggestions`.
-- `admin-ai-execute` — runs a previously approved suggestion/tool call as the admin user.
-
-## UI files
-
-- `src/pages/admin/AIAssistant.tsx` — full chat surface (threads sidebar + AI Elements transcript + composer).
-- `src/pages/admin/AISuggestions.tsx` — inbox with approve/dismiss.
-- `src/components/admin/InlineAIButton.tsx` — reusable "✨ AI" trigger embedded in ProductEdit, ShopOrders, Job pages.
-- Sidebar link in admin layout + unread suggestion badge.
-
-## Approval UX
-
-Tool calls render inline in chat with input params collapsed. Destructive tools show **Apply / Reject** buttons; nothing mutates DB until you click Apply. Inline buttons follow the same flow — the drawer shows the proposed change diff before applying.
-
-## Out of scope (for this pass)
-
-- Direct edits to source code/components (the agent can't redeploy your app).
-- Refunds (Stripe refund stays manual until you ask for it).
-- Autonomous mode — every write is approval-gated as you requested.
+- All queries scoped through Supabase client (admin-only routes already enforce role via `ProtectedRoute`).
+- Reuse existing UI primitives (`Card`, `Badge`, `Button`, `Table`).
+- Add route in `src/App.tsx` and nav entry in `src/components/admin/AdminLayout.tsx` under the existing AI group.

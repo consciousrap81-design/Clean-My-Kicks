@@ -28,6 +28,7 @@ const nav = [
   { to: "/admin/ai/suggestions", label: "AI Suggestions", icon: Lightbulb },
   { to: "/admin/ai/insights", label: "AI Insights", icon: BarChart3 },
   { to: "/admin/ai/transcripts", label: "AI Transcripts", icon: BookOpen },
+  { to: "/admin/ai/health", label: "AI Health", icon: Activity },
   { to: "/admin/ai/settings", label: "AI Settings", icon: SlidersHorizontal },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
