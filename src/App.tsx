@@ -34,6 +34,7 @@ import AISuggestions from "./pages/admin/AISuggestions";
 import AISettings from "./pages/admin/AISettings";
 import AIInsights from "./pages/admin/AIInsights";
 import AITranscripts from "./pages/admin/AITranscripts";
+import AIHealth from "./pages/admin/AIHealth";
 import CleaningGuides from "./pages/admin/CleaningGuides";
 import QuoteView from "./pages/QuoteView";
 import ProductDetail from "./pages/ProductDetail";
