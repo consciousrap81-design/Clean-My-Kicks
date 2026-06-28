@@ -20,12 +20,26 @@ Deno.serve(async (req) => {
     ]);
 
     const context = { drafts, lowStock, recentOrders, staleRequests, scannedAt: new Date().toISOString() };
+    const draftIds = new Set((drafts ?? []).map((d: any) => d.id));
+    const variantIds = new Set((lowStock ?? []).map((v: any) => v.id));
+    const requestIds = new Set((staleRequests ?? []).map((r: any) => r.id));
 
     const prefs = await loadAiPreferenceBlock();
 
     const { text } = await generateText({
       model: gateway("google/gemini-3-flash-preview"),
-      system: `You are an SMB growth advisor for a sneaker restoration shop in Denton, TX (Clean My Kicks). Look at the JSON and produce 3-6 concrete, prioritized suggestions. Each suggestion MUST be a JSON object with: title (<=60 chars), summary (1-2 sentences), kind (one of: publish_product, follow_up_request, restock_alert, marketing_idea, pricing_idea, content_idea), reasoning (1-2 sentences explaining why), sources (array of 1-3 objects: {title, url, snippet} citing the internal data row OR a credible external reference such as a competitor URL, industry report, or pricing guide). Reply as JSON array only.
+      system: `You are an SMB growth advisor for a sneaker restoration shop in Denton, TX (Clean My Kicks). Look at the JSON and produce 3-6 concrete, prioritized suggestions.
+
+Each suggestion MUST be a JSON object with: title (<=60 chars), summary (1-2 sentences), kind, reasoning (1-2 sentences), sources (array of 1-3 {title,url,snippet}), and the REQUIRED target fields for its kind:
+
+- "publish_product": product_id (MUST be a real id from drafts[])
+- "pricing_idea": product_id (from drafts[] or recentOrders[]) AND price_cents (integer, the proposed new price in cents)
+- "restock_alert": variant_id (from lowStock[]) AND add_stock (positive integer of units to add)
+- "follow_up_request": request_id (from staleRequests[]) AND status ("contacted" | "quoted" | "closed")
+- "marketing_idea": no target fields (advisory only)
+- "content_idea": no target fields (advisory only)
+
+Only reference ids that appear in the provided JSON. If you cannot tie an idea to a real id, use marketing_idea or content_idea instead. Reply as JSON array only.
 
 ${prefs}`,
       prompt: JSON.stringify(context),
@@ -37,24 +51,47 @@ ${prefs}`,
       parsed = match ? JSON.parse(match[0]) : [];
     } catch { parsed = []; }
 
-    if (parsed.length) {
-      const rows = parsed.slice(0, 8).map((s) => ({
-        kind: s.kind ?? "marketing_idea",
+    const ACTIONABLE = new Set(["publish_product", "pricing_idea", "restock_alert", "follow_up_request"]);
+    const ADVISORY = new Set(["marketing_idea", "content_idea"]);
+    const rows: any[] = [];
+    let skipped = 0;
+    for (const s of parsed.slice(0, 12)) {
+      let kind = s.kind ?? "marketing_idea";
+      const payload: any = {
+        source: "scheduled_scan",
+        reasoning: s.reasoning ?? null,
+        sources: Array.isArray(s.sources) ? s.sources.slice(0, 6) : [],
+        raw: s,
+      };
+      if (kind === "publish_product") {
+        if (!s.product_id || !draftIds.has(s.product_id)) { skipped++; continue; }
+        payload.product_id = s.product_id;
+      } else if (kind === "pricing_idea") {
+        if (!s.product_id || typeof s.price_cents !== "number" || s.price_cents <= 0) { skipped++; continue; }
+        payload.product_id = s.product_id;
+        payload.price_cents = Math.round(s.price_cents);
+      } else if (kind === "restock_alert") {
+        if (!s.variant_id || !variantIds.has(s.variant_id) || typeof s.add_stock !== "number" || s.add_stock <= 0) { skipped++; continue; }
+        payload.variant_id = s.variant_id;
+        payload.add_stock = Math.round(s.add_stock);
+      } else if (kind === "follow_up_request") {
+        if (!s.request_id || !requestIds.has(s.request_id) || !s.status) { skipped++; continue; }
+        payload.request_id = s.request_id;
+        payload.status = s.status;
+      } else if (!ADVISORY.has(kind)) {
+        kind = "marketing_idea";
+      }
+      rows.push({
+        kind,
         title: String(s.title ?? "Suggestion").slice(0, 200),
         summary: String(s.summary ?? "").slice(0, 1000),
-        payload: {
-          source: "scheduled_scan",
-          reasoning: s.reasoning ?? null,
-          sources: Array.isArray(s.sources) ? s.sources.slice(0, 6) : [],
-          raw: s,
-          context,
-        },
+        payload,
         status: "pending",
-      }));
-      await a.from("ai_suggestions").insert(rows);
+      });
     }
+    if (rows.length) await a.from("ai_suggestions").insert(rows);
 
-    return new Response(JSON.stringify({ ok: true, inserted: parsed.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, inserted: rows.length, skipped }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error(e);
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
