@@ -24,6 +24,9 @@ async function verifyAdmin(req: Request) {
 
 type Target = { table: string; id: string; updates: Record<string, unknown> } | null;
 
+const ADVISORY_KINDS = new Set(["marketing_idea", "content_idea"]);
+const ACTIONABLE_KINDS = new Set(["publish_product", "pricing_idea", "restock_alert", "follow_up_request", "update_product", "price_change", "update_job_status"]);
+
 function resolveTarget(kind: string, payload: any): Target {
   switch (kind) {
     case "update_product":
@@ -38,6 +41,14 @@ function resolveTarget(kind: string, payload: any): Target {
       if (payload?.product_id && typeof payload?.price_cents === "number")
         return { table: "shop_products", id: payload.product_id, updates: { price_cents: payload.price_cents } };
       return null;
+    case "pricing_idea":
+      if (payload?.product_id && typeof payload?.price_cents === "number")
+        return { table: "shop_products", id: payload.product_id, updates: { price_cents: payload.price_cents } };
+      return null;
+    case "follow_up_request":
+      if (payload?.request_id && payload?.status)
+        return { table: "booking_requests", id: payload.request_id, updates: { status: payload.status } };
+      return null;
     case "update_job_status":
       if (payload?.job_id && payload?.status)
         return { table: "jobs", id: payload.job_id, updates: { status: payload.status } };
@@ -49,12 +60,63 @@ function resolveTarget(kind: string, payload: any): Target {
 
 async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
   const payload = sug.payload ?? {};
+
+  // Advisory suggestions cannot be "applied" — acknowledge instead.
+  if (ADVISORY_KINDS.has(sug.kind)) {
+    await a.from("ai_suggestions").update({ status: "acknowledged", resolved_at: new Date().toISOString() }).eq("id", sug.id);
+    await a.from("ai_audit_log").insert({ actor: userId, tool: `acknowledge:${sug.kind}`, input: payload, output: { note: "Advisory acknowledged" }, approved: true });
+    await a.from("ai_feedback").insert({ suggestion_id: sug.id, actor: userId, action: "acknowledged", kind: sug.kind, suggestion_snapshot: { title: sug.title, summary: sug.summary, payload: sug.payload } });
+    return { ok: true, advisory: true, message: "Advisory acknowledged — nothing to apply" };
+  }
+
+  // Restock is a numeric increment, not a row-level overwrite — handle specially.
+  if (sug.kind === "restock_alert") {
+    const variantId = payload?.variant_id;
+    const addStock = Number(payload?.add_stock);
+    if (!variantId || !Number.isFinite(addStock) || addStock <= 0) {
+      const err = `Missing variant_id or add_stock on suggestion ${sug.id}`;
+      await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: err } }).eq("id", sug.id);
+      return { ok: false, error: err };
+    }
+    const before = await a.from("shop_accessory_variants").select("id,stock,sku").eq("id", variantId).maybeSingle();
+    if (!before.data) {
+      const err = `Variant ${variantId} not found`;
+      await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: err } }).eq("id", sug.id);
+      return { ok: false, error: err };
+    }
+    const newStock = (before.data.stock ?? 0) + addStock;
+    const { error: e } = await a.from("shop_accessory_variants").update({ stock: newStock }).eq("id", variantId);
+    if (e) {
+      await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: String(e.message ?? e) } }).eq("id", sug.id);
+      return { ok: false, error: String(e.message ?? e) };
+    }
+    const h = await a.from("ai_change_history").insert({
+      suggestion_id: sug.id, actor: userId, kind: sug.kind,
+      table_name: "shop_accessory_variants", record_id: variantId,
+      before_state: { stock: before.data.stock }, after_state: { stock: newStock },
+    }).select("id").single();
+    await a.from("ai_suggestions").update({ status: "applied", resolved_at: new Date().toISOString() }).eq("id", sug.id);
+    await a.from("ai_audit_log").insert({ actor: userId, tool: `apply:${sug.kind}`, input: payload, output: { history_id: h.data?.id, new_stock: newStock }, approved: true });
+    await a.from("ai_feedback").insert({ suggestion_id: sug.id, actor: userId, action: "applied", kind: sug.kind, suggestion_snapshot: { title: sug.title, summary: sug.summary, payload: sug.payload } });
+    return { ok: true, history_id: h.data?.id, message: `Restocked ${before.data.sku ?? "variant"} by ${addStock} (now ${newStock})` };
+  }
+
   const target = resolveTarget(sug.kind, payload);
-  let result: any = { applied: true };
   let historyId: string | null = null;
 
   try {
-    if (target) {
+    if (!target) {
+      // Actionable kind with missing IDs → fail loudly instead of silent no-op.
+      if (ACTIONABLE_KINDS.has(sug.kind)) {
+        const err = `Suggestion of kind "${sug.kind}" is missing required target ids`;
+        await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: err } }).eq("id", sug.id);
+        return { ok: false, error: err };
+      }
+      // Unknown kind — treat as advisory acknowledgement.
+      await a.from("ai_suggestions").update({ status: "acknowledged", resolved_at: new Date().toISOString() }).eq("id", sug.id);
+      return { ok: true, advisory: true, message: "Acknowledged (no executor for this suggestion kind)" };
+    }
+    {
       // Snapshot previous state for undo
       const before = await a.from(target.table).select("*").eq("id", target.id).maybeSingle();
       const beforeRow = before.data ?? null;
@@ -74,15 +136,13 @@ async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
         after_state: target.updates,
       }).select("id").single();
       historyId = h.data?.id ?? null;
-    } else {
-      result.note = "Acknowledged.";
     }
     await a.from("ai_suggestions").update({ status: "applied", resolved_at: new Date().toISOString() }).eq("id", sug.id);
-    await a.from("ai_audit_log").insert({ actor: userId, tool: `apply:${sug.kind}`, input: payload, output: { ...result, history_id: historyId }, approved: true });
+    await a.from("ai_audit_log").insert({ actor: userId, tool: `apply:${sug.kind}`, input: payload, output: { applied: true, history_id: historyId, target }, approved: true });
       await a.from("ai_feedback").insert({ suggestion_id: sug.id, actor: userId, action: "applied", kind: sug.kind, suggestion_snapshot: { title: sug.title, summary: sug.summary, payload: sug.payload } });
-    return { ok: true, history_id: historyId };
+    return { ok: true, history_id: historyId, message: `Updated ${target.table}` };
   } catch (e) {
-    await a.from("ai_suggestions").update({ status: "failed" }).eq("id", sug.id);
+    await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: String((e as any)?.message ?? e) } }).eq("id", sug.id);
     return { ok: false, error: String(e) };
   }
 }
