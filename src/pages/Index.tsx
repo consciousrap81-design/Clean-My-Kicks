@@ -1,6 +1,8 @@
 import Navbar from "@/components/Navbar";
 import Seo from "@/components/Seo";
 import Hero from "@/components/Hero";
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import TrustStrip from "@/components/TrustStrip";
 import HowItWorks from "@/components/HowItWorks";
 import Services from "@/components/Services";
@@ -14,6 +16,18 @@ import Footer from "@/components/Footer";
 import MobileBottomBar from "@/components/MobileBottomBar";
 
 const Index = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.replace("#", "");
+      // Wait for sections to render
+      setTimeout(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+      }, 150);
+    }
+  }, [location]);
+
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-0">
       <Seo
