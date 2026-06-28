@@ -62,6 +62,11 @@ const CONVERSATION_IDLE_MS = 60000;
 
 let currentAudio: HTMLAudioElement | null = null;
 let isSpeakingFlag = false;
+// Keep the recognizer muted for a short tail after audio ends so the
+// microphone doesn't pick up the last syllable of Kicks's own voice
+// (speaker echo) and treat it as a new user command.
+let speakingUntil = 0;
+const SPEAKING_TAIL_MS = 900;
 function stopCurrentAudio() {
   try { currentAudio?.pause(); } catch {}
   if (currentAudio) {
@@ -70,8 +75,11 @@ function stopCurrentAudio() {
   }
   try { window.speechSynthesis?.cancel(); } catch {}
   isSpeakingFlag = false;
+  speakingUntil = 0;
 }
-export function isKicksSpeaking() { return isSpeakingFlag; }
+export function isKicksSpeaking() {
+  return isSpeakingFlag || Date.now() < speakingUntil;
+}
 
 async function speakWithAiGateway(text: string, prefs: KicksVoicePrefs): Promise<boolean> {
   try {
@@ -105,11 +113,19 @@ async function speakWithAiGateway(text: string, prefs: KicksVoicePrefs): Promise
     const a = new Audio(urlObj);
     currentAudio = a;
     isSpeakingFlag = true;
+    speakingUntil = 0;
     a.onended = () => {
       try { URL.revokeObjectURL(urlObj); } catch {}
-      if (currentAudio === a) { currentAudio = null; isSpeakingFlag = false; }
+      if (currentAudio === a) {
+        currentAudio = null;
+        isSpeakingFlag = false;
+        speakingUntil = Date.now() + SPEAKING_TAIL_MS;
+      }
     };
-    a.onpause = () => { if (a.ended || currentAudio !== a) isSpeakingFlag = false; };
+    // Intentionally do NOT clear isSpeakingFlag on `pause` — browsers fire
+    // `pause` for transient buffering/stalls, which would briefly un-mute the
+    // recognizer mid-playback and let Kicks hear herself. Only `ended` (handled
+    // above) or an explicit stopCurrentAudio() should clear it.
     await a.play();
     return true;
   } catch (e) {
@@ -126,8 +142,9 @@ function speakWithBrowser(text: string) {
     u.rate = 1.05;
     u.pitch = 1;
     isSpeakingFlag = true;
-    u.onend = () => { isSpeakingFlag = false; };
-    u.onerror = () => { isSpeakingFlag = false; };
+    speakingUntil = 0;
+    u.onend = () => { isSpeakingFlag = false; speakingUntil = Date.now() + SPEAKING_TAIL_MS; };
+    u.onerror = () => { isSpeakingFlag = false; speakingUntil = Date.now() + SPEAKING_TAIL_MS; };
     window.speechSynthesis.speak(u);
   } catch {}
 }
