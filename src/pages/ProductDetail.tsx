@@ -15,6 +15,7 @@ import ShareButtons from "@/components/shop/ShareButtons";
 import ReviewSnippet from "@/components/shop/ReviewSnippet";
 import RecentlyViewed, { trackRecentlyViewed } from "@/components/shop/RecentlyViewed";
 import YouMayAlsoLike from "@/components/shop/YouMayAlsoLike";
+import StockAndDelivery from "@/components/shop/StockAndDelivery";
 
 type Photo = { id: string; storage_path: string; is_primary: boolean; sort_order: number };
 
@@ -211,6 +212,13 @@ export default function ProductDetail() {
                 {viewers > 1 ? `${viewers} people viewing right now` : "High interest — going fast"}
               </div>
             )}
+
+            <StockAndDelivery
+              isSold={isSold}
+              isReserved={!!isReserved}
+              reservedByMe={!!reservedByMe}
+              reservedUntil={product.reserved_until as any}
+            />
 
             {product.description && (
               <div className="mt-6 text-sm md:text-base text-foreground/80 leading-relaxed prose prose-sm md:prose-base dark:prose-invert max-w-none prose-headings:font-display prose-strong:text-foreground">
