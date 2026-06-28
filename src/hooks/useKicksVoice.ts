@@ -307,10 +307,15 @@ export function useKicksVoice(opts: {
       if (live) setLastHeard(live);
 
       // Mute-while-speaking: ignore anything the recognizer picks up while
-      // Kicks is talking so she doesn't hear herself and interrupt her own
-      // response. Voice barge-in is intentionally disabled in this mode —
-      // use the Stop button or typed input to interrupt.
-      if (isSpeakingFlag) return;
+      // Kicks is talking (and for a short tail after) so she doesn't hear
+      // herself and interrupt her own response. Voice barge-in is intentionally
+      // disabled in this mode — use the Stop button or typed input to interrupt.
+      if (isKicksSpeaking()) {
+        // Also drop any partially-buffered command text captured just before
+        // she started speaking, so her own words can't get appended to it.
+        commandInterimRef.current = "";
+        return;
+      }
 
       // Push-to-talk: just accumulate; we deliver on pushEnd().
       if (modeRef.current === "push") {
