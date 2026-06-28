@@ -10,6 +10,10 @@ import Seo from "@/components/Seo";
 import { getShopSessionId, signedPhotoUrls, type ShopProduct } from "@/lib/shop";
 import ReviewsSection from "@/components/shop/ReviewsSection";
 import ReactMarkdown from "react-markdown";
+import ProductGallery from "@/components/shop/ProductGallery";
+import ShareButtons from "@/components/shop/ShareButtons";
+import ReviewSnippet from "@/components/shop/ReviewSnippet";
+import RecentlyViewed, { trackRecentlyViewed } from "@/components/shop/RecentlyViewed";
 
 type Photo = { id: string; storage_path: string; is_primary: boolean; sort_order: number };
 
@@ -19,7 +23,6 @@ export default function ProductDetail() {
   const [product, setProduct] = useState<ShopProduct | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
-  const [activeIdx, setActiveIdx] = useState(0);
   const [viewers, setViewers] = useState(1);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
@@ -51,6 +54,7 @@ export default function ProductDetail() {
 
     // Fire view tracking
     supabase.functions.invoke("track-product-view", { body: { productId: id, sessionId } }).catch(() => {});
+    trackRecentlyViewed(id);
 
     // Realtime: product status updates
     const pchan = supabase
@@ -122,9 +126,10 @@ export default function ProductDetail() {
   const isReserved = product.status === "reserved" && product.reserved_until && new Date(product.reserved_until) > new Date();
   const reservedByMe = isReserved && (product as any).reserved_session_id === sessionId;
   const canBuy = !isSold && (!isReserved || reservedByMe);
-  const activePhoto = photos[activeIdx];
-  const activeUrl = activePhoto ? urls[activePhoto.storage_path] : null;
   const ogImage = photos[0] ? urls[photos[0].storage_path] : undefined;
+  const slides = photos.map((p) => ({ id: p.id, url: urls[p.storage_path] }));
+  const shareUrl = typeof window !== "undefined" ? window.location.href : `https://cleanmykicks.com/shop/${product.id}`;
+  const showUrgency = !isSold && (viewers > 1 || (product.view_count ?? 0) >= 10);
   const priceUsd = ((product as any).price_cents ?? 0) / 100;
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -173,30 +178,7 @@ export default function ProductDetail() {
 
         <div className="grid md:grid-cols-2 gap-8 md:gap-12">
           {/* Gallery */}
-          <div>
-            <div className="aspect-square bg-secondary rounded-xl overflow-hidden mb-3">
-              {activeUrl ? (
-                <img src={activeUrl} alt={display} className="w-full h-full object-contain p-4" />
-              ) : (
-                <div className="w-full h-full grid place-items-center text-muted-foreground">No photo</div>
-              )}
-            </div>
-            {photos.length > 1 && (
-              <div className="grid grid-cols-5 gap-2">
-                {photos.map((ph, i) => (
-                  <button
-                    key={ph.id}
-                    onClick={() => setActiveIdx(i)}
-                    className={`aspect-square bg-secondary rounded-md overflow-hidden border-2 transition ${i === activeIdx ? "border-primary" : "border-transparent"}`}
-                  >
-                    {urls[ph.storage_path] && (
-                      <img src={urls[ph.storage_path]} alt="" className="w-full h-full object-contain p-1" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <ProductGallery slides={slides} alt={display} />
 
           {/* Details */}
           <div>
@@ -206,6 +188,7 @@ export default function ProductDetail() {
                 {product.name}
               </div>
             )}
+            <div className="mt-2"><ReviewSnippet productId={product.id} /></div>
             <div className="font-display text-2xl md:text-3xl text-primary mt-2">${Number(product.price).toFixed(2)}</div>
 
             <div className="flex flex-wrap gap-4 mt-4 text-sm text-muted-foreground">
@@ -221,6 +204,12 @@ export default function ProductDetail() {
               <span className="h-2 w-2 rounded-full bg-primary" />
               Only 1 available — 1-of-1 restored pair
             </div>
+            {showUrgency && (
+              <div className="mt-3 inline-flex items-center gap-2 text-xs uppercase tracking-wider bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-900 rounded-full px-3 py-1 ml-0 md:ml-2">
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                {viewers > 1 ? `${viewers} people viewing right now` : "High interest — going fast"}
+              </div>
+            )}
 
             {product.description && (
               <div className="mt-6 text-sm md:text-base text-foreground/80 leading-relaxed prose prose-sm md:prose-base dark:prose-invert max-w-none prose-headings:font-display prose-strong:text-foreground">
@@ -245,10 +234,18 @@ export default function ProductDetail() {
                 Secure checkout via Stripe. Shipping included in the US.
               </p>
             </div>
+
+            <div className="mt-6 pt-6 border-t border-border">
+              <ShareButtons url={shareUrl} title={display} />
+            </div>
           </div>
         </div>
 
-        <ReviewsSection productId={product.id} productName={display} />
+        <div id="reviews">
+          <ReviewsSection productId={product.id} productName={display} />
+        </div>
+
+        <RecentlyViewed excludeId={product.id} />
       </div>
       <Footer />
 
