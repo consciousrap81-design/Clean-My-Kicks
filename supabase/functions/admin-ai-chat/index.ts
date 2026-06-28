@@ -166,6 +166,108 @@ function buildTools(actorId: string) {
       inputSchema: z.object({ topic: z.string(), findings: z.string() }),
       execute: async ({ topic, findings }) => ({ topic, findings, recorded: true }),
     }),
+    list_product_photos: tool({
+      description: "List all media (photos) attached to a shop product, in display order. Returns each photo's id, storage_path, signed preview URL, sort_order, and is_primary flag. Use this to audit a product's gallery for broken or missing uploads.",
+      inputSchema: z.object({ product_id: z.string().uuid() }),
+      execute: async ({ product_id }) => {
+        const { data, error } = await a.from("shop_product_photos").select("id,storage_path,sort_order,is_primary,created_at").eq("product_id", product_id).order("sort_order", { ascending: true });
+        if (error) return schemaError("shop_product_photos", error.message);
+        const photos = await Promise.all((data ?? []).map(async (p: any) => {
+          const { data: signed } = await a.storage.from("shop-products").createSignedUrl(p.storage_path, 60 * 60);
+          // HEAD-check accessibility so Kicks can flag broken/incomplete uploads
+          let reachable = true;
+          try {
+            if (signed?.signedUrl) {
+              const r = await fetch(signed.signedUrl, { method: "HEAD" });
+              reachable = r.ok;
+            } else { reachable = false; }
+          } catch { reachable = false; }
+          return { id: p.id, storage_path: p.storage_path, sort_order: p.sort_order, is_primary: p.is_primary, preview_url: signed?.signedUrl ?? null, reachable, created_at: p.created_at };
+        }));
+        return { kind: "product_photos", product_id, count: photos.length, photos };
+      },
+    }),
+    delete_product_photo: tool({
+      description: "Delete a specific product photo by its photo id. Removes the underlying file from storage and the gallery row. Use for stuck/broken/incorrect uploads. Irreversible.",
+      inputSchema: z.object({ photo_id: z.string().uuid() }),
+      execute: async ({ photo_id }) => {
+        const { data: row, error: re } = await a.from("shop_product_photos").select("id,product_id,storage_path,is_primary").eq("id", photo_id).maybeSingle();
+        if (re) return schemaError("shop_product_photos", re.message);
+        if (!row) return { error: "photo_not_found", photo_id };
+        const { error: se } = await a.storage.from("shop-products").remove([row.storage_path]);
+        const { error: de } = await a.from("shop_product_photos").delete().eq("id", photo_id);
+        if (de) return { error: de.message };
+        // If we deleted the primary, promote the next photo to primary
+        if (row.is_primary) {
+          const { data: next } = await a.from("shop_product_photos").select("id").eq("product_id", row.product_id).order("sort_order", { ascending: true }).limit(1).maybeSingle();
+          if (next?.id) await a.from("shop_product_photos").update({ is_primary: true }).eq("id", next.id);
+        }
+        await a.from("ai_audit_log").insert({ actor: actorId, tool: "delete_product_photo", input: { photo_id }, output: { product_id: row.product_id, storage_path: row.storage_path, storage_remove_error: se?.message ?? null }, approved: true });
+        return { kind: "product_photo_deleted", photo_id, product_id: row.product_id, storage_path: row.storage_path };
+      },
+    }),
+    attach_product_photo_from_url: tool({
+      description: "Download an image from a public URL and attach it to a product's gallery. Use to fix products with broken/missing photos when you have a known-good replacement image URL. Max 15 MB, must be a real image content-type.",
+      inputSchema: z.object({
+        product_id: z.string().uuid(),
+        image_url: z.string().url(),
+        make_primary: z.boolean().default(false),
+      }),
+      execute: async ({ product_id, image_url, make_primary }) => {
+        const { data: prod, error: pe } = await a.from("shop_products").select("id").eq("id", product_id).maybeSingle();
+        if (pe) return schemaError("shop_products", pe.message);
+        if (!prod) return { error: "product_not_found", product_id };
+        let resp: Response;
+        try { resp = await fetch(image_url); } catch (e) { return { error: "fetch_failed", detail: String(e) }; }
+        if (!resp.ok) return { error: "fetch_failed", status: resp.status };
+        const ct = resp.headers.get("content-type") ?? "";
+        if (!ct.startsWith("image/")) return { error: "not_an_image", content_type: ct };
+        const buf = new Uint8Array(await resp.arrayBuffer());
+        if (buf.byteLength > 15 * 1024 * 1024) return { error: "image_too_large", bytes: buf.byteLength };
+        const ext = ct.split("/")[1]?.split(";")[0]?.replace("jpeg", "jpg") || "jpg";
+        const path = `${product_id}/${crypto.randomUUID()}.${ext}`;
+        const { error: ue } = await a.storage.from("shop-products").upload(path, buf, { contentType: ct, upsert: false });
+        if (ue) return { error: "storage_upload_failed", detail: ue.message };
+        const { data: maxRow } = await a.from("shop_product_photos").select("sort_order").eq("product_id", product_id).order("sort_order", { ascending: false }).limit(1).maybeSingle();
+        const nextOrder = (maxRow?.sort_order ?? -1) + 1;
+        if (make_primary) await a.from("shop_product_photos").update({ is_primary: false }).eq("product_id", product_id);
+        const { data: ins, error: ie } = await a.from("shop_product_photos").insert({ product_id, storage_path: path, sort_order: nextOrder, is_primary: make_primary }).select("id,storage_path,sort_order,is_primary").single();
+        if (ie) return { error: "db_insert_failed", detail: ie.message };
+        await a.from("ai_audit_log").insert({ actor: actorId, tool: "attach_product_photo_from_url", input: { product_id, image_url, make_primary }, output: ins, approved: true });
+        return { kind: "product_photo_attached", product_id, photo: ins };
+      },
+    }),
+    set_primary_product_photo: tool({
+      description: "Mark a specific photo as the product's primary/cover image and unset the previous primary.",
+      inputSchema: z.object({ photo_id: z.string().uuid() }),
+      execute: async ({ photo_id }) => {
+        const { data: row, error: re } = await a.from("shop_product_photos").select("id,product_id").eq("id", photo_id).maybeSingle();
+        if (re) return schemaError("shop_product_photos", re.message);
+        if (!row) return { error: "photo_not_found", photo_id };
+        await a.from("shop_product_photos").update({ is_primary: false }).eq("product_id", row.product_id);
+        const { error: ue } = await a.from("shop_product_photos").update({ is_primary: true }).eq("id", photo_id);
+        if (ue) return { error: ue.message };
+        await a.from("ai_audit_log").insert({ actor: actorId, tool: "set_primary_product_photo", input: { photo_id }, output: { product_id: row.product_id }, approved: true });
+        return { kind: "primary_photo_set", photo_id, product_id: row.product_id };
+      },
+    }),
+    reorder_product_photos: tool({
+      description: "Reorder a product's gallery. Pass the full list of photo ids in the desired display order; sort_order is rewritten 0..n-1.",
+      inputSchema: z.object({ product_id: z.string().uuid(), photo_ids: z.array(z.string().uuid()).min(1) }),
+      execute: async ({ product_id, photo_ids }) => {
+        const { data: existing, error: ee } = await a.from("shop_product_photos").select("id").eq("product_id", product_id);
+        if (ee) return schemaError("shop_product_photos", ee.message);
+        const existingIds = new Set((existing ?? []).map((r: any) => r.id));
+        if (photo_ids.some((id) => !existingIds.has(id)) || photo_ids.length !== existingIds.size) {
+          return { error: "photo_ids_must_match_product_gallery", expected: Array.from(existingIds), got: photo_ids };
+        }
+        for (let i = 0; i < photo_ids.length; i++) {
+          await a.from("shop_product_photos").update({ sort_order: i }).eq("id", photo_ids[i]);
+        }
+        await a.from("ai_audit_log").insert({ actor: actorId, tool: "reorder_product_photos", input: { product_id, photo_ids }, output: { count: photo_ids.length }, approved: true });
+        return { kind: "product_photos_reordered", product_id, order: photo_ids };
+      },
+    }),
     list_cleaning_guides: tool({
       description: "List restoration cleaning guides. Optionally filter by shoe material (Suede, Leather, Mesh, Canvas, Knit, etc.).",
       inputSchema: z.object({ material: z.string().optional(), limit: z.number().min(1).max(50).default(20) }),
