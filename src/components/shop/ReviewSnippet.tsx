@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import StarRating from "@/components/shop/StarRating";
+import { StarRating } from "@/components/shop/StarRating";
 
 export default function ReviewSnippet({ productId }: { productId: string }) {
   const [avg, setAvg] = useState<number | null>(null);
