@@ -39,3 +39,5 @@ project_id = "xxuyhpszppnjdrmfdylv"
     verify_jwt = false
   [functions.track-shipment]
     verify_jwt = false
+  [functions.kicks-tts]
+    verify_jwt = true
