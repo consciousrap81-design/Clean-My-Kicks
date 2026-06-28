@@ -87,9 +87,17 @@ export default function AISuggestions() {
     if (!selected.size) return;
     setBusyBulk(true);
     try {
-      const { error } = await supabase.functions.invoke("admin-ai-execute", { body: { suggestion_ids: Array.from(selected), action } });
+      const { data, error } = await supabase.functions.invoke("admin-ai-execute", { body: { suggestion_ids: Array.from(selected), action } });
       if (error) throw error;
-      toast.success(`${action === "apply" ? "Applied" : "Dismissed"} ${selected.size} suggestion${selected.size === 1 ? "" : "s"}`);
+      if (action === "apply") {
+        const results: any[] = data?.results ?? [];
+        const ok = results.filter((r) => r.ok !== false).length;
+        const failed = results.length - ok;
+        if (failed > 0) toast.error(`${failed} failed, ${ok} succeeded`);
+        else toast.success(`Applied ${ok} suggestion${ok === 1 ? "" : "s"}`);
+      } else {
+        toast.success(`Dismissed ${selected.size}`);
+      }
       await load();
     } catch (e: any) { toast.error(e.message); }
     finally { setBusyBulk(false); }
