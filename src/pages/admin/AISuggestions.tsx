@@ -333,6 +333,11 @@ export default function AISuggestions() {
               {s.payload?.error && (
                 <p className="mt-2 text-xs text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> {s.payload.error}</p>
               )}
+              {s.payload?.last_error && (
+                <p className="mt-2 text-xs text-amber-700 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" /> {s.payload.last_error.code === "credits_exhausted" ? "Out of AI credits — top up and retry." : "Rate limited — retry shortly."}
+                </p>
+              )}
             </Card>
           );
         })}
