@@ -37,6 +37,7 @@ import AITranscripts from "./pages/admin/AITranscripts";
 import AIHealth from "./pages/admin/AIHealth";
 import AIDrafts from "./pages/admin/AIDrafts";
 import CleaningGuides from "./pages/admin/CleaningGuides";
+import HeroSlides from "./pages/admin/HeroSlides";
 import QuoteView from "./pages/QuoteView";
 import ProductDetail from "./pages/ProductDetail";
 import ShopOrderSuccess from "./pages/ShopOrderSuccess";
@@ -115,6 +116,7 @@ const App = () => (
               <Route path="ai/drafts" element={<AIDrafts />} />
               <Route path="ai/:threadId" element={<AIAssistant />} />
               <Route path="cleaning-guides" element={<CleaningGuides />} />
+              <Route path="hero-slides" element={<HeroSlides />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

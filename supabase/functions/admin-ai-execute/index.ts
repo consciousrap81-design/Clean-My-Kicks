@@ -140,6 +140,40 @@ Rules: no emojis unless they fit naturally, no profanity, keep it authentic (not
   };
 }
 
+async function generateHeroImageDataUrl(promoName: string, discount: number): Promise<string | null> {
+  // Use the AI Gateway image endpoint directly (non-streaming) so we can persist a single PNG.
+  const prompt = `Editorial hero banner for a sneaker restoration shop promotion.
+Promotion: "${promoName}" — ${discount}% off.
+Scene: a pair of freshly cleaned premium sneakers (generic silhouette, no brand logos, no trademarks, no text) on a dark moody studio backdrop with warm rim light and subtle red/orange glow, reflective floor, soft haze.
+Cinematic, high contrast, photo-real, ultra-detailed, 16:9 composition with strong negative space on the left for overlay text.
+Do NOT render any words, letters, numbers, logos, or signage in the image.`;
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3.1-flash-image",
+        messages: [{ role: "user", content: prompt }],
+        modalities: ["image", "text"],
+      }),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`image gateway ${res.status}: ${txt.slice(0, 300)}`);
+    }
+    const body = await res.json();
+    const b64 = body?.data?.[0]?.b64_json;
+    if (!b64) return null;
+    return `data:image/png;base64,${b64}`;
+  } catch (e) {
+    console.error("[hero-image] generation failed:", e);
+    return null;
+  }
+}
+
 async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
   const payload = sug.payload ?? {};
 
@@ -209,16 +243,39 @@ async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
         applies_to: "all",
       }).select("id, code, amount").single();
       if (insert.error) throw insert.error;
+      // Generate a brand-safe hero slide draft tied to this promo. Failure here does not fail the promo apply.
+      let heroSlideId: string | null = null;
+      try {
+        const imageDataUrl = await generateHeroImageDataUrl(name, discount);
+        const slide = await a.from("hero_slides").insert({
+          title: `${discount}% Off — ${name}`.slice(0, 120),
+          subtitle: `Use code ${insert.data!.code} at checkout. Limited time.`,
+          eyebrow: "Limited-Time Promo",
+          cta_label: "Shop the Sale",
+          cta_href: "/shop",
+          image_url: imageDataUrl,
+          image_alt: `${name} promotion — ${discount}% off`,
+          status: "draft",
+          sort_order: 200,
+          promo_code: insert.data!.code,
+          created_by_ai: true,
+          created_by: userId,
+        }).select("id").single();
+        heroSlideId = slide.data?.id ?? null;
+      } catch (e) {
+        console.error("[hero-slide] draft creation failed:", e);
+      }
       const h = await a.from("ai_change_history").insert({
         suggestion_id: sug.id, actor: userId, kind: sug.kind,
         table_name: "shop_promo_codes", record_id: insert.data!.id,
         before_state: null,
-        after_state: { code: insert.data!.code, amount: insert.data!.amount, discount_type: "percent", active: true },
+        after_state: { code: insert.data!.code, amount: insert.data!.amount, discount_type: "percent", active: true, hero_slide_id: heroSlideId },
       }).select("id").single();
       await a.from("ai_suggestions").update({ status: "applied", resolved_at: new Date().toISOString() }).eq("id", sug.id);
-      await a.from("ai_audit_log").insert({ actor: userId, tool: `apply:${sug.kind}`, input: payload, output: { promo_id: insert.data!.id, code: insert.data!.code }, approved: true });
+      await a.from("ai_audit_log").insert({ actor: userId, tool: `apply:${sug.kind}`, input: payload, output: { promo_id: insert.data!.id, code: insert.data!.code, hero_slide_id: heroSlideId }, approved: true });
       await a.from("ai_feedback").insert({ suggestion_id: sug.id, actor: userId, action: "applied", kind: sug.kind, suggestion_snapshot: { title: sug.title, summary: sug.summary, payload: sug.payload } });
-      return { ok: true, history_id: h.data?.id, message: `Promo ${insert.data!.code} is live — ${discount}% off` };
+      const heroMsg = heroSlideId ? ` Hero slide drafted — review at /admin/hero-slides.` : ` (Hero image draft skipped — generation failed.)`;
+      return { ok: true, history_id: h.data?.id, message: `Promo ${insert.data!.code} is live — ${discount}% off.${heroMsg}` };
     } catch (e) {
       const cls = classifyAiError(e);
       if (cls.code === "credits_exhausted" || cls.code === "rate_limited") {
