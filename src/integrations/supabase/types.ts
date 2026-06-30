@@ -130,6 +130,66 @@ export type Database = {
           },
         ]
       }
+      ai_drafts: {
+        Row: {
+          body: string
+          created_at: string
+          cta: string | null
+          hashtags: string[]
+          id: string
+          kind: string
+          platform: string
+          reminder_id: string | null
+          status: string
+          suggestion_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          cta?: string | null
+          hashtags?: string[]
+          id?: string
+          kind?: string
+          platform?: string
+          reminder_id?: string | null
+          status?: string
+          suggestion_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          cta?: string | null
+          hashtags?: string[]
+          id?: string
+          kind?: string
+          platform?: string
+          reminder_id?: string | null
+          status?: string
+          suggestion_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_drafts_reminder_id_fkey"
+            columns: ["reminder_id"]
+            isOneToOne: false
+            referencedRelation: "admin_reminders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_drafts_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "ai_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_feedback: {
         Row: {
           action: string
