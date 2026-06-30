@@ -236,7 +236,6 @@ export default function AISuggestions() {
         {pending.map((s) => {
           const sources = extractSources(s.payload);
           const reasoning = s.payload?.reasoning ?? s.payload?.raw?.reasoning;
-          const advisory = ADVISORY_KINDS.has(s.kind);
           const actionable = hasActionableTarget(s.kind, s.payload);
           const stale = ACTIONABLE_KINDS.has(s.kind) && !actionable;
           return (
