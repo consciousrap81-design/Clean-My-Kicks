@@ -1,4 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { generateText } from "npm:ai@7";
+import { createLovableAiGatewayProvider } from "../_shared/ai-gateway.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,6 +9,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
 function admin() { return createClient(SUPABASE_URL, SERVICE_KEY); }
 
@@ -24,8 +27,14 @@ async function verifyAdmin(req: Request) {
 
 type Target = { table: string; id: string; updates: Record<string, unknown> } | null;
 
-const ADVISORY_KINDS = new Set(["marketing_idea", "content_idea"]);
-const ACTIONABLE_KINDS = new Set(["publish_product", "pricing_idea", "restock_alert", "follow_up_request", "update_product", "price_change", "update_job_status"]);
+// Advisory kinds now ALSO have a real executor (they generate a draft + reminder).
+// Keep set empty so the apply path always runs the real executor below.
+const ADVISORY_KINDS = new Set<string>([]);
+const ACTIONABLE_KINDS = new Set([
+  "publish_product", "pricing_idea", "restock_alert", "follow_up_request",
+  "update_product", "price_change", "update_job_status",
+  "create_promo", "marketing_idea", "content_idea",
+]);
 
 function resolveTarget(kind: string, payload: any): Target {
   switch (kind) {
@@ -38,12 +47,12 @@ function resolveTarget(kind: string, payload: any): Target {
         return { table: "shop_products", id: payload.product_id, updates: { status: "available" } };
       return null;
     case "price_change":
-      if (payload?.product_id && typeof payload?.price_cents === "number")
-        return { table: "shop_products", id: payload.product_id, updates: { price_cents: payload.price_cents } };
-      return null;
     case "pricing_idea":
+      // FIX: real column is `price` (numeric dollars), not `price_cents`.
       if (payload?.product_id && typeof payload?.price_cents === "number")
-        return { table: "shop_products", id: payload.product_id, updates: { price_cents: payload.price_cents } };
+        return { table: "shop_products", id: payload.product_id, updates: { price: Math.round(payload.price_cents) / 100 } };
+      if (payload?.product_id && typeof payload?.price === "number")
+        return { table: "shop_products", id: payload.product_id, updates: { price: payload.price } };
       return null;
     case "follow_up_request":
       if (payload?.request_id && payload?.status)
@@ -58,15 +67,143 @@ function resolveTarget(kind: string, payload: any): Target {
   }
 }
 
+function slugCode(name: string, suffix: string | number = ""): string {
+  const base = String(name || "PROMO").toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 12) || "PROMO";
+  return suffix ? `${base}${suffix}` : base;
+}
+
+async function uniquePromoCode(a: ReturnType<typeof admin>, seed: string, discount: number): Promise<string> {
+  const base = slugCode(seed, discount);
+  let code = base;
+  for (let i = 2; i < 30; i++) {
+    const { data } = await a.from("shop_promo_codes").select("id").eq("code", code).maybeSingle();
+    if (!data) return code;
+    code = `${base}${i}`;
+  }
+  return `${base}${Date.now().toString().slice(-4)}`;
+}
+
+function extractJson(text: string): any | null {
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try { return JSON.parse(m[0]); } catch { return null; }
+}
+
+async function draftSocialPost(sug: any): Promise<{ title: string; body: string; hashtags: string[]; cta: string; platform: string }> {
+  const gateway = createLovableAiGatewayProvider(LOVABLE_KEY);
+  const ctx = {
+    title: sug.title,
+    summary: sug.summary,
+    reasoning: sug.payload?.reasoning ?? sug.payload?.raw?.reasoning ?? null,
+  };
+  const { text } = await generateText({
+    model: gateway("google/gemini-3-flash-preview"),
+    system: `You are Kicks, the social copywriter for Clean My Kicks — a sneaker restoration shop in Denton, TX (Seven Loaf Clothing brand, faith-aligned, sneakerhead-friendly voice).
+Convert the marketing/content idea into ONE ready-to-post social caption.
+
+Return VALID JSON only:
+{"platform":"instagram"|"tiktok"|"twitter"|"general","title":"<short internal title, <=60 chars>","body":"<the actual caption, 2-5 short lines, no hashtags inline>","hashtags":["#tag1","#tag2",...up to 8],"cta":"<one-line call to action>"}
+
+Rules: no emojis unless they fit naturally, no profanity, keep it authentic (not corporate). Mention Denton when relevant.`,
+    prompt: JSON.stringify(ctx),
+  });
+  const parsed = extractJson(text);
+  if (parsed?.body && parsed?.title) {
+    return {
+      title: String(parsed.title).slice(0, 200),
+      body: String(parsed.body),
+      hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags.slice(0, 12).map((t: any) => String(t)) : [],
+      cta: String(parsed.cta ?? ""),
+      platform: ["instagram", "tiktok", "twitter", "general"].includes(parsed.platform) ? parsed.platform : "general",
+    };
+  }
+  // Fallback: minimum viable draft if the model misbehaves
+  return {
+    title: String(sug.title).slice(0, 200),
+    body: String(sug.summary ?? sug.title),
+    hashtags: ["#CleanMyKicks", "#DentonTX", "#SneakerRestoration"],
+    cta: "DM us to drop off your kicks.",
+    platform: "general",
+  };
+}
+
 async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
   const payload = sug.payload ?? {};
 
-  // Advisory suggestions cannot be "applied" — acknowledge instead.
-  if (ADVISORY_KINDS.has(sug.kind)) {
-    await a.from("ai_suggestions").update({ status: "acknowledged", resolved_at: new Date().toISOString() }).eq("id", sug.id);
-    await a.from("ai_audit_log").insert({ actor: userId, tool: `acknowledge:${sug.kind}`, input: payload, output: { note: "Advisory acknowledged" }, approved: true });
-    await a.from("ai_feedback").insert({ suggestion_id: sug.id, actor: userId, action: "acknowledged", kind: sug.kind, suggestion_snapshot: { title: sug.title, summary: sug.summary, payload: sug.payload } });
-    return { ok: true, advisory: true, message: "Advisory acknowledged — nothing to apply" };
+  // Marketing / content ideas → draft a social post + create a reminder.
+  if (sug.kind === "marketing_idea" || sug.kind === "content_idea") {
+    try {
+      const draft = await draftSocialPost(sug);
+      const dueAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+      const reminder = await a.from("admin_reminders").insert({
+        key: `ai_draft_${sug.id}`,
+        title: `Post: ${draft.title}`.slice(0, 200),
+        body: `${draft.body}\n\n${draft.hashtags.join(" ")}`.slice(0, 2000),
+        due_at: dueAt,
+      }).select("id").single();
+      const draftRow = await a.from("ai_drafts").insert({
+        suggestion_id: sug.id,
+        reminder_id: reminder.data?.id ?? null,
+        kind: "social_post",
+        platform: draft.platform,
+        title: draft.title,
+        body: draft.body,
+        hashtags: draft.hashtags,
+        cta: draft.cta,
+        status: "draft",
+      }).select("id").single();
+      const h = await a.from("ai_change_history").insert({
+        suggestion_id: sug.id, actor: userId, kind: sug.kind,
+        table_name: "ai_drafts", record_id: draftRow.data?.id ?? null,
+        before_state: null,
+        after_state: { draft_id: draftRow.data?.id, reminder_id: reminder.data?.id, platform: draft.platform },
+      }).select("id").single();
+      await a.from("ai_suggestions").update({ status: "applied", resolved_at: new Date().toISOString() }).eq("id", sug.id);
+      await a.from("ai_audit_log").insert({ actor: userId, tool: `apply:${sug.kind}`, input: payload, output: { draft_id: draftRow.data?.id, reminder_id: reminder.data?.id }, approved: true });
+      await a.from("ai_feedback").insert({ suggestion_id: sug.id, actor: userId, action: "applied", kind: sug.kind, suggestion_snapshot: { title: sug.title, summary: sug.summary, payload: sug.payload } });
+      const dueLabel = new Date(dueAt).toLocaleDateString(undefined, { weekday: "long" });
+      return { ok: true, history_id: h.data?.id, draft_id: draftRow.data?.id, message: `Drafted ${draft.platform} post + reminder for ${dueLabel}` };
+    } catch (e) {
+      const err = String((e as any)?.message ?? e);
+      await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: err } }).eq("id", sug.id);
+      return { ok: false, error: err };
+    }
+  }
+
+  // Create a promo code from a `create_promo` suggestion.
+  if (sug.kind === "create_promo") {
+    try {
+      const discount = Math.max(1, Math.min(50, Number(payload.discount_percentage ?? payload.amount ?? 0)));
+      const name = String(payload.campaign_name ?? sug.title ?? "PROMO");
+      if (!discount) {
+        const err = "Missing discount_percentage";
+        await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: err } }).eq("id", sug.id);
+        return { ok: false, error: err };
+      }
+      const code = await uniquePromoCode(a, name, discount);
+      const insert = await a.from("shop_promo_codes").insert({
+        code,
+        discount_type: "percent",
+        amount: discount,
+        active: true,
+        applies_to: "all",
+      }).select("id, code, amount").single();
+      if (insert.error) throw insert.error;
+      const h = await a.from("ai_change_history").insert({
+        suggestion_id: sug.id, actor: userId, kind: sug.kind,
+        table_name: "shop_promo_codes", record_id: insert.data!.id,
+        before_state: null,
+        after_state: { code: insert.data!.code, amount: insert.data!.amount, discount_type: "percent", active: true },
+      }).select("id").single();
+      await a.from("ai_suggestions").update({ status: "applied", resolved_at: new Date().toISOString() }).eq("id", sug.id);
+      await a.from("ai_audit_log").insert({ actor: userId, tool: `apply:${sug.kind}`, input: payload, output: { promo_id: insert.data!.id, code: insert.data!.code }, approved: true });
+      await a.from("ai_feedback").insert({ suggestion_id: sug.id, actor: userId, action: "applied", kind: sug.kind, suggestion_snapshot: { title: sug.title, summary: sug.summary, payload: sug.payload } });
+      return { ok: true, history_id: h.data?.id, message: `Promo ${insert.data!.code} is live — ${discount}% off` };
+    } catch (e) {
+      const err = String((e as any)?.message ?? e);
+      await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: err } }).eq("id", sug.id);
+      return { ok: false, error: err };
+    }
   }
 
   // Restock is a numeric increment, not a row-level overwrite — handle specially.
@@ -140,7 +277,12 @@ async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
     await a.from("ai_suggestions").update({ status: "applied", resolved_at: new Date().toISOString() }).eq("id", sug.id);
     await a.from("ai_audit_log").insert({ actor: userId, tool: `apply:${sug.kind}`, input: payload, output: { applied: true, history_id: historyId, target }, approved: true });
       await a.from("ai_feedback").insert({ suggestion_id: sug.id, actor: userId, action: "applied", kind: sug.kind, suggestion_snapshot: { title: sug.title, summary: sug.summary, payload: sug.payload } });
-    return { ok: true, history_id: historyId, message: `Updated ${target.table}` };
+    const friendly = target.table === "shop_products" && "price" in target.updates
+      ? `Price updated to $${Number(target.updates.price).toFixed(2)}`
+      : target.table === "shop_products" && target.updates.status === "available"
+      ? `Published product`
+      : `Updated ${target.table}`;
+    return { ok: true, history_id: historyId, message: friendly };
   } catch (e) {
     await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: String((e as any)?.message ?? e) } }).eq("id", sug.id);
     return { ok: false, error: String(e) };
@@ -162,8 +304,20 @@ Deno.serve(async (req) => {
       const { data: h } = await a.from("ai_change_history").select("*").eq("id", history_id).maybeSingle();
       if (!h) return new Response(JSON.stringify({ error: "History not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       if (h.undone) return new Response(JSON.stringify({ error: "Already undone" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const { error: e } = await a.from(h.table_name).update(h.before_state ?? {}).eq("id", h.record_id);
-      if (e) return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Compound inserts (create_promo, marketing_idea, content_idea) have before_state=null → undo deletes the inserted row(s).
+      if (h.before_state === null || h.before_state === undefined) {
+        if (h.table_name === "ai_drafts") {
+          const after: any = h.after_state ?? {};
+          if (after.reminder_id) await a.from("admin_reminders").delete().eq("id", after.reminder_id);
+          if (after.draft_id) await a.from("ai_drafts").delete().eq("id", after.draft_id);
+          if (!after.draft_id && h.record_id) await a.from("ai_drafts").delete().eq("id", h.record_id);
+        } else if (h.table_name && h.record_id) {
+          await a.from(h.table_name).delete().eq("id", h.record_id);
+        }
+      } else {
+        const { error: e } = await a.from(h.table_name).update(h.before_state ?? {}).eq("id", h.record_id);
+        if (e) return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       await a.from("ai_change_history").update({ undone: true, undone_at: new Date().toISOString() }).eq("id", history_id);
       if (h.suggestion_id) {
         await a.from("ai_suggestions").update({ status: "pending", resolved_at: null }).eq("id", h.suggestion_id);
@@ -171,6 +325,15 @@ Deno.serve(async (req) => {
       await a.from("ai_audit_log").insert({ actor: user.id, tool: `undo:${h.kind}`, input: { history_id }, output: { reverted: h.before_state }, approved: true });
       await a.from("ai_feedback").insert({ suggestion_id: h.suggestion_id, actor: user.id, action: "undone", kind: h.kind, reason: body.reason ?? null, suggestion_snapshot: { before: h.before_state, after: h.after_state } });
       return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Retry stuck suggestions (failed or silently acknowledged with a now-supported executor) → flip back to pending.
+    if (action === "retry_stuck") {
+      const retryable = ["create_promo", "pricing_idea", "price_change", "marketing_idea", "content_idea"];
+      const { data: stuck } = await a.from("ai_suggestions").select("id").in("status", ["failed", "acknowledged"]).in("kind", retryable).gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+      const ids = (stuck ?? []).map((r: any) => r.id);
+      if (ids.length) await a.from("ai_suggestions").update({ status: "pending", resolved_at: null }).in("id", ids);
+      return new Response(JSON.stringify({ ok: true, reset: ids.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Bulk actions
