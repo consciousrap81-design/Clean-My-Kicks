@@ -13,6 +13,19 @@ const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
 function admin() { return createClient(SUPABASE_URL, SERVICE_KEY); }
 
+function classifyAiError(e: unknown): { code: "credits_exhausted" | "rate_limited" | "other"; message: string } {
+  const msg = String((e as any)?.message ?? e ?? "");
+  const status = Number((e as any)?.status ?? (e as any)?.statusCode ?? 0);
+  const lower = msg.toLowerCase();
+  if (status === 402 || lower.includes("payment required") || lower.includes("402") || lower.includes("credits") && lower.includes("exhaust")) {
+    return { code: "credits_exhausted", message: msg || "Payment Required" };
+  }
+  if (status === 429 || lower.includes("rate limit") || lower.includes("429") || lower.includes("too many requests")) {
+    return { code: "rate_limited", message: msg || "Rate limited" };
+  }
+  return { code: "other", message: msg };
+}
+
 async function verifyAdmin(req: Request) {
   const auth = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!auth) return null;
@@ -164,9 +177,16 @@ async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
       const dueLabel = new Date(dueAt).toLocaleDateString(undefined, { weekday: "long" });
       return { ok: true, history_id: h.data?.id, draft_id: draftRow.data?.id, message: `Drafted ${draft.platform} post + reminder for ${dueLabel}` };
     } catch (e) {
-      const err = String((e as any)?.message ?? e);
-      await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: err } }).eq("id", sug.id);
-      return { ok: false, error: err };
+      const cls = classifyAiError(e);
+      if (cls.code === "credits_exhausted" || cls.code === "rate_limited") {
+        await a.from("ai_suggestions").update({
+          status: "pending",
+          payload: { ...payload, last_error: { code: cls.code, message: cls.message, at: new Date().toISOString() } },
+        }).eq("id", sug.id);
+        return { ok: false, retryable: true, code: cls.code, error: cls.message };
+      }
+      await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: cls.message } }).eq("id", sug.id);
+      return { ok: false, error: cls.message };
     }
   }
 
@@ -200,9 +220,16 @@ async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
       await a.from("ai_feedback").insert({ suggestion_id: sug.id, actor: userId, action: "applied", kind: sug.kind, suggestion_snapshot: { title: sug.title, summary: sug.summary, payload: sug.payload } });
       return { ok: true, history_id: h.data?.id, message: `Promo ${insert.data!.code} is live — ${discount}% off` };
     } catch (e) {
-      const err = String((e as any)?.message ?? e);
-      await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: err } }).eq("id", sug.id);
-      return { ok: false, error: err };
+      const cls = classifyAiError(e);
+      if (cls.code === "credits_exhausted" || cls.code === "rate_limited") {
+        await a.from("ai_suggestions").update({
+          status: "pending",
+          payload: { ...payload, last_error: { code: cls.code, message: cls.message, at: new Date().toISOString() } },
+        }).eq("id", sug.id);
+        return { ok: false, retryable: true, code: cls.code, error: cls.message };
+      }
+      await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: cls.message } }).eq("id", sug.id);
+      return { ok: false, error: cls.message };
     }
   }
 
@@ -330,10 +357,28 @@ Deno.serve(async (req) => {
     // Retry stuck suggestions (failed or silently acknowledged with a now-supported executor) → flip back to pending.
     if (action === "retry_stuck") {
       const retryable = ["create_promo", "pricing_idea", "price_change", "marketing_idea", "content_idea"];
-      const { data: stuck } = await a.from("ai_suggestions").select("id").in("status", ["failed", "acknowledged"]).in("kind", retryable).gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
-      const ids = (stuck ?? []).map((r: any) => r.id);
-      if (ids.length) await a.from("ai_suggestions").update({ status: "pending", resolved_at: null }).in("id", ids);
-      return new Response(JSON.stringify({ ok: true, reset: ids.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: stuck } = await a.from("ai_suggestions").select("id,payload").in("status", ["failed", "acknowledged", "pending"]).in("kind", retryable).gte("created_at", since);
+      // Include items in failed/acknowledged OR pending items carrying a transient last_error.
+      const targets = (stuck ?? []).filter((r: any) => {
+        const hasLastErr = r.payload?.last_error?.code === "credits_exhausted" || r.payload?.last_error?.code === "rate_limited";
+        return hasLastErr || r.payload?.error; // include legacy failed rows too
+      });
+      const ids = targets.map((r: any) => r.id);
+      // Also include rows that were in failed/acknowledged without our flags (legacy)
+      const { data: legacy } = await a.from("ai_suggestions").select("id").in("status", ["failed", "acknowledged"]).in("kind", retryable).gte("created_at", since);
+      const allIds = Array.from(new Set([...ids, ...((legacy ?? []) as any[]).map((r) => r.id)]));
+      if (allIds.length) {
+        // Clear last_error and error on retry by re-fetching and rewriting payloads.
+        const { data: rows } = await a.from("ai_suggestions").select("id,payload").in("id", allIds);
+        for (const r of (rows ?? []) as any[]) {
+          const p = { ...(r.payload ?? {}) };
+          delete p.last_error;
+          delete p.error;
+          await a.from("ai_suggestions").update({ status: "pending", resolved_at: null, payload: p }).eq("id", r.id);
+        }
+      }
+      return new Response(JSON.stringify({ ok: true, reset: allIds.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Bulk actions
