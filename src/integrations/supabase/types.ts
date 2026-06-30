@@ -711,6 +711,71 @@ export type Database = {
         }
         Relationships: []
       }
+      hero_slides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_ai: boolean
+          cta_href: string | null
+          cta_label: string | null
+          eyebrow: string | null
+          id: string
+          image_alt: string | null
+          image_url: string | null
+          promo_code: string | null
+          published_at: string | null
+          sort_order: number
+          status: Database["public"]["Enums"]["hero_slide_status"]
+          subtitle: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_ai?: boolean
+          cta_href?: string | null
+          cta_label?: string | null
+          eyebrow?: string | null
+          id?: string
+          image_alt?: string | null
+          image_url?: string | null
+          promo_code?: string | null
+          published_at?: string | null
+          sort_order?: number
+          status?: Database["public"]["Enums"]["hero_slide_status"]
+          subtitle?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_ai?: boolean
+          cta_href?: string | null
+          cta_label?: string | null
+          eyebrow?: string | null
+          id?: string
+          image_alt?: string | null
+          image_url?: string | null
+          promo_code?: string | null
+          published_at?: string | null
+          sort_order?: number
+          status?: Database["public"]["Enums"]["hero_slide_status"]
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hero_slides_promo_code_fkey"
+            columns: ["promo_code"]
+            isOneToOne: false
+            referencedRelation: "shop_promo_codes"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       job_photos: {
         Row: {
           customer_visible: boolean
@@ -1967,6 +2032,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user" | "customer"
+      hero_slide_status: "draft" | "published" | "archived"
       job_status:
         | "new_request"
         | "awaiting_shoes"
@@ -2116,6 +2182,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user", "customer"],
+      hero_slide_status: ["draft", "published", "archived"],
       job_status: [
         "new_request",
         "awaiting_shoes",
