@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { Sparkles, RefreshCw, Check, X, Undo2, ExternalLink, History, AlertTriangle } from "lucide-react";
+import { Sparkles, RefreshCw, Check, X, Undo2, ExternalLink, History, AlertTriangle, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 
 type Suggestion = { id: string; kind: string; title: string; summary: string | null; status: string; payload: any; created_at: string };
@@ -102,8 +102,11 @@ export default function AISuggestions() {
     if (error) { toast.error(error.message); return; }
     if (action === "apply") {
       const r = data?.results?.[0];
-      if (r && r.ok === false) toast.error(r.error || "Failed to apply");
-      else if (r?.advisory) toast.success(r.message || "Advisory acknowledged");
+      if (r && r.ok === false) {
+        if (r.code === "credits_exhausted") toast.error("Out of AI credits — top up and retry.");
+        else if (r.code === "rate_limited") toast.error("Rate limited — try again in a moment.");
+        else toast.error(r.error || "Failed to apply");
+      } else if (r?.advisory) toast.success(r.message || "Advisory acknowledged");
       else toast.success(r?.message || "Applied");
     } else {
       toast.success("Dismissed");
@@ -142,6 +145,14 @@ export default function AISuggestions() {
   const resolved = useMemo(() => items.filter((i) => i.status !== "pending"), [items]);
   const stuckCount = useMemo(
     () => items.filter((i) => (i.status === "failed" || i.status === "acknowledged") && (i.kind === "create_promo" || i.kind === "marketing_idea" || i.kind === "content_idea" || i.kind === "pricing_idea" || i.kind === "price_change")).length,
+    [items]
+  );
+  const creditExhaustedCount = useMemo(
+    () => items.filter((i) => i.payload?.last_error?.code === "credits_exhausted" || (i.status === "failed" && /payment required/i.test(i.payload?.error ?? ""))).length,
+    [items]
+  );
+  const rateLimitedCount = useMemo(
+    () => items.filter((i) => i.payload?.last_error?.code === "rate_limited").length,
     [items]
   );
   const allSelected = pending.length > 0 && pending.every((p) => selected.has(p.id));
@@ -191,6 +202,35 @@ export default function AISuggestions() {
       </div>
 
       <section className="space-y-2">
+        {creditExhaustedCount > 0 && (
+          <Card className="p-3 border-amber-500/40 bg-amber-500/5 flex items-start gap-2">
+            <CreditCard className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div className="text-xs flex-1">
+              <p className="font-medium">AI credits exhausted — {creditExhaustedCount} suggestion{creditExhaustedCount === 1 ? "" : "s"} can't be drafted.</p>
+              <p className="text-muted-foreground mt-0.5">Top up your workspace credits, then retry. Suggestions stay pending until applied.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" asChild>
+                <a href="https://lovable.dev/settings" target="_blank" rel="noopener noreferrer">Add credits <ExternalLink className="h-3 w-3 ml-1" /></a>
+              </Button>
+              <Button size="sm" onClick={retryStuck} disabled={retrying}>
+                <RefreshCw className={`h-3.5 w-3.5 mr-1 ${retrying ? "animate-spin" : ""}`} /> Retry
+              </Button>
+            </div>
+          </Card>
+        )}
+        {rateLimitedCount > 0 && (
+          <Card className="p-3 border-blue-500/40 bg-blue-500/5 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+            <div className="text-xs flex-1">
+              <p className="font-medium">{rateLimitedCount} suggestion{rateLimitedCount === 1 ? " was" : "s were"} rate-limited.</p>
+              <p className="text-muted-foreground mt-0.5">Wait a moment, then retry.</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={retryStuck} disabled={retrying}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${retrying ? "animate-spin" : ""}`} /> Retry
+            </Button>
+          </Card>
+        )}
         {stuckCount > 0 && (
           <Card className="p-3 border-blue-500/40 bg-blue-500/5 flex items-start gap-2">
             <RefreshCw className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
