@@ -36,8 +36,9 @@ Each suggestion MUST be a JSON object with: title (<=60 chars), summary (1-2 sen
 - "pricing_idea": product_id (from drafts[] or recentOrders[]) AND price_cents (integer, the proposed new price in cents)
 - "restock_alert": variant_id (from lowStock[]) AND add_stock (positive integer of units to add)
 - "follow_up_request": request_id (from staleRequests[]) AND status ("contacted" | "quoted" | "closed")
-- "marketing_idea": no target fields (advisory only)
-- "content_idea": no target fields (advisory only)
+- "create_promo": campaign_name (short string) AND discount_percentage (integer 5-30). Suggest only when there's a clear reason (slow week, holiday, abandoned-cart cluster).
+- "marketing_idea": no target fields — Kicks will draft a social post + reminder when applied
+- "content_idea": no target fields — Kicks will draft a social post + reminder when applied
 
 Only reference ids that appear in the provided JSON. If you cannot tie an idea to a real id, use marketing_idea or content_idea instead. Reply as JSON array only.
 
@@ -51,7 +52,7 @@ ${prefs}`,
       parsed = match ? JSON.parse(match[0]) : [];
     } catch { parsed = []; }
 
-    const ACTIONABLE = new Set(["publish_product", "pricing_idea", "restock_alert", "follow_up_request"]);
+    const ACTIONABLE = new Set(["publish_product", "pricing_idea", "restock_alert", "follow_up_request", "create_promo"]);
     const ADVISORY = new Set(["marketing_idea", "content_idea"]);
     const rows: any[] = [];
     let skipped = 0;
@@ -78,6 +79,11 @@ ${prefs}`,
         if (!s.request_id || !requestIds.has(s.request_id) || !s.status) { skipped++; continue; }
         payload.request_id = s.request_id;
         payload.status = s.status;
+      } else if (kind === "create_promo") {
+        const pct = Number(s.discount_percentage);
+        if (!Number.isFinite(pct) || pct < 5 || pct > 30) { skipped++; continue; }
+        payload.discount_percentage = Math.round(pct);
+        payload.campaign_name = String(s.campaign_name ?? s.title ?? "PROMO").slice(0, 60);
       } else if (!ADVISORY.has(kind)) {
         kind = "marketing_idea";
       }

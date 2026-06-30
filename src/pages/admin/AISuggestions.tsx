@@ -19,21 +19,48 @@ function extractSources(payload: any): SourceLink[] {
   return [];
 }
 
-const ADVISORY_KINDS = new Set(["marketing_idea", "content_idea"]);
-const ACTIONABLE_KINDS = new Set(["publish_product", "pricing_idea", "restock_alert", "follow_up_request", "update_product", "price_change", "update_job_status"]);
+// All kinds below have a real executor now. "Drafted" kinds produce a social post + reminder when applied.
+const DRAFTED_KINDS = new Set(["marketing_idea", "content_idea"]);
+const ACTIONABLE_KINDS = new Set([
+  "publish_product", "pricing_idea", "restock_alert", "follow_up_request",
+  "update_product", "price_change", "update_job_status", "create_promo",
+  "marketing_idea", "content_idea",
+]);
 
 function hasActionableTarget(kind: string, payload: any): boolean {
-  if (ADVISORY_KINDS.has(kind)) return false;
+  if (DRAFTED_KINDS.has(kind)) return true; // always applyable — Kicks generates the draft on apply
   switch (kind) {
     case "publish_product": return !!payload?.product_id;
     case "pricing_idea":
-    case "price_change": return !!payload?.product_id && typeof payload?.price_cents === "number";
+    case "price_change": return !!payload?.product_id && (typeof payload?.price_cents === "number" || typeof payload?.price === "number");
     case "restock_alert": return !!payload?.variant_id && typeof payload?.add_stock === "number";
     case "follow_up_request": return !!payload?.request_id && !!payload?.status;
     case "update_product": return !!payload?.product_id && !!payload?.updates;
     case "update_job_status": return !!payload?.job_id && !!payload?.status;
+    case "create_promo": {
+      const pct = Number(payload?.discount_percentage ?? payload?.amount);
+      return Number.isFinite(pct) && pct >= 1 && pct <= 50;
+    }
     default: return false;
   }
+}
+
+function previewFor(kind: string, payload: any): string | null {
+  if (kind === "pricing_idea" || kind === "price_change") {
+    const cents = payload?.price_cents;
+    const price = typeof cents === "number" ? cents / 100 : payload?.price;
+    if (typeof price === "number") return `New price → $${price.toFixed(2)}`;
+  }
+  if (kind === "create_promo") {
+    const pct = payload?.discount_percentage ?? payload?.amount;
+    const name = payload?.campaign_name;
+    return pct ? `Will create promo code (${pct}% off${name ? ` · ${name}` : ""})` : null;
+  }
+  if (kind === "restock_alert" && payload?.add_stock) return `+${payload.add_stock} units`;
+  if (kind === "publish_product") return `Will set status → available`;
+  if (kind === "follow_up_request" && payload?.status) return `Request → ${payload.status}`;
+  if (kind === "marketing_idea" || kind === "content_idea") return `Kicks will draft a social post + a reminder for 3 days from now`;
+  return null;
 }
 
 export default function AISuggestions() {
@@ -44,6 +71,7 @@ export default function AISuggestions() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showSources, setShowSources] = useState(true);
   const [busyBulk, setBusyBulk] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -112,11 +140,26 @@ export default function AISuggestions() {
 
   const pending = useMemo(() => items.filter((i) => i.status === "pending"), [items]);
   const resolved = useMemo(() => items.filter((i) => i.status !== "pending"), [items]);
+  const stuckCount = useMemo(
+    () => items.filter((i) => (i.status === "failed" || i.status === "acknowledged") && (i.kind === "create_promo" || i.kind === "marketing_idea" || i.kind === "content_idea" || i.kind === "pricing_idea" || i.kind === "price_change")).length,
+    [items]
+  );
   const allSelected = pending.length > 0 && pending.every((p) => selected.has(p.id));
   const staleCount = useMemo(
     () => pending.filter((p) => ACTIONABLE_KINDS.has(p.kind) && !hasActionableTarget(p.kind, p.payload)).length,
     [pending]
   );
+
+  async function retryStuck() {
+    setRetrying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-ai-execute", { body: { action: "retry_stuck" } });
+      if (error) throw error;
+      toast.success(`Moved ${data?.reset ?? 0} stuck suggestion${data?.reset === 1 ? "" : "s"} back to pending`);
+      await load();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setRetrying(false); }
+  }
 
   function toggleAll() {
     if (allSelected) setSelected(new Set());
@@ -148,6 +191,18 @@ export default function AISuggestions() {
       </div>
 
       <section className="space-y-2">
+        {stuckCount > 0 && (
+          <Card className="p-3 border-blue-500/40 bg-blue-500/5 flex items-start gap-2">
+            <RefreshCw className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+            <div className="text-xs flex-1">
+              <p className="font-medium">{stuckCount} previously-stuck suggestion{stuckCount === 1 ? "" : "s"} can now be applied.</p>
+              <p className="text-muted-foreground mt-0.5">The pricing column bug is fixed, promos and post drafts have executors. Retry them now.</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={retryStuck} disabled={retrying}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${retrying ? "animate-spin" : ""}`} /> Retry stuck
+            </Button>
+          </Card>
+        )}
         {staleCount > 0 && (
           <Card className="p-3 border-amber-500/40 bg-amber-500/5 flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
@@ -181,7 +236,6 @@ export default function AISuggestions() {
         {pending.map((s) => {
           const sources = extractSources(s.payload);
           const reasoning = s.payload?.reasoning ?? s.payload?.raw?.reasoning;
-          const advisory = ADVISORY_KINDS.has(s.kind);
           const actionable = hasActionableTarget(s.kind, s.payload);
           const stale = ACTIONABLE_KINDS.has(s.kind) && !actionable;
           return (
@@ -191,13 +245,18 @@ export default function AISuggestions() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <Badge variant="outline">{s.kind}</Badge>
-                    {advisory && <Badge variant="secondary" className="text-[10px]">Advisory</Badge>}
+                    {DRAFTED_KINDS.has(s.kind) && <Badge variant="secondary" className="text-[10px]">Drafts a post</Badge>}
                     {actionable && <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">Actionable</Badge>}
                     {stale && <Badge variant="destructive" className="text-[10px]">Missing target ID</Badge>}
                     <span className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleString()}</span>
                   </div>
                   <p className="font-medium">{s.title}</p>
                   {s.summary && <p className="text-sm text-muted-foreground mt-1">{s.summary}</p>}
+                  {previewFor(s.kind, s.payload) && (
+                    <p className="text-xs mt-1 px-2 py-1 rounded bg-primary/5 border border-primary/20 inline-block">
+                      <span className="font-medium text-primary">On apply:</span> {previewFor(s.kind, s.payload)}
+                    </p>
+                  )}
                   {reasoning && <p className="text-xs text-muted-foreground mt-2 italic">Why: {reasoning}</p>}
                   {showSources && sources.length > 0 && (
                     <div className="mt-3 space-y-1 border-l-2 border-primary/40 pl-3">
@@ -226,7 +285,7 @@ export default function AISuggestions() {
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <Button size="sm" onClick={() => act(s.id, "apply")} disabled={stale} title={stale ? "Missing target ID — re-scan to regenerate" : undefined}>
-                    <Check className="h-3.5 w-3.5 mr-1" />{advisory ? "Acknowledge" : "Apply"}
+                    <Check className="h-3.5 w-3.5 mr-1" />Apply
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => act(s.id, "dismiss")}><X className="h-3.5 w-3.5" /></Button>
                 </div>

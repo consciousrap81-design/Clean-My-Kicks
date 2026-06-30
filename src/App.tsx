@@ -35,6 +35,7 @@ import AISettings from "./pages/admin/AISettings";
 import AIInsights from "./pages/admin/AIInsights";
 import AITranscripts from "./pages/admin/AITranscripts";
 import AIHealth from "./pages/admin/AIHealth";
+import AIDrafts from "./pages/admin/AIDrafts";
 import CleaningGuides from "./pages/admin/CleaningGuides";
 import QuoteView from "./pages/QuoteView";
 import ProductDetail from "./pages/ProductDetail";
@@ -111,6 +112,7 @@ const App = () => (
               <Route path="ai/insights" element={<AIInsights />} />
               <Route path="ai/transcripts" element={<AITranscripts />} />
               <Route path="ai/health" element={<AIHealth />} />
+              <Route path="ai/drafts" element={<AIDrafts />} />
               <Route path="ai/:threadId" element={<AIAssistant />} />
               <Route path="cleaning-guides" element={<CleaningGuides />} />
             </Route>
