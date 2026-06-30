@@ -1,80 +1,32 @@
+## Goal
+Stop credit/rate-limit failures (HTTP 402 / 429) from permanently burning AI suggestions. Detect them, keep the suggestion retryable, and surface a clear "Out of AI credits" banner with a one-click retry.
 
-# Make Kicks's "Apply" actually do work — grounded in your real inbox
+## Changes
 
-I pulled your live `ai_suggestions` table. The picture:
+### 1. `supabase/functions/admin-ai-execute/index.ts`
+- Add a `classifyAiError(err)` helper that detects 402 ("Payment Required", credits exhausted) and 429 (rate limited) from the gateway error message/status.
+- In the `marketing_idea` / `content_idea` branch (the `draftSocialPost` try/catch), when the error is 402 or 429:
+  - Do NOT mark the suggestion `failed`.
+  - Leave `status = 'pending'` and write `payload.last_error = { code: 'credits_exhausted' | 'rate_limited', message, at }`.
+  - Return `{ ok: false, retryable: true, code, error }`.
+- Same treatment in the `create_promo` branch and anywhere else `generateText` is invoked at apply time.
+- Extend the `retry_stuck` action to also pick up suggestions where `status='pending'` with a `payload.last_error.code` of `credits_exhausted` / `rate_limited` (clear the `last_error` flag on the row when retried).
 
-| Kind | Pending | Applied | Stuck (failed / silent-ack) |
-|---|---|---|---|
-| `publish_product` | 9 | 2 | 0 — executor works |
-| `pricing_idea` / `price_change` | 7 | 2 | **1 failed silently** — column bug |
-| `create_promo` | 0 | 1 | **3 silent-ack** — no executor at all |
-| `content_idea` / `marketing_idea` | 7 | 2 | **4 silent-ack** — no destination |
+### 2. `src/pages/admin/AISuggestions.tsx`
+- Compute `creditExhaustedCount` from items whose `payload.last_error?.code === 'credits_exhausted'`.
+- Show a new amber banner above the existing "stuck" banner when count > 0:
+  - "AI credits exhausted — top up to apply N suggestion(s)."
+  - Buttons: "Add credits" (external link to workspace billing settings) + "Retry" (calls existing `retryStuck`).
+- On per-card apply, if the returned result has `retryable: true` and `code === 'credits_exhausted'`, show a `toast.error("Out of AI credits — top up and retry.")` instead of the generic failure toast, and keep the card in the pending list (no reload needed since status stayed pending).
+- Add a small "Retry" button on cards that carry `payload.last_error`.
 
-Three real holes. Fix below.
+### 3. Backfill the 3 currently-failed rows
+- Migration / one-off update: for the three current `status='failed'` rows whose `payload.error = 'Payment Required'`, flip them back to `status='pending'` and move the error into `payload.last_error = { code: 'credits_exhausted', message: 'Payment Required' }` so the new UI picks them up.
 
-## 1. Fix the pricing column bug (real bug)
+## Out of scope
+- No change to the hero carousel work — that resumes after this fix lands.
+- No change to the scanner; only the executor + UI.
 
-`admin-ai-execute` writes `shop_products.price_cents`. That column doesn't exist — the real column is `price` (numeric dollars). Every `pricing_idea` and `price_change` errors out and gets marked `failed` (or silently swallows in some branches).
-
-**Fix in `supabase/functions/admin-ai-execute/index.ts`:** convert `price_cents → price` (divide by 100) and write to `shop_products.price`. Snapshot the old `price` into `ai_change_history` so the existing 30-second Undo toast restores it cleanly.
-
-This unblocks the 7 stuck pricing suggestions immediately on next click.
-
-## 2. Add a real executor for `create_promo` (biggest hole)
-
-Kicks already proposes full promo campaigns (campaign_name, description, discount_percentage, target_audience) but Apply silently acknowledges. Wire it to actually create a `shop_promo_codes` row.
-
-**New executor in `admin-ai-execute`:**
-- Auto-generate `code` from campaign name (e.g. "UNT Student Fresh Start Promo" → `UNTFRESH15`). Strip non-alphanum, uppercase, append the discount %.
-- `discount_type = 'percent'`, `amount = discount_percentage`.
-- `active = true` (your choice — live immediately).
-- `expires_at = null`, `max_redemptions = null` (you can tighten in /admin/promo-codes).
-- Snapshot insert into `ai_change_history` with `table_name='shop_promo_codes'` so Undo deletes the row.
-- Apply toast: ✅ "Promo `UNTFRESH15` is live — 15% off · Edit / Undo".
-
-**Scanner update in `admin-ai-scan`:** validate `discount_percentage` is 1–50, `campaign_name` is non-empty, and the generated code doesn't collide with an existing one (append `-2`, `-3` if it does).
-
-## 3. Make `content_idea` / `marketing_idea` actually do something — reminder + drafted post
-
-Your pick: **both** — Apply creates a reminder *and* a Kicks-drafted social post you can copy from.
-
-**New table `public.ai_drafts`:**
-- `id`, `created_at`, `suggestion_id` (fk), `reminder_id` (fk → admin_reminders, nullable), `kind` ('social_post'), `platform` (text — 'instagram'|'tiktok'|'twitter'|'general'), `title`, `body` (markdown), `hashtags` (text[]), `cta` (text), `status` ('draft'|'used'|'archived')
-- Standard RLS: admin-only, full GRANTs for `authenticated` + `service_role`.
-
-**New executor for `content_idea` / `marketing_idea`:**
-1. Call Lovable AI Gateway (`google/gemini-3-flash-preview`) with the suggestion's title + summary + Clean My Kicks brand context (already in `ai-preferences`) → returns `{title, body, hashtags[], cta, platform}`.
-2. Insert into `ai_drafts`.
-3. Insert a row into `admin_reminders`: `key='ai_draft_<draft_id>'`, `title='Post: <draft title>'`, `body=<truncated body>`, `due_at = now() + 3 days`.
-4. Snapshot both inserts into `ai_change_history` (compound) so Undo deletes them together.
-5. Apply toast: ✅ "Drafted Instagram post + reminder for Friday · View draft / Undo".
-
-## 4. UI updates in `src/pages/admin/AISuggestions.tsx`
-
-- Per-kind preview before Apply:
-  - `pricing_idea` → "$X → $Y" with delta %
-  - `create_promo` → preview the generated code + discount
-  - `content_idea` → "Will draft a post + add a reminder"
-- After Apply, replace the generic toast with the executor's actual message (already returned).
-- Failed badge shows the real error (e.g. "Column `price_cents` not found" — though that'll be gone after fix #1).
-- New "Drafts" sub-tab linking to `ai_drafts` filtered by `status='draft'`, with one-click copy buttons for caption + hashtags.
-
-## 5. Backfill — don't make you re-scan
-
-The 7 stuck pricing pendings and 3 silently-acked promo suggestions can be retried. Add a small "Retry stuck suggestions" button at the top of `/admin/ai-suggestions` that:
-- Finds suggestions where `status IN ('failed','acknowledged')` AND `kind` now has a working executor AND `resolved_at > now() - 30 days`.
-- Resets them to `pending` so you can click Apply with the new code.
-
-## Files touched
-
-- `supabase/functions/admin-ai-execute/index.ts` — fix `price`, add `create_promo`, add `content_idea`/`marketing_idea` executors (LLM-backed), compound undo
-- `supabase/functions/admin-ai-scan/index.ts` — validation for `create_promo`, broader marketing/content context
-- Migration: `ai_drafts` table + grants + RLS + updated_at trigger
-- `src/pages/admin/AISuggestions.tsx` — per-kind previews, real toast messages, "Retry stuck" button, drafts tab
-- `src/pages/admin/AIDrafts.tsx` *(new)* — list + copy buttons for `ai_drafts`
-- `src/components/admin/AdminLayout.tsx` — sidebar link to Drafts
-
-## What I'm explicitly NOT touching
-- Auto-posting to Instagram/TikTok (would need OAuth + Meta Graph API — separate request).
-- Site-wide hero/homepage copy editing (no `site_settings` table — separate request).
-- The `update_product` / `publish_product` paths — they already work.
+## Technical notes
+- 402 from Lovable AI Gateway = workspace credits exhausted. User tops up in Settings → Workspace → Usage.
+- 429 is transient; same UX path (keep pending, allow retry) but labeled "Rate limited — try again shortly."
