@@ -1,15 +1,16 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getCartId } from "./cartId";
 
-const SESSION_KEY = "cmk_shop_session";
-
+/**
+ * Shop session id — unified with the cart id so that reservations created
+ * via the cart drawer are recognized as "reserved by me" everywhere
+ * (product detail, shop grid, quick-buy checkout). Previously this used a
+ * separate `cmk_shop_session` key which caused the same shopper to see
+ * their own held pair as "Reserved by another buyer".
+ */
 export function getShopSessionId(): string {
   if (typeof window === "undefined") return "ssr";
-  let id = localStorage.getItem(SESSION_KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem(SESSION_KEY, id);
-  }
-  return id;
+  return getCartId();
 }
 
 export async function signedPhotoUrl(path: string | null | undefined, expiresIn = 60 * 60): Promise<string | null> {
