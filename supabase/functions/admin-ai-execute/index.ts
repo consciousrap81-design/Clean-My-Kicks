@@ -299,14 +299,14 @@ async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
       await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: err } }).eq("id", sug.id);
       return { ok: false, error: err };
     }
-    const before = await a.from("shop_accessory_variants").select("id,stock,sku").eq("id", variantId).maybeSingle();
+    const before = await a.from("shop_accessory_variants").select("id,stock_qty,sku").eq("id", variantId).maybeSingle();
     if (!before.data) {
       const err = `Variant ${variantId} not found`;
       await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: err } }).eq("id", sug.id);
       return { ok: false, error: err };
     }
-    const newStock = (before.data.stock ?? 0) + addStock;
-    const { error: e } = await a.from("shop_accessory_variants").update({ stock: newStock }).eq("id", variantId);
+    const newStock = (before.data.stock_qty ?? 0) + addStock;
+    const { error: e } = await a.from("shop_accessory_variants").update({ stock_qty: newStock }).eq("id", variantId);
     if (e) {
       await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: String(e.message ?? e) } }).eq("id", sug.id);
       return { ok: false, error: String(e.message ?? e) };
@@ -314,7 +314,7 @@ async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
     const h = await a.from("ai_change_history").insert({
       suggestion_id: sug.id, actor: userId, kind: sug.kind,
       table_name: "shop_accessory_variants", record_id: variantId,
-      before_state: { stock: before.data.stock }, after_state: { stock: newStock },
+      before_state: { stock_qty: before.data.stock_qty }, after_state: { stock_qty: newStock },
     }).select("id").single();
     await a.from("ai_suggestions").update({ status: "applied", resolved_at: new Date().toISOString() }).eq("id", sug.id);
     await a.from("ai_audit_log").insert({ actor: userId, tool: `apply:${sug.kind}`, input: payload, output: { history_id: h.data?.id, new_stock: newStock }, approved: true });
