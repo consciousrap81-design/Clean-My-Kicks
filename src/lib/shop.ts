@@ -40,6 +40,7 @@ export type ShopProduct = {
   description: string | null;
   price: number;
   status: "draft" | "available" | "reserved" | "sold" | "archived";
+  category: "restored" | "new";
   view_count: number;
   reserved_until: string | null;
   sold_at: string | null;
@@ -52,7 +53,7 @@ export type ShopProduct = {
  * Use this everywhere instead of `select("*")` for non-admin queries.
  */
 export const SHOP_PRODUCT_PUBLIC_COLS =
-  "id, name, brand, model, size, condition, description, price, status, view_count, reserved_until, sold_at, created_at, updated_at";
+  "id, name, brand, model, size, condition, description, price, status, category, view_count, reserved_until, sold_at, created_at, updated_at";
 
 export type ReservationStatus = {
   id: string;

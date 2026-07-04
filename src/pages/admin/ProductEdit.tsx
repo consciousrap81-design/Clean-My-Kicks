@@ -38,6 +38,7 @@ export default function ProductEdit() {
     description: "",
     price: "",
     status: "draft",
+    category: "restored",
   });
 
   function applyTemplate(id: string) {
@@ -61,7 +62,7 @@ export default function ProductEdit() {
     (async () => {
       const { data: p } = await supabase
         .from("shop_products")
-        .select("id, name, brand, model, size, condition, description, price, status")
+        .select("id, name, brand, model, size, condition, description, price, status, category")
         .eq("id", id!)
         .maybeSingle();
       if (!p) return;
@@ -74,6 +75,7 @@ export default function ProductEdit() {
         description: p.description ?? "",
         price: String(p.price ?? ""),
         status: p.status ?? "draft",
+        category: (p as any).category ?? "restored",
       });
       await loadPhotos();
     })();
@@ -120,6 +122,7 @@ export default function ProductEdit() {
         description: form.description || null,
         price: Number(form.price),
         status: form.status,
+        category: form.category,
       };
       if (isNew) {
         const { data, error } = await supabase.from("shop_products").insert(payload).select("id").single();
@@ -277,6 +280,15 @@ export default function ProductEdit() {
                 <SelectItem value="Lightly Used">Lightly Used</SelectItem>
                 <SelectItem value="Good Used">Good Used</SelectItem>
                 <SelectItem value="Worn">Worn</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div><Label>Category</Label>
+            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="restored">Restored Kicks</SelectItem>
+                <SelectItem value="new">New Kicks (deadstock / never worn)</SelectItem>
               </SelectContent>
             </Select>
           </div>

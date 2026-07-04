@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Eye, Clock } from "lucide-react";
@@ -81,15 +81,89 @@ const Shop = () => {
     };
   }, []);
 
+  const restored = useMemo(() => products.filter((p) => (p.category ?? "restored") === "restored"), [products]);
+  const brandNew = useMemo(() => products.filter((p) => p.category === "new"), [products]);
+
+  const renderCard = (p: Row, index: number) => {
+    const img = p.photo_path ? urls[p.photo_path] : null;
+    const reserved = p.status === "reserved";
+    const display = [p.brand, p.model].filter(Boolean).join(" ") || p.name;
+    return (
+      <Link
+        to={`/shop/${p.id}`}
+        key={p.id}
+        className="group bg-card rounded-xl md:rounded-2xl overflow-hidden border border-border hover:border-primary/50 transition-all duration-500 animate-scale-in"
+        style={{ animationDelay: `${index * 0.05}s` }}
+      >
+        <div className="relative aspect-square overflow-hidden bg-secondary">
+          {img ? (
+            <img src={img} alt={display} className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-700" />
+          ) : (
+            <div className="w-full h-full grid place-items-center text-xs text-muted-foreground">No photo</div>
+          )}
+          {p.condition && (
+            <span className="absolute top-2 left-2 md:top-4 md:left-4 bg-primary text-primary-foreground text-[10px] md:text-xs font-body uppercase tracking-wider px-2 py-0.5 md:px-3 md:py-1 rounded-full">
+              {p.condition}
+            </span>
+          )}
+          {reserved && (
+            <span className="absolute top-2 right-2 md:top-4 md:right-4 bg-amber-500 text-white text-[10px] md:text-xs font-body uppercase tracking-wider px-2 py-0.5 md:px-3 md:py-1 rounded-full inline-flex items-center gap-1">
+              <Clock className="w-3 h-3" /> Reserved
+            </span>
+          )}
+        </div>
+        <div className="p-3 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-1 md:mb-2 gap-0.5">
+            <h3 className="font-display text-sm sm:text-base md:text-xl text-foreground leading-tight">{display}</h3>
+            <span className="font-display text-base md:text-xl text-primary shrink-0">${Number(p.price).toFixed(0)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="font-body text-xs md:text-sm text-muted-foreground">
+              {p.size ? `Size ${p.size}` : ""}
+            </p>
+            {p.view_count > 0 && (
+              <span className="inline-flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
+                <Eye className="w-3 h-3" /> {p.view_count}
+              </span>
+            )}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button variant="outline" className="h-9 md:h-10 text-xs md:text-sm">View</Button>
+            <BuyNowButton
+              productId={p.id}
+              status={p.status}
+              reservedUntil={(p as any).reserved_until}
+              price={Number(p.price)}
+              className="h-9 md:h-10 text-xs md:text-sm w-full"
+            />
+          </div>
+        </div>
+      </Link>
+    );
+  };
+
+  const renderSection = (label: string, kicker: string, blurb: string, list: Row[]) => (
+    <div className="mb-14 md:mb-20 last:mb-0">
+      <div className="mb-6 md:mb-8">
+        <span className="text-primary font-body text-xs md:text-sm uppercase tracking-widest">{kicker}</span>
+        <h3 className="font-display text-2xl sm:text-3xl md:text-5xl text-foreground mt-2 md:mt-3">{label}</h3>
+        <p className="font-body text-sm text-muted-foreground max-w-xl mt-2">{blurb}</p>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 lg:gap-8">
+        {list.map((p, i) => renderCard(p, i))}
+      </div>
+    </div>
+  );
+
   return (
     <section id="shop" className="py-16 md:py-32 bg-slate-100">
       <div className="container px-4">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10">
           <div>
             <span className="text-primary font-body text-xs md:text-sm uppercase tracking-widest">Shop</span>
-            <h2 className="font-display text-3xl sm:text-4xl md:text-6xl text-foreground mt-3 md:mt-4">RESTORED KICKS</h2>
+            <h2 className="font-display text-3xl sm:text-4xl md:text-6xl text-foreground mt-3 md:mt-4">SHOP KICKS</h2>
             <p className="font-body text-sm md:text-base text-muted-foreground max-w-xl mt-3 md:mt-4">
-              One-of-one restored pairs. When it's gone, it's gone.
+              One-of-one restored pairs and hand-picked deadstock. When it's gone, it's gone.
             </p>
           </div>
           <Link
@@ -123,70 +197,20 @@ const Shop = () => {
             No pairs available right now. Check back soon — new drops weekly.
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 lg:gap-8">
-            {products.map((p, index) => {
-              const img = p.photo_path ? urls[p.photo_path] : null;
-              const reserved = p.status === "reserved";
-              const display = [p.brand, p.model].filter(Boolean).join(" ") || p.name;
-              return (
-                <Link
-                  to={`/shop/${p.id}`}
-                  key={p.id}
-                  className="group bg-card rounded-xl md:rounded-2xl overflow-hidden border border-border hover:border-primary/50 transition-all duration-500 animate-scale-in"
-                  style={{ animationDelay: `${index * 0.05}s` }}
-                >
-                  <div className="relative aspect-square overflow-hidden bg-secondary">
-                    {img ? (
-                      <img src={img} alt={display} className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-700" />
-                    ) : (
-                      <div className="w-full h-full grid place-items-center text-xs text-muted-foreground">No photo</div>
-                    )}
-                    {p.condition && (
-                      <span className="absolute top-2 left-2 md:top-4 md:left-4 bg-primary text-primary-foreground text-[10px] md:text-xs font-body uppercase tracking-wider px-2 py-0.5 md:px-3 md:py-1 rounded-full">
-                        {p.condition}
-                      </span>
-                    )}
-                    {reserved && (
-                      <span className="absolute top-2 right-2 md:top-4 md:right-4 bg-amber-500 text-white text-[10px] md:text-xs font-body uppercase tracking-wider px-2 py-0.5 md:px-3 md:py-1 rounded-full inline-flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> Reserved
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-3 md:p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-1 md:mb-2 gap-0.5">
-                      <h3 className="font-display text-sm sm:text-base md:text-xl text-foreground leading-tight">{display}</h3>
-                      <span className="font-display text-base md:text-xl text-primary shrink-0">${Number(p.price).toFixed(0)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="font-body text-xs md:text-sm text-muted-foreground">
-                        {p.size ? `Size ${p.size}` : ""}
-                      </p>
-                      {p.view_count > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
-                          <Eye className="w-3 h-3" /> {p.view_count}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button
-                        variant="outline"
-                        className="h-9 md:h-10 text-xs md:text-sm"
-                      >
-                        View
-                      </Button>
-                      <BuyNowButton
-                        productId={p.id}
-                        status={p.status}
-                        reservedUntil={(p as any).reserved_until}
-                        price={Number(p.price)}
-                        className="h-9 md:h-10 text-xs md:text-sm w-full"
-                      />
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          <>
+            {restored.length > 0 && renderSection(
+              "RESTORED KICKS",
+              "One-of-one",
+              "Hand-restored, one-of-one pairs. When it's gone, it's gone.",
+              restored,
+            )}
+            {brandNew.length > 0 && renderSection(
+              "NEW KICKS",
+              "Deadstock",
+              "Brand-new, never-worn pairs. Straight from the box.",
+              brandNew,
+            )}
+          </>
         )}
 
         {products.length > 0 && (
