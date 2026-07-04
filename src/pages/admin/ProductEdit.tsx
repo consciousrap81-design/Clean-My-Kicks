@@ -283,6 +283,15 @@ export default function ProductEdit() {
               </SelectContent>
             </Select>
           </div>
+          <div><Label>Category</Label>
+            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="restored">Restored Kicks</SelectItem>
+                <SelectItem value="new">New Kicks (deadstock / never worn)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div><Label>Price (USD) *</Label><Input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
           <div><Label>Status</Label>
             <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
