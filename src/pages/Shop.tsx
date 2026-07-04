@@ -362,8 +362,10 @@ export default function ShopPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
-              {sorted.map((p, index) => {
+            (() => {
+              const restored = sorted.filter((p) => (p.category ?? "restored") === "restored");
+              const brandNew = sorted.filter((p) => p.category === "new");
+              const renderCard = (p: Row, index: number) => {
                 const img = p.photo_path ? urls[p.photo_path] : null;
                 const reserved = p.status === "reserved";
                 const display = [p.brand, p.model].filter(Boolean).join(" ") || p.name;
@@ -439,8 +441,36 @@ export default function ShopPage() {
                     </div>
                   </Link>
                 );
-              })}
-            </div>
+              };
+              const renderSection = (label: string, kicker: string, blurb: string, list: Row[]) => (
+                <div className="mb-12 last:mb-0">
+                  <div className="mb-4 md:mb-6">
+                    <span className="text-primary font-body text-[10px] md:text-xs uppercase tracking-widest">{kicker}</span>
+                    <h2 className="font-display text-2xl md:text-4xl text-foreground mt-1">{label}</h2>
+                    <p className="font-body text-xs md:text-sm text-muted-foreground mt-1 max-w-xl">{blurb}</p>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
+                    {list.map((p, i) => renderCard(p, i))}
+                  </div>
+                </div>
+              );
+              return (
+                <>
+                  {restored.length > 0 && renderSection(
+                    "RESTORED KICKS",
+                    "One-of-one",
+                    "Hand-restored pairs — cleaned, unyellowed, and finished by hand.",
+                    restored,
+                  )}
+                  {brandNew.length > 0 && renderSection(
+                    "NEW KICKS",
+                    "Deadstock",
+                    "Brand-new, never-worn pairs. Straight from the box.",
+                    brandNew,
+                  )}
+                </>
+              );
+            })()
           )}
         </div>
       </section>
