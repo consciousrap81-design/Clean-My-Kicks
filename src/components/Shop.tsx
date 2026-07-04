@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { signedPhotoUrls, SHOP_PRODUCT_PUBLIC_COLS, type ShopProduct } from "@/lib/shop";
 import { formatDistanceToNow } from "date-fns";
 import BuyNowButton from "@/components/shop/BuyNowButton";
+import AccessoryCard, { type AccessoryRow } from "@/components/shop/AccessoryCard";
 
 type Row = ShopProduct & { photo_path: string | null };
 
@@ -13,12 +14,13 @@ const Shop = () => {
   const [products, setProducts] = useState<Row[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [recentlySold, setRecentlySold] = useState<{ id: string; name: string; sold_at: string }[]>([]);
+  const [accessories, setAccessories] = useState<AccessoryRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const [{ data: live }, { data: sold }] = await Promise.all([
+      const [{ data: live }, { data: sold }, { data: accs }] = await Promise.all([
         supabase
           .from("shop_products")
           .select(`${SHOP_PRODUCT_PUBLIC_COLS}, shop_product_photos(storage_path, is_primary, sort_order)`)
@@ -32,6 +34,14 @@ const Shop = () => {
           .not("sold_at", "is", null)
           .order("sold_at", { ascending: false })
           .limit(3),
+        supabase
+          .from("shop_accessories")
+          .select(
+            "id, name, slug, description, category, base_price_cents, shop_accessory_variants(id, name, stock_qty, active, price_cents_override, sort_order), shop_accessory_photos(storage_path, sort_order)",
+          )
+          .eq("active", true)
+          .order("created_at", { ascending: false })
+          .limit(3),
       ]);
 
       const rows: Row[] = (live ?? []).map((p: any) => {
@@ -42,6 +52,7 @@ const Shop = () => {
       });
       if (!mounted) return;
       setProducts(rows);
+      setAccessories((accs ?? []) as any);
       setRecentlySold(
         (sold ?? []).map((s: any) => ({
           id: s.id,
@@ -61,6 +72,8 @@ const Shop = () => {
     const channel = supabase
       .channel("shop-products-public")
       .on("postgres_changes", { event: "*", schema: "public", table: "shop_products" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "shop_accessories" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "shop_accessory_variants" }, () => load())
       .subscribe();
     return () => {
       mounted = false;
@@ -183,6 +196,22 @@ const Shop = () => {
                 Shop all pairs →
               </Button>
             </Link>
+          </div>
+        )}
+
+        {accessories.length > 0 && (
+          <div className="mt-14 md:mt-20">
+            <div className="mb-6 md:mb-8">
+              <span className="text-primary font-body text-xs md:text-sm uppercase tracking-widest">Accessories</span>
+              <h3 className="font-display text-2xl sm:text-3xl md:text-4xl text-foreground mt-2 md:mt-3">
+                CARE KITS & EXTRAS
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
+              {accessories.map((a) => (
+                <AccessoryCard key={a.id} acc={a} />
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -1,30 +1,36 @@
-## Problem
+# Investigation: missing accessory on homepage
 
-Accessory cards on `/shop` (rendered by `src/components/shop/AccessoryCard.tsx`) show only the name and a 2-line truncated description (`line-clamp-2`). Unlike sneakers, accessories have no detail page and no way to expand — so shoppers can't read the full description or see additional photos before adding to cart.
+## What I found
 
-## Fix
+- Database is fine. `shop_accessories` still has **"Premium Cleaning Kit"** (active, $5.00, Default variant with stock 10). Nothing was deleted or deactivated.
+- The homepage Shop section (`src/components/Shop.tsx`, rendered inside `src/pages/Index.tsx`) only ever queried the `shop_products` table (restored sneakers). It has **no code path that reads `shop_accessories`** — never has, per chat history and the current file.
+- Accessories are only rendered on the standalone `/shop` page (`src/pages/Shop.tsx`), which has an "Accessories" section below the sneaker grid using `AccessoryCard`.
 
-Add a "View details" affordance on each accessory card that opens a dialog with the full product info. Presentation-only — no routing, backend, or schema changes.
+So no accessory was removed from the homepage in the recent changes — there was no accessory block on `/` to begin with. What you're remembering is almost certainly the `/shop` page.
 
-### Changes to `src/components/shop/AccessoryCard.tsx`
+## Proposal: add an accessories teaser to the homepage
 
-1. Add a **"View details"** text link under the truncated description (small, primary color, with a chevron). Also make the product image clickable to open the same dialog.
-2. Add a shadcn `Dialog` that shows:
-   - Larger primary photo, plus a thumbnail strip for the remaining `shop_accessory_photos` (sorted by `sort_order`); clicking a thumb swaps the main image.
-   - Accessory `name` and `category`.
-   - **Full description** (no `line-clamp`), rendered with `whitespace-pre-wrap` so admin-entered line breaks are preserved.
-   - Variant picker (same `Select` markup already in the card) with stock hints ("only N left" / "sold out").
-   - Price and quantity stepper.
-   - "Add to cart" button that reuses the existing `handleAdd` logic and closes the dialog on success.
-3. Keep the existing card-level "Add to cart" so quick-add still works without opening the dialog.
-4. Sign URLs for the extra photos lazily when the dialog first opens (reuse `signedPhotoUrl` from `@/lib/shop`) so shoppers who never open it don't pay the extra requests.
+Mirror the existing "restored kicks" pattern so accessories are also promoted on `/`.
+
+### Scope (frontend only)
+- Edit `src/components/Shop.tsx`:
+  - Add a second query alongside the existing `shop_products` + `sold` loads:
+    ```ts
+    supabase
+      .from("shop_accessories")
+      .select("id, name, slug, description, category, base_price_cents, shop_accessory_variants(id, name, stock_qty, active, price_cents_override, sort_order), shop_accessory_photos(storage_path, sort_order)")
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(3)
+    ```
+  - Add realtime subscription on `shop_accessories` + `shop_accessory_variants` (same channel).
+  - Below the sneaker grid, render a compact "Accessories" subsection: heading + 2–3 col grid reusing `AccessoryCard` (already handles photo signing, variant picker, quantity, add-to-cart, and the details dialog). Only render when `accessories.length > 0`.
+  - Keep the existing "Shop all pairs →" CTA; add nothing else.
 
 ### Out of scope
+- No changes to `/shop` page, `AccessoryCard`, cart, backend, RLS, storage rules, or `shop_products` logic.
 
-- No new accessory detail route.
-- No changes to sneaker cards, filters, cart, or backend.
-- No changes to `src/components/Shop.tsx` (homepage section) — it doesn't render accessories today.
+### Files touched
+- `src/components/Shop.tsx` (only)
 
-## Files touched
-
-- `src/components/shop/AccessoryCard.tsx` — add dialog + trigger, lazy-sign extra photos, drop description truncation inside the dialog.
+If you'd rather I just confirm the investigation and leave the homepage alone, say the word and I'll skip the edit.
