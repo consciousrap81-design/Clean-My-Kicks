@@ -14,8 +14,8 @@ Deno.serve(async (req) => {
     // Gather quick signals
     const [{ data: drafts }, { data: lowStock }, { data: recentOrders }, { data: staleRequests }] = await Promise.all([
       a.from("shop_products").select("id,name,brand,model,created_at").eq("status", "draft").order("created_at", { ascending: true }).limit(10),
-      a.from("shop_accessory_variants").select("id,sku,stock,accessory_id").lte("stock", 3).limit(10),
-      a.from("shop_orders").select("id,status,total_cents,created_at").order("created_at", { ascending: false }).limit(10),
+      a.from("shop_accessory_variants").select("id,sku,stock_qty,accessory_id").lte("stock_qty", 3).limit(10),
+      a.from("shop_orders").select("id,status,amount,created_at").order("created_at", { ascending: false }).limit(10),
       a.from("booking_requests").select("id,status,created_at").eq("status", "new").order("created_at", { ascending: true }).limit(10),
     ]);
 
