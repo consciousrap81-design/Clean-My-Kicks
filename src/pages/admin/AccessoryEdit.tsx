@@ -347,9 +347,37 @@ export default function AccessoryEdit() {
             </div>
           </div>
           <div className="grid gap-2">
-            <Label>Description</Label>
-            <Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <div className="flex items-center justify-between">
+              <Label>Description</Label>
+              <Button type="button" size="sm" variant="outline" onClick={() => setPolishOpen(true)} disabled={!form.description.trim()}>
+                <Sparkles className="h-3.5 w-3.5 mr-1" /> Polish with Kicks
+              </Button>
+            </div>
+            <Textarea rows={6} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Paste raw notes — Kicks can reformat with bullets, sections, and bold highlights." />
+            <p className="text-[11px] text-muted-foreground">Markdown supported: <code>**bold**</code>, <code>- bullets</code>, and headings.</p>
           </div>
+          <PolishDescriptionDialog
+            open={polishOpen}
+            onOpenChange={setPolishOpen}
+            original={form.description}
+            product={{ name: form.name, price: form.base_price_dollars }}
+            onAccept={(formatted) => setForm((f) => ({ ...f, description: formatted }))}
+          />
+          {(form.name || form.base_price_dollars) && (
+            <div className="rounded-lg border border-dashed bg-secondary/40 p-4">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                Public page preview
+              </div>
+              <div className="font-display text-2xl text-foreground leading-tight">
+                {form.name || "—"}
+              </div>
+              {form.base_price_dollars && (
+                <div className="font-display text-xl text-primary mt-1">
+                  ${Number(form.base_price_dollars || 0).toFixed(2)}
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <Label htmlFor="active-switch">Active (visible in shop)</Label>
             <Switch id="active-switch" checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
