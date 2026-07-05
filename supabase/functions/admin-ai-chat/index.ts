@@ -173,6 +173,90 @@ function buildTools(actorId: string) {
       inputSchema: z.object({ topic: z.string(), findings: z.string() }),
       execute: async ({ topic, findings }) => ({ topic, findings, recorded: true }),
     }),
+    search_accessories: tool({
+      description: "Search shop accessories (cleaning kits, laces, buckles, etc) by name or category. Accessories are the SECOND catalog, separate from shop_products (restored kicks / dead stock). Returns up to 20 rows with base price and active flag. NOTE: SKUs do NOT live on accessories — they live on their variants; use list_accessory_variants or get_accessory to see SKUs.",
+      inputSchema: z.object({
+        q: z.string().optional(),
+        category: z.enum(["cleaning_kit", "laces", "buckle", "other"]).optional(),
+        active: z.boolean().optional(),
+      }),
+      execute: async ({ q, category, active }) => {
+        let query = a.from("shop_accessories").select("id,name,slug,category,base_price_cents,active,created_at").limit(20).order("created_at", { ascending: false });
+        if (q) query = query.ilike("name", `%${q}%`);
+        if (category) query = query.eq("category", category);
+        if (typeof active === "boolean") query = query.eq("active", active);
+        const { data, error } = await query;
+        if (error) return schemaError("shop_accessories", error.message);
+        return {
+          kind: "accessories",
+          count: data?.length ?? 0,
+          accessories: (data ?? []).map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            slug: r.slug,
+            category: r.category,
+            active: r.active,
+            base_price: r.base_price_cents != null ? Number(r.base_price_cents) / 100 : null,
+            base_price_formatted: r.base_price_cents != null ? `$${(Number(r.base_price_cents) / 100).toFixed(2)}` : null,
+            created_at: r.created_at,
+          })),
+        };
+      },
+    }),
+    get_accessory: tool({
+      description: "Get an accessory with all its variants (each variant is a color/size/style row with its own SKU, stock, and optional price override). Use this when the admin asks about SKUs, stock, or pricing for a specific accessory.",
+      inputSchema: z.object({ id: z.string().uuid() }),
+      execute: async ({ id }) => {
+        const { data: acc, error } = await a.from("shop_accessories").select("*").eq("id", id).maybeSingle();
+        if (error) return schemaError("shop_accessories", error.message);
+        if (!acc) return { error: "accessory_not_found", id };
+        const { data: variants, error: ve } = await a.from("shop_accessory_variants").select("id,name,sku,stock_qty,price_cents_override,active,sort_order").eq("accessory_id", id).order("sort_order", { ascending: true });
+        if (ve) return schemaError("shop_accessory_variants", ve.message);
+        return {
+          kind: "accessory",
+          accessory: {
+            id: acc.id,
+            name: acc.name,
+            slug: acc.slug,
+            category: acc.category,
+            description: acc.description,
+            active: acc.active,
+            base_price: acc.base_price_cents != null ? Number(acc.base_price_cents) / 100 : null,
+          },
+          variants: (variants ?? []).map((v: any) => ({
+            id: v.id,
+            name: v.name,
+            sku: v.sku,
+            stock_qty: v.stock_qty,
+            active: v.active,
+            price_override: v.price_cents_override != null ? Number(v.price_cents_override) / 100 : null,
+            sort_order: v.sort_order,
+          })),
+        };
+      },
+    }),
+    list_accessory_variants: tool({
+      description: "List all variants (SKU, stock, price override, active) for one accessory. Faster than get_accessory when the admin only cares about SKUs or stock.",
+      inputSchema: z.object({ accessory_id: z.string().uuid() }),
+      execute: async ({ accessory_id }) => {
+        const { data, error } = await a.from("shop_accessory_variants").select("id,accessory_id,name,sku,stock_qty,price_cents_override,active,sort_order").eq("accessory_id", accessory_id).order("sort_order", { ascending: true });
+        if (error) return schemaError("shop_accessory_variants", error.message);
+        return {
+          kind: "accessory_variants",
+          accessory_id,
+          count: data?.length ?? 0,
+          variants: (data ?? []).map((v: any) => ({
+            id: v.id,
+            name: v.name,
+            sku: v.sku,
+            stock_qty: v.stock_qty,
+            active: v.active,
+            price_override: v.price_cents_override != null ? Number(v.price_cents_override) / 100 : null,
+            sort_order: v.sort_order,
+          })),
+        };
+      },
+    }),
     list_product_photos: tool({
       description: "List all media (photos) attached to a shop product, in display order. Returns each photo's id, storage_path, signed preview URL, sort_order, and is_primary flag. Use this to audit a product's gallery for broken or missing uploads.",
       inputSchema: z.object({ product_id: z.string().uuid() }),
