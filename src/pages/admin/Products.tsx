@@ -5,12 +5,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Plus, Pencil, Trash2, RotateCcw, Rocket, ExternalLink } from "lucide-react";
+import { Eye, Plus, Pencil, Trash2, RotateCcw, Rocket, ExternalLink, History, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { signedPhotoUrls } from "@/lib/shop";
 import { useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +36,9 @@ export default function Products() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [pubConfirm, setConfirm] = useState<{ ids: string[]; label: string } | null>(null);
+  const [catConfirm, setCatConfirm] = useState<{ ids: string[]; to: "restored" | "new" } | null>(null);
+  const [historyFor, setHistoryFor] = useState<{ id: string; label: string } | null>(null);
+  const [historyRows, setHistoryRows] = useState<any[] | null>(null);
 
   const { data: products } = useQuery({
     queryKey: ["admin-shop-products"],
@@ -95,6 +105,76 @@ export default function Products() {
       },
       duration: 6000,
     });
+  }
+
+  async function runBulkCategory() {
+    if (!catConfirm) return;
+    const { ids, to } = catConfirm;
+    setBulkBusy(true);
+    try {
+      // Capture previous categories for undo
+      const prevMap = new Map<string, string>();
+      (products || []).forEach((p: any) => {
+        if (ids.includes(p.id)) prevMap.set(p.id, p.category ?? "restored");
+      });
+      const { data: updated, error } = await supabase
+        .from("shop_products")
+        .update({ category: to })
+        .in("id", ids)
+        .select("id");
+      if (error) throw error;
+      const okIds = (updated || []).map((r: any) => r.id as string);
+      const failed = ids.length - okIds.length;
+      setSelected(new Set());
+      await qc.refetchQueries({ queryKey: ["admin-shop-products"] });
+      const toLabel = to === "restored" ? "Restored Kicks" : "Deadstock";
+      if (failed > 0) toast.error(`${failed} of ${ids.length} could not be moved.`);
+      if (okIds.length) {
+        toast.success(`Moved ${okIds.length} product${okIds.length === 1 ? "" : "s"} to ${toLabel}`, {
+          action: {
+            label: "Undo",
+            onClick: async () => {
+              for (const pid of okIds) {
+                const prev = prevMap.get(pid);
+                if (!prev) continue;
+                await supabase.from("shop_products").update({ category: prev }).eq("id", pid);
+              }
+              await qc.refetchQueries({ queryKey: ["admin-shop-products"] });
+              toast.success("Category move reverted");
+            },
+          },
+          duration: 8000,
+        });
+      }
+    } catch (e: any) {
+      toast.error(`Move failed: ${e.message}`);
+    } finally {
+      setBulkBusy(false);
+      setCatConfirm(null);
+    }
+  }
+
+  function askBulkCategory(to: "restored" | "new") {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    setCatConfirm({ ids, to });
+  }
+
+  async function openHistory(p: any) {
+    const label = [p.brand, p.model].filter(Boolean).join(" ") || p.name;
+    setHistoryFor({ id: p.id, label });
+    setHistoryRows(null);
+    const { data, error } = await supabase
+      .from("shop_product_category_history")
+      .select("id, from_category, to_category, changed_by_email, created_at")
+      .eq("product_id", p.id)
+      .order("created_at", { ascending: false });
+    if (error) {
+      toast.error(error.message);
+      setHistoryRows([]);
+      return;
+    }
+    setHistoryRows(data || []);
   }
 
   async function runPublish() {
