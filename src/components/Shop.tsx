@@ -37,7 +37,7 @@ const Shop = () => {
         supabase
           .from("shop_accessories")
           .select(
-            "id, name, slug, description, category, base_price_cents, shop_accessory_variants(id, name, stock_qty, active, price_cents_override, sort_order), shop_accessory_photos(storage_path, sort_order)",
+            "id, name, slug, description, category, base_price_cents, shop_accessory_variants(id, name, stock_qty, active, price_cents_override, sort_order), shop_accessory_photos(storage_path, sort_order, is_primary)",
           )
           .eq("active", true)
           .order("created_at", { ascending: false })
