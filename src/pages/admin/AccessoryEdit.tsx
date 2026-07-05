@@ -38,6 +38,7 @@ export default function AccessoryEdit() {
   const [uploading, setUploading] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const [dragOver, setDragOver] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -199,6 +200,26 @@ export default function AccessoryEdit() {
     setPhotos((arr) => arr.filter((x) => x.id !== p.id));
   }
 
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    if (isNew) {
+      toast.error("Save first, then upload photos");
+      return;
+    }
+    const files = e.dataTransfer.files;
+    if (files && files.length) {
+      const images = Array.from(files).filter((f) => f.type.startsWith("image/"));
+      if (!images.length) {
+        toast.error("Please drop image files only");
+        return;
+      }
+      const dt = new DataTransfer();
+      images.forEach((f) => dt.items.add(f));
+      onUpload(dt.files);
+    }
+  }
+
   return (
     <div className="max-w-3xl space-y-4">
       <h1 className="text-3xl font-display tracking-wide">{isNew ? "New Accessory" : "Edit Accessory"}</h1>
@@ -354,7 +375,17 @@ export default function AccessoryEdit() {
         <CardHeader><CardTitle className="text-base">Photos</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {isNew && <p className="text-xs text-muted-foreground">Save first to upload photos.</p>}
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (!isNew) setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            className={`grid grid-cols-3 sm:grid-cols-4 gap-3 p-2 rounded-md transition-colors ${
+              dragOver ? "bg-primary/10 ring-2 ring-primary ring-dashed" : ""
+            }`}
+          >
             {photos.map((p) => (
               <div key={p.id} className="relative aspect-square bg-secondary rounded overflow-hidden group">
                 {urls[p.storage_path] && (
@@ -368,11 +399,17 @@ export default function AccessoryEdit() {
                 </button>
               </div>
             ))}
-            <label className={`aspect-square border-2 border-dashed rounded flex items-center justify-center text-muted-foreground hover:bg-secondary cursor-pointer ${isNew ? "opacity-50 pointer-events-none" : ""}`}>
+            <label className={`aspect-square border-2 border-dashed rounded flex flex-col items-center justify-center gap-1 text-muted-foreground text-[10px] text-center px-1 hover:bg-secondary cursor-pointer ${isNew ? "opacity-50 pointer-events-none" : ""}`}>
               {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+              <span>Click or drop</span>
               <input type="file" multiple accept="image/*" hidden onChange={(e) => onUpload(e.target.files)} />
             </label>
           </div>
+          {!isNew && (
+            <p className="text-xs text-muted-foreground">
+              Tip: drag and drop images anywhere in the photo grid to upload.
+            </p>
+          )}
         </CardContent>
       </Card>
 
