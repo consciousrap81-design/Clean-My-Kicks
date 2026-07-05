@@ -70,6 +70,33 @@ export default function Products() {
     qc.invalidateQueries({ queryKey: ["admin-shop-products"] });
   }
 
+  async function changeCategory(p: any, next: "restored" | "new") {
+    if (p.category === next) return;
+    const prev = p.category;
+    const label = [p.brand, p.model].filter(Boolean).join(" ") || p.name;
+    const nextLabel = next === "restored" ? "Restored Kicks" : "Deadstock";
+    const { error } = await supabase
+      .from("shop_products")
+      .update({ category: next })
+      .eq("id", p.id);
+    if (error) return toast.error(error.message);
+    await qc.refetchQueries({ queryKey: ["admin-shop-products"] });
+    toast.success(`Moved ${label} to ${nextLabel}`, {
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          const { error: undoErr } = await supabase
+            .from("shop_products")
+            .update({ category: prev })
+            .eq("id", p.id);
+          if (undoErr) return toast.error(`Undo failed: ${undoErr.message}`);
+          await qc.refetchQueries({ queryKey: ["admin-shop-products"] });
+        },
+      },
+      duration: 6000,
+    });
+  }
+
   async function runPublish() {
     if (!pubConfirm) return;
     const ids = pubConfirm.ids;
