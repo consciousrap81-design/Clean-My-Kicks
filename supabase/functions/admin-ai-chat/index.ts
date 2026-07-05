@@ -151,7 +151,12 @@ function buildTools(actorId: string) {
     propose_action: tool({
       description: "Propose a write action (update product, send email, change price, publish, etc) for the admin to approve. The action is stored in the suggestions inbox and NOT executed until approved.",
       inputSchema: z.object({
-        kind: z.enum(["update_product", "publish_product", "rewrite_seo", "update_job_status", "send_customer_email", "create_promo", "price_change"]),
+        kind: z.enum([
+          "update_product", "publish_product", "rewrite_seo", "update_job_status",
+          "send_customer_email", "create_promo", "price_change",
+          "update_accessory", "publish_accessory",
+          "update_accessory_variant", "bulk_set_accessory_skus",
+        ]),
         title: z.string(),
         summary: z.string(),
         payload: z.record(z.string(), z.any()),
