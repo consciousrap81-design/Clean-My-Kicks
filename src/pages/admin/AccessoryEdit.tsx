@@ -349,7 +349,7 @@ export default function AccessoryEdit() {
           <div className="grid gap-2">
             <div className="flex items-center justify-between">
               <Label>Description</Label>
-              <Button type="button" size="sm" variant="outline" onClick={() => setPolishOpen(true)} disabled={!form.description.trim()}>
+              <Button type="button" size="sm" variant="outline" onClick={() => setPolishOpen(true)}>
                 <Sparkles className="h-3.5 w-3.5 mr-1" /> Polish with Kicks
               </Button>
             </div>
