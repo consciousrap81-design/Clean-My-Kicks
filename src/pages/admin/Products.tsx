@@ -449,8 +449,83 @@ export default function Products() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!catConfirm} onOpenChange={(o) => !o && !bulkBusy && setCatConfirm(null)}>
+        <AlertDialogContent
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !bulkBusy) {
+              e.preventDefault();
+              runBulkCategory();
+            }
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move category?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {catConfirm && (
+                <>
+                  Move <strong>{catConfirm.ids.length} product{catConfirm.ids.length === 1 ? "" : "s"}</strong>{" "}
+                  to <strong>{catConfirm.to === "restored" ? "Restored Kicks" : "Deadstock"}</strong>?
+                  <span className="block mt-2 text-xs">
+                    This is logged in the category history. You can undo from the toast.
+                  </span>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              autoFocus
+              onClick={(e) => { e.preventDefault(); runBulkCategory(); }}
+              disabled={bulkBusy}
+            >
+              <ArrowRightLeft className="w-4 h-4 mr-1" />
+              {bulkBusy ? "Moving…" : "Move now"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={!!historyFor} onOpenChange={(o) => !o && setHistoryFor(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Category history</DialogTitle>
+            <DialogDescription>{historyFor?.label}</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-auto text-sm">
+            {historyRows === null && <div className="text-muted-foreground">Loading…</div>}
+            {historyRows && historyRows.length === 0 && (
+              <div className="text-muted-foreground">No category changes recorded yet.</div>
+            )}
+            {historyRows && historyRows.length > 0 && (
+              <ul className="space-y-2">
+                {historyRows.map((r) => (
+                  <li key={r.id} className="border-b pb-2 last:border-0">
+                    <div>
+                      <span className="font-medium">
+                        {catLabel(r.from_category)} → {catLabel(r.to_category)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(r.created_at).toLocaleString()}
+                      {r.changed_by_email ? ` · by ${r.changed_by_email}` : ""}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+function catLabel(c: string | null) {
+  if (c === "restored") return "Restored Kicks";
+  if (c === "new") return "Deadstock";
+  return c ?? "—";
 }
 
 function StatusBadge({ status }: { status: string }) {
