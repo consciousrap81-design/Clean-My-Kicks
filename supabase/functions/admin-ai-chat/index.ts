@@ -38,6 +38,8 @@ function buildTools(actorId: string) {
     shop_orders: ["id","product_id","product_snapshot","user_id","customer_email","customer_name","shipping_address","amount","currency","status","stripe_session_id","stripe_payment_intent","tracking_number","tracking_carrier","paid_at","shipped_at","created_at","updated_at","review_request_sent_at","discount_cents","promo_code","shipping_method"],
     jobs: ["id","customer_id","service_id","shoe_brand","shoe_model","shoe_material","cleaning_guide_id","condition_notes","quoted_price","payment_status","status","intake_date","due_date","completion_date","admin_notes","lead_source_id","created_at","updated_at","user_id"],
     cleaning_guides: ["id","material","title","summary","recommended_chemicals","brush_stiffness","tools","steps","cautions","estimated_minutes","source","created_by","created_at","updated_at"],
+    shop_accessories: ["id","name","slug","description","category","base_price_cents","active","sort_order","created_at","updated_at"],
+    shop_accessory_variants: ["id","accessory_id","name","sku","price_cents_override","stock_qty","active","sort_order","created_at","updated_at"],
   };
   function schemaError(table: string, message: string) {
     // Parse `column <table>.<col> does not exist` from PostgREST/Postgres
