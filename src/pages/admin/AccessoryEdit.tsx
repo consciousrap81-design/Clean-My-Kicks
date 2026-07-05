@@ -39,6 +39,8 @@ export default function AccessoryEdit() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [dragOver, setDragOver] = useState(false);
+  // Files dropped/selected before the accessory has been saved for the first time.
+  const [pendingFiles, setPendingFiles] = useState<{ file: File; preview: string }[]>([]);
 
   const [form, setForm] = useState({
     name: "",
@@ -155,6 +157,18 @@ export default function AccessoryEdit() {
       }
 
       toast.success("Saved");
+
+      // If we queued photos before the first save, upload them now that we have an id.
+      if (pendingFiles.length) {
+        try {
+          await uploadFilesFor(accId, pendingFiles.map((p) => p.file));
+          pendingFiles.forEach((p) => URL.revokeObjectURL(p.preview));
+          setPendingFiles([]);
+        } catch (e: any) {
+          toast.error(`Photo upload failed: ${e.message || e}`);
+        }
+      }
+
       if (isNew) nav(`/admin/accessories/${accId}`);
     } catch (e: any) {
       toast.error(e.message || "Save failed");
@@ -163,30 +177,45 @@ export default function AccessoryEdit() {
     }
   }
 
+  async function uploadFilesFor(accId: string, files: File[]) {
+    let order = photos.length;
+    for (const file of files) {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `accessories/${accId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("shop-products").upload(path, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+      if (upErr) throw upErr;
+      const { data: row } = await supabase
+        .from("shop_accessory_photos")
+        .insert({ accessory_id: accId, storage_path: path, sort_order: order++ })
+        .select()
+        .single();
+      if (row) setPhotos((p) => [...p, row as Photo]);
+      const u = await signedPhotoUrls([path]);
+      setUrls((prev) => ({ ...prev, ...u }));
+    }
+  }
+
   async function onUpload(files: FileList | null) {
-    if (!files || !files.length || isNew) {
-      if (isNew) toast.error("Save first, then upload photos");
+    if (!files || !files.length) return;
+    const images = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (!images.length) return toast.error("Please choose image files");
+
+    // Before the accessory exists, just queue the files with local previews.
+    if (isNew) {
+      const queued = images.map((f) => ({ file: f, preview: URL.createObjectURL(f) }));
+      setPendingFiles((prev) => [...prev, ...queued]);
+      toast.success(
+        `${images.length} photo${images.length === 1 ? "" : "s"} queued — click Save to upload`,
+      );
       return;
     }
+
     setUploading(true);
     try {
-      for (const file of Array.from(files)) {
-        const ext = file.name.split(".").pop() || "jpg";
-        const path = `accessories/${id}/${crypto.randomUUID()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from("shop-products").upload(path, file, {
-          contentType: file.type,
-          upsert: false,
-        });
-        if (upErr) throw upErr;
-        const { data: row } = await supabase
-          .from("shop_accessory_photos")
-          .insert({ accessory_id: id, storage_path: path, sort_order: photos.length })
-          .select()
-          .single();
-        if (row) setPhotos((p) => [...p, row as Photo]);
-        const u = await signedPhotoUrls([path]);
-        setUrls((prev) => ({ ...prev, ...u }));
-      }
+      await uploadFilesFor(id!, images);
     } catch (e: any) {
       toast.error(e.message || "Upload failed");
     } finally {
@@ -200,13 +229,18 @@ export default function AccessoryEdit() {
     setPhotos((arr) => arr.filter((x) => x.id !== p.id));
   }
 
+  function removePending(idx: number) {
+    setPendingFiles((prev) => {
+      const clone = [...prev];
+      const [gone] = clone.splice(idx, 1);
+      if (gone) URL.revokeObjectURL(gone.preview);
+      return clone;
+    });
+  }
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragOver(false);
-    if (isNew) {
-      toast.error("Save first, then upload photos");
-      return;
-    }
     const files = e.dataTransfer.files;
     if (files && files.length) {
       const images = Array.from(files).filter((f) => f.type.startsWith("image/"));
