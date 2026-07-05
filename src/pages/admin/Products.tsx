@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { signedPhotoUrls } from "@/lib/shop";
 import { useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +36,7 @@ export default function Products() {
       const { data, error } = await supabase
         .from("shop_products")
         .select(
-          "id, name, brand, model, size, condition, description, price, status, view_count, reserved_until, sold_at, created_at, updated_at, shop_product_photos(storage_path, is_primary, sort_order)",
+          "id, name, brand, model, size, condition, description, price, status, category, view_count, reserved_until, sold_at, created_at, updated_at, shop_product_photos(storage_path, is_primary, sort_order)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -67,6 +68,33 @@ export default function Products() {
     if (error) return toast.error(error.message);
     toast.success("Deleted");
     qc.invalidateQueries({ queryKey: ["admin-shop-products"] });
+  }
+
+  async function changeCategory(p: any, next: "restored" | "new") {
+    if (p.category === next) return;
+    const prev = p.category;
+    const label = [p.brand, p.model].filter(Boolean).join(" ") || p.name;
+    const nextLabel = next === "restored" ? "Restored Kicks" : "Deadstock";
+    const { error } = await supabase
+      .from("shop_products")
+      .update({ category: next })
+      .eq("id", p.id);
+    if (error) return toast.error(error.message);
+    await qc.refetchQueries({ queryKey: ["admin-shop-products"] });
+    toast.success(`Moved ${label} to ${nextLabel}`, {
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          const { error: undoErr } = await supabase
+            .from("shop_products")
+            .update({ category: prev })
+            .eq("id", p.id);
+          if (undoErr) return toast.error(`Undo failed: ${undoErr.message}`);
+          await qc.refetchQueries({ queryKey: ["admin-shop-products"] });
+        },
+      },
+      duration: 6000,
+    });
   }
 
   async function runPublish() {
@@ -233,7 +261,21 @@ export default function Products() {
                     <span>· ${Number(p.price).toFixed(2)}</span>
                     <span className="inline-flex items-center gap-1"><Eye className="w-3 h-3" /> {p.view_count}</span>
                   </div>
-                  <div className="mt-1.5"><StatusBadge status={p.status} /></div>
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    <StatusBadge status={p.status} />
+                    <Select
+                      value={p.category ?? "restored"}
+                      onValueChange={(v) => changeCategory(p, v as "restored" | "new")}
+                    >
+                      <SelectTrigger className="h-7 w-[140px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="restored">Restored Kicks</SelectItem>
+                        <SelectItem value="new">Deadstock</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="flex gap-1">
                   {p.status === "draft" && (
