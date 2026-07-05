@@ -489,72 +489,103 @@ export default function AccessoryEdit() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Photos</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {isNew && (
-            <p className="text-xs text-muted-foreground">
-              Drop or choose photos now — they'll upload when you click Save.
-            </p>
-          )}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            className={`grid grid-cols-3 sm:grid-cols-4 gap-3 p-2 rounded-md transition-colors ${
-              dragOver ? "bg-primary/10 ring-2 ring-primary ring-dashed" : ""
-            }`}
-          >
-            {photos.map((p) => (
-              <div key={p.id} className="relative aspect-square bg-secondary rounded overflow-hidden group">
-                {urls[p.storage_path] && (
-                  <img src={urls[p.storage_path]} alt="" className="w-full h-full object-cover" />
+      {!isNew && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Photos</CardTitle></CardHeader>
+          <CardContent>
+            {photos.length > 0 && (
+              <p className="text-xs text-muted-foreground mb-2">
+                Drag to reorder. Click the <Star className="inline w-3 h-3 mx-0.5" /> to set the <strong>cover photo</strong>.
+              </p>
+            )}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+              {photos.map((p) => (
+                <div
+                  key={p.id}
+                  draggable
+                  onDragStart={() => setDragId(p.id)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => onDrop(p.id)}
+                  className={`relative aspect-square bg-secondary rounded-lg overflow-hidden border cursor-move transition ${dragId === p.id ? "opacity-50 ring-2 ring-primary" : ""}`}
+                >
+                  <div className="absolute top-1 right-1 bg-background/80 rounded p-1 pointer-events-none">
+                    <GripVertical className="w-3 h-3 text-muted-foreground" />
+                  </div>
+                  {urls[p.storage_path] && (
+                    <img src={urls[p.storage_path]} alt="" className="w-full h-full object-contain p-1" />
+                  )}
+                  {p.is_primary && (
+                    <span className="absolute top-1 left-1 bg-primary text-primary-foreground text-[10px] uppercase px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                      <Star className="w-2.5 h-2.5 fill-current" /> Cover
+                    </span>
+                  )}
+                  <div className="absolute bottom-1 right-1 flex gap-1">
+                    {!p.is_primary && (
+                      <Button size="icon" variant="secondary" className="h-7 w-7" title="Set as cover photo" onClick={() => setPrimary(p.id)}>
+                        <Star className="w-3 h-3" />
+                      </Button>
+                    )}
+                    <Button size="icon" variant="destructive" className="h-7 w-7" onClick={() => delPhoto(p)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {reordering && (
+              <p className="text-xs text-muted-foreground mb-2 inline-flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Saving order…
+              </p>
+            )}
+            <label
+              onDragEnter={(e) => { e.preventDefault(); if (!dragId) setDropActive(true); }}
+              onDragOver={(e) => { e.preventDefault(); if (!dragId) setDropActive(true); }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                setDropActive(false);
+              }}
+              onDrop={onPhotoDrop}
+              className={`block cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition ${
+                dropActive ? "border-primary bg-primary/10" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-secondary/40"
+              } ${uploading ? "pointer-events-none opacity-70" : ""}`}
+            >
+              <input type="file" accept="image/*" multiple className="hidden" onChange={onUpload} disabled={uploading} />
+              <div className="flex flex-col items-center gap-2">
+                {uploading ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                ) : (
+                  <Upload className="w-6 h-6 text-muted-foreground" />
                 )}
-                <button
-                  onClick={() => removePhoto(p)}
-                  className="absolute top-1 right-1 bg-background/80 rounded p-1 opacity-0 group-hover:opacity-100 transition"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                </button>
+                <div className="text-sm font-medium">
+                  {uploading ? "Uploading…" : dropActive ? "Drop photos to upload" : "Drag & drop photos here, or click to browse"}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Photos are automatically resized to 1920px and compressed for fast loading.
+                </p>
               </div>
-            ))}
-            {pendingFiles.map((pf, i) => (
-              <div
-                key={`pending-${i}`}
-                className="relative aspect-square bg-secondary rounded overflow-hidden group ring-1 ring-dashed ring-primary/60"
-                title="Queued — uploads on Save"
-              >
-                <img src={pf.preview} alt="" className="w-full h-full object-cover" />
-                <span className="absolute bottom-1 left-1 bg-background/80 text-[9px] uppercase tracking-wide px-1 rounded">
-                  Queued
-                </span>
-                <button
-                  onClick={() => removePending(i)}
-                  className="absolute top-1 right-1 bg-background/80 rounded p-1 opacity-0 group-hover:opacity-100 transition"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                </button>
-              </div>
-            ))}
-            <label className="aspect-square border-2 border-dashed rounded flex flex-col items-center justify-center gap-1 text-muted-foreground text-[10px] text-center px-1 hover:bg-secondary cursor-pointer">
-              {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-              <span>Click or drop</span>
-              <input type="file" multiple accept="image/*" hidden onChange={(e) => onUpload(e.target.files)} />
             </label>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Tip: drag and drop images anywhere in the photo grid to upload.
-          </p>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      <div className="flex gap-2 sticky bottom-0 bg-background py-3 border-t">
+      <div className="flex flex-wrap gap-2 sticky bottom-0 bg-background py-3 border-t">
         <Button onClick={save} disabled={saving}>
-          {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Save
+          {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} {isNew ? "Create Accessory" : "Save Changes"}
         </Button>
+        {!isNew && (
+          <>
+            <Button asChild variant="outline">
+              <a href={`/shop`} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-4 h-4 mr-2" /> Preview on Shop
+              </a>
+            </Button>
+            {!form.active && (
+              <Button variant="default" onClick={publishNow} disabled={saving}>
+                <Rocket className="w-4 h-4 mr-2" /> Publish Now
+              </Button>
+            )}
+          </>
+        )}
         <Button variant="outline" onClick={() => nav("/admin/accessories")}>Cancel</Button>
       </div>
     </div>
