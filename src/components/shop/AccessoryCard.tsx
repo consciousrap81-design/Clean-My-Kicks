@@ -30,7 +30,7 @@ export type AccessoryRow = {
   category: string;
   base_price_cents: number;
   shop_accessory_variants: Variant[];
-  shop_accessory_photos: { storage_path: string; sort_order: number }[];
+  shop_accessory_photos: { storage_path: string; sort_order: number; is_primary?: boolean }[];
 };
 
 function fmt(cents: number) {
@@ -55,7 +55,10 @@ export default function AccessoryCard({ acc }: { acc: AccessoryRow }) {
     () =>
       (acc.shop_accessory_photos || [])
         .slice()
-        .sort((a, b) => a.sort_order - b.sort_order),
+        .sort(
+          (a, b) =>
+            (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0) || a.sort_order - b.sort_order,
+        ),
     [acc.shop_accessory_photos],
   );
   const photoPath = sortedPhotos[0]?.storage_path ?? null;
