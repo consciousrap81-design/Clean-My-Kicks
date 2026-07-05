@@ -16,6 +16,7 @@ import PolishDescriptionDialog from "@/components/admin/PolishDescriptionDialog"
 import { Sparkles } from "lucide-react";
 
 type Photo = { id: string; storage_path: string; is_primary: boolean; sort_order: number };
+type BeforePhoto = { id: string; storage_path: string; sort_order: number };
 
 export default function ProductEdit() {
   const { id } = useParams<{ id: string }>();
@@ -24,11 +25,15 @@ export default function ProductEdit() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [beforePhotos, setBeforePhotos] = useState<BeforePhoto[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [dragId, setDragId] = useState<string | null>(null);
+  const [beforeDragId, setBeforeDragId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [polishOpen, setPolishOpen] = useState(false);
   const [dropActive, setDropActive] = useState(false);
+  const [beforeDropActive, setBeforeDropActive] = useState(false);
+  const [beforeUploading, setBeforeUploading] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -103,7 +108,17 @@ export default function ProductEdit() {
       }
     }
     setPhotos(ph);
-    const u = await signedPhotoUrls(ph.map((p) => p.storage_path));
+    const { data: bp } = await supabase
+      .from("shop_product_before_photos")
+      .select("id, storage_path, sort_order")
+      .eq("product_id", id!)
+      .order("sort_order", { ascending: true });
+    const before = (bp ?? []) as BeforePhoto[];
+    setBeforePhotos(before);
+    const u = await signedPhotoUrls([
+      ...ph.map((p) => p.storage_path),
+      ...before.map((b) => b.storage_path),
+    ]);
     setUrls(u);
   }
 
@@ -212,6 +227,96 @@ export default function ProductEdit() {
     if (dragId) return; // reordering existing photos, not a file drop
     const files = Array.from(e.dataTransfer.files ?? []);
     if (files.length) await uploadFiles(files);
+  }
+
+  // ---------- Before photos ----------
+  async function uploadBeforeFiles(files: File[]) {
+    if (isNew) {
+      toast.error("Save the product first");
+      return;
+    }
+    if (!files.length) return;
+    const images = files.filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+    if (!images.length) {
+      toast.error("Only image files are supported");
+      return;
+    }
+    setBeforeUploading(true);
+    try {
+      const maxSort = beforePhotos.reduce((m, p) => Math.max(m, p.sort_order), -1);
+      for (let i = 0; i < images.length; i++) {
+        const f = await prepareProductPhoto(images[i]);
+        const path = `${id}/before/${crypto.randomUUID()}.jpg`;
+        const { error: upErr } = await supabase.storage.from("shop-products").upload(path, f, { upsert: false });
+        if (upErr) throw upErr;
+        const { error: insErr } = await supabase.from("shop_product_before_photos").insert({
+          product_id: id!,
+          storage_path: path,
+          sort_order: maxSort + 1 + i,
+        });
+        if (insErr) throw insErr;
+      }
+      await loadPhotos();
+      toast.success(`Uploaded ${images.length} before photo${images.length === 1 ? "" : "s"}`);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setBeforeUploading(false);
+    }
+  }
+
+  async function onBeforeUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    await uploadBeforeFiles(files);
+    e.target.value = "";
+  }
+
+  async function onBeforePhotoDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setBeforeDropActive(false);
+    if (beforeDragId) return;
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length) await uploadBeforeFiles(files);
+  }
+
+  async function delBeforePhoto(p: BeforePhoto) {
+    if (!confirm("Delete this before photo?")) return;
+    await supabase.storage.from("shop-products").remove([p.storage_path]);
+    await supabase.from("shop_product_before_photos").delete().eq("id", p.id);
+    await loadPhotos();
+  }
+
+  async function persistBeforeOrder(list: BeforePhoto[]) {
+    setReordering(true);
+    try {
+      setBeforePhotos(list.map((p, idx) => ({ ...p, sort_order: idx })));
+      await Promise.all(
+        list.map((p, idx) =>
+          supabase.from("shop_product_before_photos").update({ sort_order: idx }).eq("id", p.id),
+        ),
+      );
+      toast.success("Before photo order saved");
+    } catch (e: any) {
+      toast.error(e.message);
+      await loadPhotos();
+    } finally {
+      setReordering(false);
+    }
+  }
+
+  async function onBeforeDrop(targetId: string) {
+    if (!beforeDragId || beforeDragId === targetId) {
+      setBeforeDragId(null);
+      return;
+    }
+    const from = beforePhotos.findIndex((p) => p.id === beforeDragId);
+    const to = beforePhotos.findIndex((p) => p.id === targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...beforePhotos];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setBeforeDragId(null);
+    await persistBeforeOrder(next);
   }
 
   async function setPrimary(photoId: string) {
@@ -465,6 +570,75 @@ export default function ProductEdit() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Photos are automatically resized to 1920px and compressed for fast loading.
+                </p>
+              </div>
+            </label>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isNew && form.category === "restored" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Before restoration photos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground mb-3">
+              These show shoppers the shoe <strong>before</strong> you cleaned it. On the product page, each before photo pairs with the after photo in the same position — so the <strong>1st before</strong> matches the <strong>1st after</strong>, <strong>2nd</strong> with <strong>2nd</strong>, and so on. Drag to reorder.
+            </p>
+            {beforePhotos.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                {beforePhotos.map((p, i) => (
+                  <div
+                    key={p.id}
+                    draggable
+                    onDragStart={() => setBeforeDragId(p.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => onBeforeDrop(p.id)}
+                    className={`relative aspect-square bg-secondary rounded-lg overflow-hidden border cursor-move transition ${beforeDragId === p.id ? "opacity-50 ring-2 ring-primary" : ""}`}
+                  >
+                    <div className="absolute top-1 right-1 bg-background/80 rounded p-1 pointer-events-none">
+                      <GripVertical className="w-3 h-3 text-muted-foreground" />
+                    </div>
+                    {urls[p.storage_path] && (
+                      <img src={urls[p.storage_path]} alt="" className="w-full h-full object-contain p-1" />
+                    )}
+                    <span className="absolute top-1 left-1 bg-background/85 border border-border text-[10px] uppercase px-1.5 py-0.5 rounded">
+                      Before #{i + 1}
+                    </span>
+                    <div className="absolute bottom-1 right-1 flex gap-1">
+                      <Button size="icon" variant="destructive" className="h-7 w-7" onClick={() => delBeforePhoto(p)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label
+              onDragEnter={(e) => { e.preventDefault(); if (!beforeDragId) setBeforeDropActive(true); }}
+              onDragOver={(e) => { e.preventDefault(); if (!beforeDragId) setBeforeDropActive(true); }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                setBeforeDropActive(false);
+              }}
+              onDrop={onBeforePhotoDrop}
+              className={`block cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition ${
+                beforeDropActive ? "border-primary bg-primary/10" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-secondary/40"
+              } ${beforeUploading ? "pointer-events-none opacity-70" : ""}`}
+            >
+              <input type="file" accept="image/*" multiple className="hidden" onChange={onBeforeUpload} disabled={beforeUploading} />
+              <div className="flex flex-col items-center gap-2">
+                {beforeUploading ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                ) : (
+                  <Upload className="w-6 h-6 text-muted-foreground" />
+                )}
+                <div className="text-sm font-medium">
+                  {beforeUploading ? "Uploading…" : beforeDropActive ? "Drop before photos to upload" : "Drag & drop before photos here, or click to browse"}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Try to match the angle of each after photo so the slider comparison looks natural.
                 </p>
               </div>
             </label>
