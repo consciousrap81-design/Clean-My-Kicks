@@ -250,8 +250,12 @@ export default function Products() {
     });
   }
 
+  const allIds = (products || []).map((p: any) => p.id);
   const draftIds = (products || []).filter((p: any) => p.status === "draft").map((p: any) => p.id);
-  const allDraftsSelected = draftIds.length > 0 && draftIds.every((id: string) => selected.has(id));
+  const allSelected = allIds.length > 0 && allIds.every((id: string) => selected.has(id));
+  const selectedArr = Array.from(selected);
+  const allSelectedAreDrafts =
+    selectedArr.length > 0 && selectedArr.every((id) => draftIds.includes(id));
 
   async function restoreStaged() {
     if (!confirm("Recreate the 3 previously staged draft products?")) return;
