@@ -261,7 +261,21 @@ export default function Products() {
                     <span>· ${Number(p.price).toFixed(2)}</span>
                     <span className="inline-flex items-center gap-1"><Eye className="w-3 h-3" /> {p.view_count}</span>
                   </div>
-                  <div className="mt-1.5"><StatusBadge status={p.status} /></div>
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    <StatusBadge status={p.status} />
+                    <Select
+                      value={p.category ?? "restored"}
+                      onValueChange={(v) => changeCategory(p, v as "restored" | "new")}
+                    >
+                      <SelectTrigger className="h-7 w-[140px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="restored">Restored Kicks</SelectItem>
+                        <SelectItem value="new">Deadstock</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="flex gap-1">
                   {p.status === "draft" && (
