@@ -1,36 +1,48 @@
-# Investigation: missing accessory on homepage
+# Before / After photos for Restored Kicks
 
-## What I found
+Add a second photo track ("before" photos) on Restored Kicks products, uploaded from the admin editor and shown on the public product page as a draggable slider that wipes between the restored (after) and original (before) shots.
 
-- Database is fine. `shop_accessories` still has **"Premium Cleaning Kit"** (active, $5.00, Default variant with stock 10). Nothing was deleted or deactivated.
-- The homepage Shop section (`src/components/Shop.tsx`, rendered inside `src/pages/Index.tsx`) only ever queried the `shop_products` table (restored sneakers). It has **no code path that reads `shop_accessories`** — never has, per chat history and the current file.
-- Accessories are only rendered on the standalone `/shop` page (`src/pages/Shop.tsx`), which has an "Accessories" section below the sneaker grid using `AccessoryCard`.
+## Scope
 
-So no accessory was removed from the homepage in the recent changes — there was no accessory block on `/` to begin with. What you're remembering is almost certainly the `/shop` page.
+- Restored Kicks only. New Kicks keep the current single gallery.
+- Shop grid and homepage stay unchanged — surprise reveal happens on the product detail page.
 
-## Proposal: add an accessories teaser to the homepage
+## Admin (ProductEdit)
 
-Mirror the existing "restored kicks" pattern so accessories are also promoted on `/`.
+- When category = `restored`, show a second photo section titled **"Before restoration photos"** below the existing Photos card.
+  - Same drag-and-drop uploader as the current one.
+  - Same reorder + delete controls. No "cover" concept — before photos don't have a primary.
+  - Each before photo pairs with the after photo of the same sort_order for the slider; first before ↔ first after, etc. If counts differ, extras are shown as regular thumbnails below the slider.
+- When category = `new`, the section is hidden.
 
-### Scope (frontend only)
-- Edit `src/components/Shop.tsx`:
-  - Add a second query alongside the existing `shop_products` + `sold` loads:
-    ```ts
-    supabase
-      .from("shop_accessories")
-      .select("id, name, slug, description, category, base_price_cents, shop_accessory_variants(id, name, stock_qty, active, price_cents_override, sort_order), shop_accessory_photos(storage_path, sort_order)")
-      .eq("active", true)
-      .order("created_at", { ascending: false })
-      .limit(3)
-    ```
-  - Add realtime subscription on `shop_accessories` + `shop_accessory_variants` (same channel).
-  - Below the sneaker grid, render a compact "Accessories" subsection: heading + 2–3 col grid reusing `AccessoryCard` (already handles photo signing, variant picker, quantity, add-to-cart, and the details dialog). Only render when `accessories.length > 0`.
-  - Keep the existing "Shop all pairs →" CTA; add nothing else.
+## Public product page
 
-### Out of scope
-- No changes to `/shop` page, `AccessoryCard`, cart, backend, RLS, storage rules, or `shop_products` logic.
+- New **BeforeAfterSlider** component: single image stage, draggable vertical handle. Right side = after (restored), left side = before. Handle draggable via mouse/touch, keyboard accessible (arrow keys move handle 5% at a time, aria-label "Compare before and after").
+- Placement: replaces the top of the gallery when at least one before photo exists. Under it: a small label "Drag to compare — before / after". Thumbnails strip below still switches between all after photos; when the active after photo has a matching before, the slider is shown, otherwise the plain image.
+- Fullscreen dialog: adds a "Show before" toggle instead of the slider (simpler on mobile).
 
-### Files touched
-- `src/components/Shop.tsx` (only)
+## Data model
 
-If you'd rather I just confirm the investigation and leave the homepage alone, say the word and I'll skip the edit.
+New table `shop_product_before_photos` (mirrors `shop_product_photos` minus `is_primary`):
+- `product_id` (fk → shop_products, cascade delete)
+- `storage_path`, `sort_order`
+- RLS: public SELECT for photos of `available`/`sold` products; admin full access. Grants: `anon`/`authenticated` SELECT, `service_role` ALL, admin write via existing `has_role('admin')` pattern.
+- Storage: reuse existing `shop-products` bucket, path prefix `${productId}/before/…`.
+
+## Technical details
+
+- Files touched:
+  - `supabase/migrations/…` — new table, grants, RLS policies.
+  - `src/lib/shop.ts` — add `BeforePhoto` type + fetch helper.
+  - `src/pages/admin/ProductEdit.tsx` — second uploader/gallery, gated on `form.category === "restored"`.
+  - `src/components/shop/BeforeAfterSlider.tsx` — new component (pointer + touch drag, keyboard nudge, clip-path or width overlay).
+  - `src/components/shop/ProductGallery.tsx` — accept optional `beforeSlides`, render slider when the active index has a match.
+  - `src/pages/ProductDetail.tsx` — load before photos, pass to gallery.
+- Pairing rule: index-based (sort_order aligned). Documented in the admin section so the shop owner knows drag order controls which pair matches.
+- No changes to shop grid, homepage, or Shop.tsx.
+
+## Out of scope
+
+- Hover reveal on shop cards.
+- AI auto-alignment of before/after crops.
+- Side-by-side layout option (can add later if slider isn't enough).

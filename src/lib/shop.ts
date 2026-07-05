@@ -62,6 +62,21 @@ export type ReservationStatus = {
   reserved_by_me: boolean;
 };
 
+export type BeforePhoto = {
+  id: string;
+  storage_path: string;
+  sort_order: number;
+};
+
+export async function fetchBeforePhotos(productId: string): Promise<BeforePhoto[]> {
+  const { data } = await supabase
+    .from("shop_product_before_photos")
+    .select("id, storage_path, sort_order")
+    .eq("product_id", productId)
+    .order("sort_order", { ascending: true });
+  return (data ?? []) as BeforePhoto[];
+}
+
 /**
  * Fetch reservation status (held / by-me) for a batch of products without
  * exposing the underlying reserved_session_id.

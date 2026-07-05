@@ -2,19 +2,31 @@ import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, Expand, ZoomIn, ZoomOut, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import BeforeAfterSlider from "./BeforeAfterSlider";
 
 type Slide = { id: string; url: string | undefined };
 
-export default function ProductGallery({ slides, alt }: { slides: Slide[]; alt: string }) {
+export default function ProductGallery({
+  slides,
+  alt,
+  beforeSlides = [],
+}: {
+  slides: Slide[];
+  alt: string;
+  beforeSlides?: Slide[];
+}) {
   const [idx, setIdx] = useState(0);
   const [hoverZoom, setHoverZoom] = useState(false);
   const [pos, setPos] = useState({ x: 50, y: 50 });
   const [fullscreen, setFullscreen] = useState(false);
   const [fsZoom, setFsZoom] = useState(1);
+  const [fsShowBefore, setFsShowBefore] = useState(false);
   const stageRef = useRef<HTMLDivElement | null>(null);
 
   const total = slides.length;
   const active = slides[idx];
+  const activeBefore = beforeSlides[idx];
+  const hasBefore = !!(active?.url && activeBefore?.url);
 
   const next = () => setIdx((i) => (i + 1) % Math.max(total, 1));
   const prev = () => setIdx((i) => (i - 1 + Math.max(total, 1)) % Math.max(total, 1));
@@ -44,6 +56,9 @@ export default function ProductGallery({ slides, alt }: { slides: Slide[]; alt: 
 
   return (
     <div>
+      {hasBefore ? (
+        <BeforeAfterSlider beforeUrl={activeBefore!.url!} afterUrl={active!.url!} alt={alt} />
+      ) : (
       <div
         ref={stageRef}
         className="relative aspect-square bg-secondary rounded-xl overflow-hidden group cursor-zoom-in"
@@ -107,6 +122,7 @@ export default function ProductGallery({ slides, alt }: { slides: Slide[]; alt: 
           </div>
         )}
       </div>
+      )}
 
       {total > 1 && (
         <div className="mt-3 grid grid-cols-5 gap-2">
@@ -122,6 +138,9 @@ export default function ProductGallery({ slides, alt }: { slides: Slide[]; alt: 
               )}
             >
               {s.url && <img src={s.url} alt="" className="w-full h-full object-contain p-1" />}
+              {beforeSlides[i]?.url && (
+                <span className="sr-only">Includes before photo</span>
+              )}
             </button>
           ))}
         </div>
@@ -155,6 +174,15 @@ export default function ProductGallery({ slides, alt }: { slides: Slide[]; alt: 
               <ZoomIn className="w-5 h-5" />
             </button>
             <span className="text-white/70 text-xs self-center px-2">{Math.round(fsZoom * 100)}%</span>
+            {hasBefore && (
+              <button
+                type="button"
+                onClick={() => setFsShowBefore((v) => !v)}
+                className="text-white text-xs uppercase tracking-wider bg-white/10 hover:bg-white/20 rounded-full px-3 py-1.5 border border-white/20"
+              >
+                {fsShowBefore ? "Show after" : "Show before"}
+              </button>
+            )}
           </div>
 
           {total > 1 && (
@@ -179,10 +207,10 @@ export default function ProductGallery({ slides, alt }: { slides: Slide[]; alt: 
           )}
 
           <div className="w-full h-full overflow-auto flex items-center justify-center">
-            {active?.url && (
+            {(fsShowBefore && hasBefore ? activeBefore?.url : active?.url) && (
               <img
-                src={active.url}
-                alt={alt}
+                src={fsShowBefore && hasBefore ? activeBefore!.url! : active!.url!}
+                alt={fsShowBefore ? `${alt} — before restoration` : alt}
                 style={{ transform: `scale(${fsZoom})`, transition: "transform 0.15s" }}
                 className="max-w-full max-h-full object-contain select-none"
                 onClick={() => setFsZoom((z) => (z >= 2 ? 1 : z + 1))}

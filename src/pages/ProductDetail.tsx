@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Seo from "@/components/Seo";
-import { getShopSessionId, signedPhotoUrls, SHOP_PRODUCT_PUBLIC_COLS, fetchReservationStatus, type ShopProduct } from "@/lib/shop";
+import { getShopSessionId, signedPhotoUrls, SHOP_PRODUCT_PUBLIC_COLS, fetchReservationStatus, fetchBeforePhotos, type ShopProduct, type BeforePhoto } from "@/lib/shop";
 import ReviewsSection from "@/components/shop/ReviewsSection";
 import ReactMarkdown from "react-markdown";
 import ProductGallery from "@/components/shop/ProductGallery";
@@ -24,6 +24,7 @@ export default function ProductDetail() {
   const [search] = useSearchParams();
   const [product, setProduct] = useState<ShopProduct | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [beforePhotos, setBeforePhotos] = useState<BeforePhoto[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [viewers, setViewers] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -47,11 +48,16 @@ export default function ProductDetail() {
         .eq("product_id", id)
         .order("is_primary", { ascending: false })
         .order("sort_order", { ascending: true });
+      const before = (p as any)?.category === "restored" ? await fetchBeforePhotos(id!) : [];
       if (!mounted) return;
       setProduct(p as any);
       const photos = (ph ?? []) as Photo[];
       setPhotos(photos);
-      const u = await signedPhotoUrls(photos.map((p) => p.storage_path));
+      setBeforePhotos(before);
+      const u = await signedPhotoUrls([
+        ...photos.map((p) => p.storage_path),
+        ...before.map((b) => b.storage_path),
+      ]);
       if (mounted) {
         setUrls(u);
         setLoading(false);
@@ -141,6 +147,7 @@ export default function ProductDetail() {
   const canBuy = !isSold && (!isReserved || reservedByMe);
   const ogImage = photos[0] ? urls[photos[0].storage_path] : undefined;
   const slides = photos.map((p) => ({ id: p.id, url: urls[p.storage_path] }));
+  const beforeSlides = beforePhotos.map((b) => ({ id: b.id, url: urls[b.storage_path] }));
   const shareUrl = typeof window !== "undefined" ? window.location.href : `https://cleanmykicks.com/shop/${product.id}`;
   const showUrgency = !isSold && (viewers > 1 || (product.view_count ?? 0) >= 10);
   const priceUsd = ((product as any).price_cents ?? 0) / 100;
@@ -191,7 +198,7 @@ export default function ProductDetail() {
 
         <div className="grid md:grid-cols-2 gap-8 md:gap-12">
           {/* Gallery */}
-          <ProductGallery slides={slides} alt={display} />
+          <ProductGallery slides={slides} alt={display} beforeSlides={beforeSlides} />
 
           {/* Details */}
           <div>
