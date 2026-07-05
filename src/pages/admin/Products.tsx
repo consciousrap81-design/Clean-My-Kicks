@@ -291,24 +291,51 @@ export default function Products() {
         </div>
       </div>
 
-      {draftIds.length > 0 && (
+      {allIds.length > 0 && (
         <Card>
           <CardContent className="p-3 flex flex-wrap items-center gap-3 justify-between">
             <div className="flex items-center gap-2 text-sm">
               <Checkbox
-                checked={allDraftsSelected}
-                onCheckedChange={(c) =>
-                  setSelected(c ? new Set(draftIds) : new Set())
-                }
+                checked={allSelected}
+                onCheckedChange={(c) => setSelected(c ? new Set(allIds) : new Set())}
               />
-              <span>Select all drafts ({draftIds.length})</span>
+              <span>Select all ({allIds.length})</span>
               {selected.size > 0 && (
                 <span className="text-muted-foreground">· {selected.size} selected</span>
               )}
             </div>
-            <Button size="sm" onClick={askPublishSelected} disabled={bulkBusy || selected.size === 0}>
-              <Rocket className="w-4 h-4 mr-1" /> Publish Selected
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => askBulkCategory("restored")}
+                disabled={bulkBusy || selected.size === 0}
+                title="Move selected products to Restored Kicks"
+              >
+                <ArrowRightLeft className="w-4 h-4 mr-1" /> Move to Restored
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => askBulkCategory("new")}
+                disabled={bulkBusy || selected.size === 0}
+                title="Move selected products to Deadstock"
+              >
+                <ArrowRightLeft className="w-4 h-4 mr-1" /> Move to Deadstock
+              </Button>
+              <Button
+                size="sm"
+                onClick={askPublishSelected}
+                disabled={bulkBusy || selected.size === 0 || !allSelectedAreDrafts}
+                title={
+                  !allSelectedAreDrafts && selected.size > 0
+                    ? "Only draft products can be published"
+                    : "Publish selected drafts"
+                }
+              >
+                <Rocket className="w-4 h-4 mr-1" /> Publish Selected
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -328,12 +355,10 @@ export default function Products() {
           return (
             <Card key={p.id}>
               <CardContent className="p-3 md:p-4 flex items-center gap-3">
-                {p.status === "draft" && (
-                  <Checkbox
-                    checked={selected.has(p.id)}
-                    onCheckedChange={() => toggleSel(p.id)}
-                  />
-                )}
+                <Checkbox
+                  checked={selected.has(p.id)}
+                  onCheckedChange={() => toggleSel(p.id)}
+                />
                 <div className="w-16 h-16 md:w-20 md:h-20 bg-secondary rounded-lg overflow-hidden shrink-0">
                   {img && <img src={img} alt={display} className="w-full h-full object-contain p-1" />}
                 </div>
@@ -374,6 +399,9 @@ export default function Products() {
                   </Button>
                   <Button asChild variant="ghost" size="icon">
                     <Link to={`/admin/products/${p.id}`}><Pencil className="w-4 h-4" /></Link>
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => openHistory(p)} title="Category history">
+                    <History className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="icon" onClick={() => del(p.id)}>
                     <Trash2 className="w-4 h-4" />
