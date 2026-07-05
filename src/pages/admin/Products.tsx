@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { signedPhotoUrls } from "@/lib/shop";
 import { useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +36,7 @@ export default function Products() {
       const { data, error } = await supabase
         .from("shop_products")
         .select(
-          "id, name, brand, model, size, condition, description, price, status, view_count, reserved_until, sold_at, created_at, updated_at, shop_product_photos(storage_path, is_primary, sort_order)",
+          "id, name, brand, model, size, condition, description, price, status, category, view_count, reserved_until, sold_at, created_at, updated_at, shop_product_photos(storage_path, is_primary, sort_order)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
