@@ -1699,6 +1699,44 @@ export type Database = {
           },
         ]
       }
+      shop_product_category_history: {
+        Row: {
+          changed_by: string | null
+          changed_by_email: string | null
+          created_at: string
+          from_category: string | null
+          id: string
+          product_id: string
+          to_category: string
+        }
+        Insert: {
+          changed_by?: string | null
+          changed_by_email?: string | null
+          created_at?: string
+          from_category?: string | null
+          id?: string
+          product_id: string
+          to_category: string
+        }
+        Update: {
+          changed_by?: string | null
+          changed_by_email?: string | null
+          created_at?: string
+          from_category?: string | null
+          id?: string
+          product_id?: string
+          to_category?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_product_category_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shop_product_photos: {
         Row: {
           created_at: string

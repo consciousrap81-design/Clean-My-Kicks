@@ -5,12 +5,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Plus, Pencil, Trash2, RotateCcw, Rocket, ExternalLink } from "lucide-react";
+import { Eye, Plus, Pencil, Trash2, RotateCcw, Rocket, ExternalLink, History, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { signedPhotoUrls } from "@/lib/shop";
 import { useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +36,9 @@ export default function Products() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [pubConfirm, setConfirm] = useState<{ ids: string[]; label: string } | null>(null);
+  const [catConfirm, setCatConfirm] = useState<{ ids: string[]; to: "restored" | "new" } | null>(null);
+  const [historyFor, setHistoryFor] = useState<{ id: string; label: string } | null>(null);
+  const [historyRows, setHistoryRows] = useState<any[] | null>(null);
 
   const { data: products } = useQuery({
     queryKey: ["admin-shop-products"],
@@ -95,6 +105,76 @@ export default function Products() {
       },
       duration: 6000,
     });
+  }
+
+  async function runBulkCategory() {
+    if (!catConfirm) return;
+    const { ids, to } = catConfirm;
+    setBulkBusy(true);
+    try {
+      // Capture previous categories for undo
+      const prevMap = new Map<string, string>();
+      (products || []).forEach((p: any) => {
+        if (ids.includes(p.id)) prevMap.set(p.id, p.category ?? "restored");
+      });
+      const { data: updated, error } = await supabase
+        .from("shop_products")
+        .update({ category: to })
+        .in("id", ids)
+        .select("id");
+      if (error) throw error;
+      const okIds = (updated || []).map((r: any) => r.id as string);
+      const failed = ids.length - okIds.length;
+      setSelected(new Set());
+      await qc.refetchQueries({ queryKey: ["admin-shop-products"] });
+      const toLabel = to === "restored" ? "Restored Kicks" : "Deadstock";
+      if (failed > 0) toast.error(`${failed} of ${ids.length} could not be moved.`);
+      if (okIds.length) {
+        toast.success(`Moved ${okIds.length} product${okIds.length === 1 ? "" : "s"} to ${toLabel}`, {
+          action: {
+            label: "Undo",
+            onClick: async () => {
+              for (const pid of okIds) {
+                const prev = prevMap.get(pid);
+                if (!prev) continue;
+                await supabase.from("shop_products").update({ category: prev }).eq("id", pid);
+              }
+              await qc.refetchQueries({ queryKey: ["admin-shop-products"] });
+              toast.success("Category move reverted");
+            },
+          },
+          duration: 8000,
+        });
+      }
+    } catch (e: any) {
+      toast.error(`Move failed: ${e.message}`);
+    } finally {
+      setBulkBusy(false);
+      setCatConfirm(null);
+    }
+  }
+
+  function askBulkCategory(to: "restored" | "new") {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    setCatConfirm({ ids, to });
+  }
+
+  async function openHistory(p: any) {
+    const label = [p.brand, p.model].filter(Boolean).join(" ") || p.name;
+    setHistoryFor({ id: p.id, label });
+    setHistoryRows(null);
+    const { data, error } = await supabase
+      .from("shop_product_category_history")
+      .select("id, from_category, to_category, changed_by_email, created_at")
+      .eq("product_id", p.id)
+      .order("created_at", { ascending: false });
+    if (error) {
+      toast.error(error.message);
+      setHistoryRows([]);
+      return;
+    }
+    setHistoryRows(data || []);
   }
 
   async function runPublish() {
@@ -170,8 +250,12 @@ export default function Products() {
     });
   }
 
+  const allIds = (products || []).map((p: any) => p.id);
   const draftIds = (products || []).filter((p: any) => p.status === "draft").map((p: any) => p.id);
-  const allDraftsSelected = draftIds.length > 0 && draftIds.every((id: string) => selected.has(id));
+  const allSelected = allIds.length > 0 && allIds.every((id: string) => selected.has(id));
+  const selectedArr = Array.from(selected);
+  const allSelectedAreDrafts =
+    selectedArr.length > 0 && selectedArr.every((id) => draftIds.includes(id));
 
   async function restoreStaged() {
     if (!confirm("Recreate the 3 previously staged draft products?")) return;
@@ -207,24 +291,51 @@ export default function Products() {
         </div>
       </div>
 
-      {draftIds.length > 0 && (
+      {allIds.length > 0 && (
         <Card>
           <CardContent className="p-3 flex flex-wrap items-center gap-3 justify-between">
             <div className="flex items-center gap-2 text-sm">
               <Checkbox
-                checked={allDraftsSelected}
-                onCheckedChange={(c) =>
-                  setSelected(c ? new Set(draftIds) : new Set())
-                }
+                checked={allSelected}
+                onCheckedChange={(c) => setSelected(c ? new Set(allIds) : new Set())}
               />
-              <span>Select all drafts ({draftIds.length})</span>
+              <span>Select all ({allIds.length})</span>
               {selected.size > 0 && (
                 <span className="text-muted-foreground">· {selected.size} selected</span>
               )}
             </div>
-            <Button size="sm" onClick={askPublishSelected} disabled={bulkBusy || selected.size === 0}>
-              <Rocket className="w-4 h-4 mr-1" /> Publish Selected
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => askBulkCategory("restored")}
+                disabled={bulkBusy || selected.size === 0}
+                title="Move selected products to Restored Kicks"
+              >
+                <ArrowRightLeft className="w-4 h-4 mr-1" /> Move to Restored
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => askBulkCategory("new")}
+                disabled={bulkBusy || selected.size === 0}
+                title="Move selected products to Deadstock"
+              >
+                <ArrowRightLeft className="w-4 h-4 mr-1" /> Move to Deadstock
+              </Button>
+              <Button
+                size="sm"
+                onClick={askPublishSelected}
+                disabled={bulkBusy || selected.size === 0 || !allSelectedAreDrafts}
+                title={
+                  !allSelectedAreDrafts && selected.size > 0
+                    ? "Only draft products can be published"
+                    : "Publish selected drafts"
+                }
+              >
+                <Rocket className="w-4 h-4 mr-1" /> Publish Selected
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -244,12 +355,10 @@ export default function Products() {
           return (
             <Card key={p.id}>
               <CardContent className="p-3 md:p-4 flex items-center gap-3">
-                {p.status === "draft" && (
-                  <Checkbox
-                    checked={selected.has(p.id)}
-                    onCheckedChange={() => toggleSel(p.id)}
-                  />
-                )}
+                <Checkbox
+                  checked={selected.has(p.id)}
+                  onCheckedChange={() => toggleSel(p.id)}
+                />
                 <div className="w-16 h-16 md:w-20 md:h-20 bg-secondary rounded-lg overflow-hidden shrink-0">
                   {img && <img src={img} alt={display} className="w-full h-full object-contain p-1" />}
                 </div>
@@ -290,6 +399,9 @@ export default function Products() {
                   </Button>
                   <Button asChild variant="ghost" size="icon">
                     <Link to={`/admin/products/${p.id}`}><Pencil className="w-4 h-4" /></Link>
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => openHistory(p)} title="Category history">
+                    <History className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="icon" onClick={() => del(p.id)}>
                     <Trash2 className="w-4 h-4" />
@@ -337,8 +449,83 @@ export default function Products() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!catConfirm} onOpenChange={(o) => !o && !bulkBusy && setCatConfirm(null)}>
+        <AlertDialogContent
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !bulkBusy) {
+              e.preventDefault();
+              runBulkCategory();
+            }
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move category?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {catConfirm && (
+                <>
+                  Move <strong>{catConfirm.ids.length} product{catConfirm.ids.length === 1 ? "" : "s"}</strong>{" "}
+                  to <strong>{catConfirm.to === "restored" ? "Restored Kicks" : "Deadstock"}</strong>?
+                  <span className="block mt-2 text-xs">
+                    This is logged in the category history. You can undo from the toast.
+                  </span>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              autoFocus
+              onClick={(e) => { e.preventDefault(); runBulkCategory(); }}
+              disabled={bulkBusy}
+            >
+              <ArrowRightLeft className="w-4 h-4 mr-1" />
+              {bulkBusy ? "Moving…" : "Move now"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={!!historyFor} onOpenChange={(o) => !o && setHistoryFor(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Category history</DialogTitle>
+            <DialogDescription>{historyFor?.label}</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-auto text-sm">
+            {historyRows === null && <div className="text-muted-foreground">Loading…</div>}
+            {historyRows && historyRows.length === 0 && (
+              <div className="text-muted-foreground">No category changes recorded yet.</div>
+            )}
+            {historyRows && historyRows.length > 0 && (
+              <ul className="space-y-2">
+                {historyRows.map((r) => (
+                  <li key={r.id} className="border-b pb-2 last:border-0">
+                    <div>
+                      <span className="font-medium">
+                        {catLabel(r.from_category)} → {catLabel(r.to_category)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(r.created_at).toLocaleString()}
+                      {r.changed_by_email ? ` · by ${r.changed_by_email}` : ""}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+function catLabel(c: string | null) {
+  if (c === "restored") return "Restored Kicks";
+  if (c === "new") return "Deadstock";
+  return c ?? "—";
 }
 
 function StatusBadge({ status }: { status: string }) {
