@@ -25,7 +25,7 @@ export default function Accessories() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("shop_accessories")
-        .select("*, shop_accessory_variants(id, stock_qty, active), shop_accessory_photos(storage_path, sort_order)")
+        .select("*, shop_accessory_variants(id, stock_qty, active), shop_accessory_photos(storage_path, sort_order, is_primary)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];
@@ -35,7 +35,7 @@ export default function Accessories() {
   useEffect(() => {
     if (!items) return;
     const paths = (items as any[])
-      .map((a) => (a.shop_accessory_photos ?? []).slice().sort((x: any, y: any) => x.sort_order - y.sort_order)[0]?.storage_path)
+      .map((a) => (a.shop_accessory_photos ?? []).slice().sort((x: any, y: any) => (y.is_primary ? 1 : 0) - (x.is_primary ? 1 : 0) || x.sort_order - y.sort_order)[0]?.storage_path)
       .filter(Boolean);
     signedPhotoUrls(paths).then(setUrls);
   }, [items]);
@@ -75,7 +75,7 @@ export default function Accessories() {
           </Card>
         )}
         {(items || []).map((a: any) => {
-          const ph = (a.shop_accessory_photos ?? []).slice().sort((x: any, y: any) => x.sort_order - y.sort_order);
+          const ph = (a.shop_accessory_photos ?? []).slice().sort((x: any, y: any) => (y.is_primary ? 1 : 0) - (x.is_primary ? 1 : 0) || x.sort_order - y.sort_order);
           const img = ph[0]?.storage_path ? urls[ph[0].storage_path] : null;
           const totalStock = (a.shop_accessory_variants ?? [])
             .filter((v: any) => v.active)

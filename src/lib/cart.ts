@@ -107,7 +107,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       variantIds.length
         ? supabase
             .from("shop_accessory_variants")
-            .select("id, name, sku, stock_qty, active, accessory_id, shop_accessories!inner(id, name, slug, active, shop_accessory_photos(storage_path, sort_order))")
+            .select("id, name, sku, stock_qty, active, accessory_id, shop_accessories!inner(id, name, slug, active, shop_accessory_photos(storage_path, sort_order, is_primary))")
             .in("id", variantIds)
         : Promise.resolve({ data: [] as any[] }),
     ]);
@@ -165,7 +165,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
           return { ...row, display_name: "Removed item", available: false, unavailable_reason: "Removed", photo_path: null };
         }
         const acc = v.shop_accessories;
-        const photos = (acc?.shop_accessory_photos ?? []).slice().sort((a: any, b: any) => a.sort_order - b.sort_order);
+        const photos = (acc?.shop_accessory_photos ?? [])
+          .slice()
+          .sort((a: any, b: any) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0) || a.sort_order - b.sort_order);
         const inStock = v.active && v.stock_qty > 0;
         const variantLabel = v.name && v.name !== "Default" ? v.name : null;
         const subtitleParts = [variantLabel, v.sku ? `SKU ${v.sku}` : null].filter(Boolean);

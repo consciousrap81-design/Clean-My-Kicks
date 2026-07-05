@@ -1384,6 +1384,7 @@ export type Database = {
           accessory_id: string
           created_at: string
           id: string
+          is_primary: boolean
           sort_order: number
           storage_path: string
         }
@@ -1391,6 +1392,7 @@ export type Database = {
           accessory_id: string
           created_at?: string
           id?: string
+          is_primary?: boolean
           sort_order?: number
           storage_path: string
         }
@@ -1398,6 +1400,7 @@ export type Database = {
           accessory_id?: string
           created_at?: string
           id?: string
+          is_primary?: boolean
           sort_order?: number
           storage_path?: string
         }
