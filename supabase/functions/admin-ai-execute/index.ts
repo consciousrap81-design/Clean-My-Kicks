@@ -414,6 +414,14 @@ async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
       ? `Price updated to $${Number(target.updates.price).toFixed(2)}`
       : target.table === "shop_products" && target.updates.status === "available"
       ? `Published product`
+      : target.table === "shop_accessories" && target.updates.active === true
+      ? `Published accessory`
+      : target.table === "shop_accessory_variants" && typeof target.updates.sku === "string"
+      ? `Set SKU to ${target.updates.sku}`
+      : target.table === "shop_accessory_variants"
+      ? `Updated accessory variant`
+      : target.table === "shop_accessories"
+      ? `Updated accessory`
       : `Updated ${target.table}`;
     return { ok: true, history_id: historyId, message: friendly };
   } catch (e) {
