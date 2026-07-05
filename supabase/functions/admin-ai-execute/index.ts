@@ -47,6 +47,8 @@ const ACTIONABLE_KINDS = new Set([
   "publish_product", "pricing_idea", "restock_alert", "follow_up_request",
   "update_product", "price_change", "update_job_status",
   "create_promo", "marketing_idea", "content_idea",
+  "update_accessory", "publish_accessory",
+  "update_accessory_variant", "bulk_set_accessory_skus",
 ]);
 
 function resolveTarget(kind: string, payload: any): Target {
@@ -74,6 +76,18 @@ function resolveTarget(kind: string, payload: any): Target {
     case "update_job_status":
       if (payload?.job_id && payload?.status)
         return { table: "jobs", id: payload.job_id, updates: { status: payload.status } };
+      return null;
+    case "update_accessory":
+      if (payload?.accessory_id && payload?.updates && typeof payload.updates === "object")
+        return { table: "shop_accessories", id: payload.accessory_id, updates: payload.updates };
+      return null;
+    case "publish_accessory":
+      if (payload?.accessory_id)
+        return { table: "shop_accessories", id: payload.accessory_id, updates: { active: true } };
+      return null;
+    case "update_accessory_variant":
+      if (payload?.variant_id && payload?.updates && typeof payload.updates === "object")
+        return { table: "shop_accessory_variants", id: payload.variant_id, updates: payload.updates };
       return null;
     default:
       return null;
