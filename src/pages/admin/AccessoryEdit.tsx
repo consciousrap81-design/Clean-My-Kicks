@@ -39,6 +39,8 @@ export default function AccessoryEdit() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [dragOver, setDragOver] = useState(false);
+  // Files dropped/selected before the accessory has been saved for the first time.
+  const [pendingFiles, setPendingFiles] = useState<{ file: File; preview: string }[]>([]);
 
   const [form, setForm] = useState({
     name: "",
@@ -155,6 +157,18 @@ export default function AccessoryEdit() {
       }
 
       toast.success("Saved");
+
+      // If we queued photos before the first save, upload them now that we have an id.
+      if (pendingFiles.length) {
+        try {
+          await uploadFilesFor(accId, pendingFiles.map((p) => p.file));
+          pendingFiles.forEach((p) => URL.revokeObjectURL(p.preview));
+          setPendingFiles([]);
+        } catch (e: any) {
+          toast.error(`Photo upload failed: ${e.message || e}`);
+        }
+      }
+
       if (isNew) nav(`/admin/accessories/${accId}`);
     } catch (e: any) {
       toast.error(e.message || "Save failed");
@@ -163,30 +177,45 @@ export default function AccessoryEdit() {
     }
   }
 
+  async function uploadFilesFor(accId: string, files: File[]) {
+    let order = photos.length;
+    for (const file of files) {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `accessories/${accId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("shop-products").upload(path, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+      if (upErr) throw upErr;
+      const { data: row } = await supabase
+        .from("shop_accessory_photos")
+        .insert({ accessory_id: accId, storage_path: path, sort_order: order++ })
+        .select()
+        .single();
+      if (row) setPhotos((p) => [...p, row as Photo]);
+      const u = await signedPhotoUrls([path]);
+      setUrls((prev) => ({ ...prev, ...u }));
+    }
+  }
+
   async function onUpload(files: FileList | null) {
-    if (!files || !files.length || isNew) {
-      if (isNew) toast.error("Save first, then upload photos");
+    if (!files || !files.length) return;
+    const images = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (!images.length) return toast.error("Please choose image files");
+
+    // Before the accessory exists, just queue the files with local previews.
+    if (isNew) {
+      const queued = images.map((f) => ({ file: f, preview: URL.createObjectURL(f) }));
+      setPendingFiles((prev) => [...prev, ...queued]);
+      toast.success(
+        `${images.length} photo${images.length === 1 ? "" : "s"} queued — click Save to upload`,
+      );
       return;
     }
+
     setUploading(true);
     try {
-      for (const file of Array.from(files)) {
-        const ext = file.name.split(".").pop() || "jpg";
-        const path = `accessories/${id}/${crypto.randomUUID()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from("shop-products").upload(path, file, {
-          contentType: file.type,
-          upsert: false,
-        });
-        if (upErr) throw upErr;
-        const { data: row } = await supabase
-          .from("shop_accessory_photos")
-          .insert({ accessory_id: id, storage_path: path, sort_order: photos.length })
-          .select()
-          .single();
-        if (row) setPhotos((p) => [...p, row as Photo]);
-        const u = await signedPhotoUrls([path]);
-        setUrls((prev) => ({ ...prev, ...u }));
-      }
+      await uploadFilesFor(id!, images);
     } catch (e: any) {
       toast.error(e.message || "Upload failed");
     } finally {
@@ -200,13 +229,18 @@ export default function AccessoryEdit() {
     setPhotos((arr) => arr.filter((x) => x.id !== p.id));
   }
 
+  function removePending(idx: number) {
+    setPendingFiles((prev) => {
+      const clone = [...prev];
+      const [gone] = clone.splice(idx, 1);
+      if (gone) URL.revokeObjectURL(gone.preview);
+      return clone;
+    });
+  }
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragOver(false);
-    if (isNew) {
-      toast.error("Save first, then upload photos");
-      return;
-    }
     const files = e.dataTransfer.files;
     if (files && files.length) {
       const images = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -374,11 +408,15 @@ export default function AccessoryEdit() {
       <Card>
         <CardHeader><CardTitle className="text-base">Photos</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          {isNew && <p className="text-xs text-muted-foreground">Save first to upload photos.</p>}
+          {isNew && (
+            <p className="text-xs text-muted-foreground">
+              Drop or choose photos now — they'll upload when you click Save.
+            </p>
+          )}
           <div
             onDragOver={(e) => {
               e.preventDefault();
-              if (!isNew) setDragOver(true);
+              setDragOver(true);
             }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
@@ -399,17 +437,33 @@ export default function AccessoryEdit() {
                 </button>
               </div>
             ))}
-            <label className={`aspect-square border-2 border-dashed rounded flex flex-col items-center justify-center gap-1 text-muted-foreground text-[10px] text-center px-1 hover:bg-secondary cursor-pointer ${isNew ? "opacity-50 pointer-events-none" : ""}`}>
+            {pendingFiles.map((pf, i) => (
+              <div
+                key={`pending-${i}`}
+                className="relative aspect-square bg-secondary rounded overflow-hidden group ring-1 ring-dashed ring-primary/60"
+                title="Queued — uploads on Save"
+              >
+                <img src={pf.preview} alt="" className="w-full h-full object-cover" />
+                <span className="absolute bottom-1 left-1 bg-background/80 text-[9px] uppercase tracking-wide px-1 rounded">
+                  Queued
+                </span>
+                <button
+                  onClick={() => removePending(i)}
+                  className="absolute top-1 right-1 bg-background/80 rounded p-1 opacity-0 group-hover:opacity-100 transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                </button>
+              </div>
+            ))}
+            <label className="aspect-square border-2 border-dashed rounded flex flex-col items-center justify-center gap-1 text-muted-foreground text-[10px] text-center px-1 hover:bg-secondary cursor-pointer">
               {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
               <span>Click or drop</span>
               <input type="file" multiple accept="image/*" hidden onChange={(e) => onUpload(e.target.files)} />
             </label>
           </div>
-          {!isNew && (
-            <p className="text-xs text-muted-foreground">
-              Tip: drag and drop images anywhere in the photo grid to upload.
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground">
+            Tip: drag and drop images anywhere in the photo grid to upload.
+          </p>
         </CardContent>
       </Card>
 
