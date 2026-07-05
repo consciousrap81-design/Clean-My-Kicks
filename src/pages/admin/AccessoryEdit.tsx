@@ -408,11 +408,15 @@ export default function AccessoryEdit() {
       <Card>
         <CardHeader><CardTitle className="text-base">Photos</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          {isNew && <p className="text-xs text-muted-foreground">Save first to upload photos.</p>}
+          {isNew && (
+            <p className="text-xs text-muted-foreground">
+              Drop or choose photos now — they'll upload when you click Save.
+            </p>
+          )}
           <div
             onDragOver={(e) => {
               e.preventDefault();
-              if (!isNew) setDragOver(true);
+              setDragOver(true);
             }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
@@ -433,17 +437,33 @@ export default function AccessoryEdit() {
                 </button>
               </div>
             ))}
-            <label className={`aspect-square border-2 border-dashed rounded flex flex-col items-center justify-center gap-1 text-muted-foreground text-[10px] text-center px-1 hover:bg-secondary cursor-pointer ${isNew ? "opacity-50 pointer-events-none" : ""}`}>
+            {pendingFiles.map((pf, i) => (
+              <div
+                key={`pending-${i}`}
+                className="relative aspect-square bg-secondary rounded overflow-hidden group ring-1 ring-dashed ring-primary/60"
+                title="Queued — uploads on Save"
+              >
+                <img src={pf.preview} alt="" className="w-full h-full object-cover" />
+                <span className="absolute bottom-1 left-1 bg-background/80 text-[9px] uppercase tracking-wide px-1 rounded">
+                  Queued
+                </span>
+                <button
+                  onClick={() => removePending(i)}
+                  className="absolute top-1 right-1 bg-background/80 rounded p-1 opacity-0 group-hover:opacity-100 transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                </button>
+              </div>
+            ))}
+            <label className="aspect-square border-2 border-dashed rounded flex flex-col items-center justify-center gap-1 text-muted-foreground text-[10px] text-center px-1 hover:bg-secondary cursor-pointer">
               {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
               <span>Click or drop</span>
               <input type="file" multiple accept="image/*" hidden onChange={(e) => onUpload(e.target.files)} />
             </label>
           </div>
-          {!isNew && (
-            <p className="text-xs text-muted-foreground">
-              Tip: drag and drop images anywhere in the photo grid to upload.
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground">
+            Tip: drag and drop images anywhere in the photo grid to upload.
+          </p>
         </CardContent>
       </Card>
 
