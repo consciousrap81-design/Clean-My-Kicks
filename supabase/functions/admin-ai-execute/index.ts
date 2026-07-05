@@ -47,6 +47,8 @@ const ACTIONABLE_KINDS = new Set([
   "publish_product", "pricing_idea", "restock_alert", "follow_up_request",
   "update_product", "price_change", "update_job_status",
   "create_promo", "marketing_idea", "content_idea",
+  "update_accessory", "publish_accessory",
+  "update_accessory_variant", "bulk_set_accessory_skus",
 ]);
 
 function resolveTarget(kind: string, payload: any): Target {
@@ -74,6 +76,18 @@ function resolveTarget(kind: string, payload: any): Target {
     case "update_job_status":
       if (payload?.job_id && payload?.status)
         return { table: "jobs", id: payload.job_id, updates: { status: payload.status } };
+      return null;
+    case "update_accessory":
+      if (payload?.accessory_id && payload?.updates && typeof payload.updates === "object")
+        return { table: "shop_accessories", id: payload.accessory_id, updates: payload.updates };
+      return null;
+    case "publish_accessory":
+      if (payload?.accessory_id)
+        return { table: "shop_accessories", id: payload.accessory_id, updates: { active: true } };
+      return null;
+    case "update_accessory_variant":
+      if (payload?.variant_id && payload?.updates && typeof payload.updates === "object")
+        return { table: "shop_accessory_variants", id: payload.variant_id, updates: payload.updates };
       return null;
     default:
       return null;
@@ -176,6 +190,41 @@ Do NOT render any words, letters, numbers, logos, or signage in the image.`;
 
 async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
   const payload = sug.payload ?? {};
+
+  // Bulk SKU / variant updates — multi-row, so it can't ride resolveTarget's single-row path.
+  if (sug.kind === "bulk_set_accessory_skus") {
+    const updates = Array.isArray(payload?.updates) ? payload.updates : [];
+    const clean = updates.filter((u: any) => u?.variant_id && typeof u?.sku === "string");
+    if (clean.length === 0) {
+      const err = "bulk_set_accessory_skus requires payload.updates = [{ variant_id, sku }, ...]";
+      await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: err } }).eq("id", sug.id);
+      return { ok: false, error: err };
+    }
+    const ids = clean.map((u: any) => u.variant_id);
+    const before = await a.from("shop_accessory_variants").select("id,sku").in("id", ids);
+    const beforeMap = Object.fromEntries((before.data ?? []).map((r: any) => [r.id, r.sku]));
+    const results: any[] = [];
+    for (const u of clean) {
+      const { error: e } = await a.from("shop_accessory_variants").update({ sku: u.sku }).eq("id", u.variant_id);
+      results.push({ variant_id: u.variant_id, sku: u.sku, ok: !e, error: e?.message });
+    }
+    const failures = results.filter((r) => !r.ok);
+    const h = await a.from("ai_change_history").insert({
+      suggestion_id: sug.id, actor: userId, kind: sug.kind,
+      table_name: "shop_accessory_variants", record_id: null,
+      before_state: { skus: beforeMap },
+      after_state: { updates: clean, failures },
+    }).select("id").single();
+    if (failures.length === clean.length) {
+      await a.from("ai_suggestions").update({ status: "failed", payload: { ...payload, error: "All SKU updates failed", results } }).eq("id", sug.id);
+      return { ok: false, history_id: h.data?.id, error: "All SKU updates failed", results };
+    }
+    await a.from("ai_suggestions").update({ status: "applied", resolved_at: new Date().toISOString() }).eq("id", sug.id);
+    await a.from("ai_audit_log").insert({ actor: userId, tool: `apply:${sug.kind}`, input: payload, output: { history_id: h.data?.id, results }, approved: true });
+    await a.from("ai_feedback").insert({ suggestion_id: sug.id, actor: userId, action: "applied", kind: sug.kind, suggestion_snapshot: { title: sug.title, summary: sug.summary, payload: sug.payload } });
+    const okCount = results.length - failures.length;
+    return { ok: true, history_id: h.data?.id, message: `Set SKUs on ${okCount}/${results.length} variant${results.length === 1 ? "" : "s"}${failures.length ? ` (${failures.length} failed)` : ""}` };
+  }
 
   // Marketing / content ideas → draft a social post + create a reminder.
   if (sug.kind === "marketing_idea" || sug.kind === "content_idea") {
@@ -365,6 +414,14 @@ async function applyOne(a: ReturnType<typeof admin>, userId: string, sug: any) {
       ? `Price updated to $${Number(target.updates.price).toFixed(2)}`
       : target.table === "shop_products" && target.updates.status === "available"
       ? `Published product`
+      : target.table === "shop_accessories" && target.updates.active === true
+      ? `Published accessory`
+      : target.table === "shop_accessory_variants" && typeof target.updates.sku === "string"
+      ? `Set SKU to ${target.updates.sku}`
+      : target.table === "shop_accessory_variants"
+      ? `Updated accessory variant`
+      : target.table === "shop_accessories"
+      ? `Updated accessory`
       : `Updated ${target.table}`;
     return { ok: true, history_id: historyId, message: friendly };
   } catch (e) {

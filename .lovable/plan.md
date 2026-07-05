@@ -1,43 +1,49 @@
-## Bring Accessory editor to parity with the Product editor
+# Why she couldn't do it
 
-Match the accessory editor (`/admin/accessories/:id`) to the product editor (`/admin/products/:id`) so the description polish, drag-and-drop photo uploader, photo reorder, and cover-photo controls all work the same way. Skip only the pieces that are genuinely sneaker-specific.
+Your admin AI ("Kicks") only knows about the **restored kicks / dead stock** catalog (`shop_products`). She has zero tools pointed at the **accessories** catalog (`shop_accessories` + `shop_accessory_variants`), and SKUs on accessories actually live on the **variant** rows (each color/size/style of an accessory has its own SKU). That's why she said she couldn't find a category — from her side of the fence, accessories literally don't exist as a thing she can search or edit.
 
-## What gets added on accessories
+The one exception already wired up is `restock_accessory_variant` (used to bump stock), but there's nothing for searching accessories, viewing variants, or changing a SKU / price / active flag.
 
-- **Polish with Kicks** button next to the Description field — opens the same `PolishDescriptionDialog` used on products (accepts optional product context, so brand/model/size aren't required).
-- **Big drag-and-drop photo zone** — same look and behavior as products: click to browse OR drop files anywhere in the drop zone.
-- **Auto-compression** — accessory uploads go through the same `prepareProductPhoto` helper (resize to 1920px, convert to JPEG). Currently they upload the raw file at full size.
-- **Drag-to-reorder** — grab-and-drop tiles to change photo order, with an optimistic UI and a "Saving order…" indicator, matching products.
-- **Cover photo** — a Star toggle on each tile marks that photo as the cover; the shop grid + product-style card use it first. Requires adding an `is_primary boolean` column to `shop_accessory_photos` (default false; auto-set to true on the first uploaded photo so existing accessories still show a cover).
-- **Public-page preview block** — same dashed-border preview above the Save button, showing the accessory name and price the way it appears on `/shop`.
-- **Make Active button** — one-click equivalent of "Publish Now": when the accessory is saved and `active = false`, a primary button flips it to `active = true` (accessories don't have draft/available/archived — active toggle is their publish switch, so this just surfaces it more prominently).
-- **Kept as-is on accessories**: variants + stock (accessory-specific), category dropdown (cleaning kit / laces / etc.), the existing Active switch inside the form.
+# What to add
 
-## What is NOT copied over (intentionally)
+Bring accessories to full parity with products in the AI's toolbelt.
 
-- **Sneaker templates** ("Start from template" Jordan/Nike catalog) — has no meaning for accessories.
-- **Before/after restoration photos** — Restored Kicks only.
-- **Product-specific fields** (brand/model/size/condition/status enum) — accessories don't use them.
+## 1. Read tools (direct-execute, no approval)
 
-## Files touched
+In `admin-ai-chat`:
+- `search_accessories` — search `shop_accessories` by name/category, returns id, name, category, base price, active.
+- `get_accessory` — full accessory record + all its variants (id, name, SKU, stock, price override, active, sort_order) + photos.
+- `list_accessory_variants` — variants for a given accessory, for quick SKU/stock audits.
 
-- Migration: add `is_primary boolean NOT NULL DEFAULT false` to `public.shop_accessory_photos` and backfill the first-by-`sort_order` photo of every existing accessory as its cover. No RLS changes.
-- `src/integrations/supabase/types.ts` will regenerate after the migration.
-- `src/pages/admin/AccessoryEdit.tsx`:
-  - Replace the current small photo grid + queued-files flow with the product-editor's photo card (big drop zone, drag reorder, cover star, delete). The "upload before save" queueing added earlier will be removed — accessories, like products, will require saving first before uploading photos (this matches the universal behavior you asked for and avoids the buggy pending-upload path).
-  - Add the Polish button + `PolishDescriptionDialog` above the Description textarea.
-  - Add the public-page preview block and the "Make Active" primary button.
-- `src/components/shop/AccessoryCard.tsx` + `src/pages/Shop.tsx`: when picking the display image, prefer `is_primary === true`, then fall back to lowest `sort_order` (so nothing breaks for accessories without a cover set yet).
-- No changes to the Polish edge function — `product` is already an optional loose object.
+## 2. Write actions (propose_action → admin approves in inbox)
 
-## Technical notes
+New proposal kinds routed through `admin-ai-execute`:
+- `update_accessory` → updates `shop_accessories` (name, description, category, base_price_cents, active).
+- `publish_accessory` → sets `shop_accessories.active = true`.
+- `update_accessory_variant` → updates a single `shop_accessory_variants` row (SKU, stock_qty, price_cents_override, active, name).
+- `bulk_set_accessory_skus` → convenience for "set SKUs on all variants of accessory X" (array of { variant_id, sku }); expands to per-row updates.
 
-- Photo card, uploader, drag-reorder handlers, and drop-zone JSX will be lifted from `ProductEdit.tsx` and adapted for `shop_accessory_photos` (swap table name, storage-path prefix stays `accessories/${id}/…`).
-- `prepareProductPhoto` is already generic and works for any image; no changes needed.
-- `PolishDescriptionDialog` accepts an optional `product` prop — for accessories we'll pass `{ name, price }` (brand/model/size/condition omitted).
-- Cover backfill is a one-time UPDATE using a lateral join to pick each accessory's lowest `sort_order` photo.
+`resolveTarget` in `admin-ai-execute/index.ts` gets new cases for each kind, matching the existing `shop_products` pattern. `ACTIONABLE_KINDS` extended with the new kinds so the approval → apply path runs.
 
-## Out of scope
+## 3. Schema hints + system prompt
 
-- Adding a dedicated public detail page for accessories (they still render inline on `/shop`). "Preview on Shop" is therefore skipped for accessories — clicking the shop link would just open the shop grid.
-- Adding a full draft/available/archived enum to accessories. The existing `active` boolean already gates visibility; the new "Make Active" button just makes toggling it a single, obvious action.
+- Add `shop_accessories` and `shop_accessory_variants` to the `KNOWN_COLUMNS` map in `admin-ai-chat` so schema-drift errors stay clear.
+- Add a paragraph to the Kicks system prompt explaining that the shop has **two catalogs**: (a) `shop_products` = restored kicks + dead stock, SKU-less, one row per shoe; (b) `shop_accessories` = cleaning kits / laces / buckles, where **SKU lives on the variant row**, not the accessory itself. Tell her to use `search_accessories` / `list_accessory_variants` when the admin asks about accessory SKUs, prices, or stock.
+
+## 4. No frontend or DB changes
+
+No new migrations, no UI changes. The accessory tables and SKU column already exist and admin edit screens already show them — this is purely giving the AI the tools + vocabulary to reach them.
+
+# Files touched
+
+- `supabase/functions/admin-ai-chat/index.ts` — new tools + KNOWN_COLUMNS entries + system prompt note.
+- `supabase/functions/admin-ai-execute/index.ts` — new cases in `resolveTarget` + `ACTIONABLE_KINDS`.
+
+# After this ships
+
+You'll be able to say things like:
+- "Kicks, set the SKU on the white 45in laces to LACE-WHT-45"
+- "What's the stock on the premium cleaning kit variants?"
+- "Publish the buckle accessory"
+
+…and she'll actually find them and propose the change for your approval, same as she does today for restored kicks.
