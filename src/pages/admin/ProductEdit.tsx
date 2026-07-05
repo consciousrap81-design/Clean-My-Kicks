@@ -28,6 +28,7 @@ export default function ProductEdit() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [polishOpen, setPolishOpen] = useState(false);
+  const [dropActive, setDropActive] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -162,18 +163,22 @@ export default function ProductEdit() {
     }
   }
 
-  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function uploadFiles(files: File[]) {
     if (isNew) {
       toast.error("Save the product first");
       return;
     }
-    const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
+    const images = files.filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+    if (!images.length) {
+      toast.error("Only image files are supported");
+      return;
+    }
     setUploading(true);
     try {
       const maxSort = photos.reduce((m, p) => Math.max(m, p.sort_order), -1);
-      for (let i = 0; i < files.length; i++) {
-        const original = files[i];
+      for (let i = 0; i < images.length; i++) {
+        const original = images[i];
         const f = await prepareProductPhoto(original);
         const path = `${id}/${crypto.randomUUID()}.jpg`;
         const { error: upErr } = await supabase.storage.from("shop-products").upload(path, f, { upsert: false });
@@ -187,13 +192,26 @@ export default function ProductEdit() {
         if (insErr) throw insErr;
       }
       await loadPhotos();
-      toast.success(`Uploaded ${files.length} photo${files.length === 1 ? "" : "s"}`);
+      toast.success(`Uploaded ${images.length} photo${images.length === 1 ? "" : "s"}`);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       setUploading(false);
-      e.target.value = "";
     }
+  }
+
+  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    await uploadFiles(files);
+    e.target.value = "";
+  }
+
+  async function onPhotoDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDropActive(false);
+    if (dragId) return; // reordering existing photos, not a file drop
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length) await uploadFiles(files);
   }
 
   async function setPrimary(photoId: string) {
@@ -423,18 +441,33 @@ export default function ProductEdit() {
                 <Loader2 className="w-3 h-3 animate-spin" /> Saving order…
               </p>
             )}
-            <label className="inline-flex items-center gap-2 cursor-pointer">
+            <label
+              onDragEnter={(e) => { e.preventDefault(); if (!dragId) setDropActive(true); }}
+              onDragOver={(e) => { e.preventDefault(); if (!dragId) setDropActive(true); }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                setDropActive(false);
+              }}
+              onDrop={onPhotoDrop}
+              className={`block cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition ${
+                dropActive ? "border-primary bg-primary/10" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-secondary/40"
+              } ${uploading ? "pointer-events-none opacity-70" : ""}`}
+            >
               <input type="file" accept="image/*" multiple className="hidden" onChange={onUpload} disabled={uploading} />
-              <Button asChild disabled={uploading}>
-                <span>
-                  {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-                  Upload Photos
-                </span>
-              </Button>
+              <div className="flex flex-col items-center gap-2">
+                {uploading ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                ) : (
+                  <Upload className="w-6 h-6 text-muted-foreground" />
+                )}
+                <div className="text-sm font-medium">
+                  {uploading ? "Uploading…" : dropActive ? "Drop photos to upload" : "Drag & drop photos here, or click to browse"}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Photos are automatically resized to 1920px and compressed for fast loading.
+                </p>
+              </div>
             </label>
-            <p className="text-xs text-muted-foreground mt-2">
-              Photos are automatically resized to 1920px and compressed for fast loading.
-            </p>
           </CardContent>
         </Card>
       )}
